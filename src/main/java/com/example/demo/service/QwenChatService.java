@@ -7,7 +7,8 @@ import static dev.langchain4j.service.spring.AiServiceWiringMode.EXPLICIT;
 
 @AiService(
         wiringMode = EXPLICIT,
-        chatModel = "qwen")
+        chatModel = "chatModel",
+        streamingChatModel = "streamingChatModel")
 public interface QwenChatService {
     /**
      * 流式聊天

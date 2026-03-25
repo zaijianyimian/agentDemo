@@ -10,7 +10,7 @@ description = 'demo'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(17)
     }
 }
 
@@ -25,12 +25,24 @@ repositories {
 }
 
 dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // Source: https://mvnrepository.com/artifact/dev.langchain4j/langchain4j-qdrant
+    implementation 'dev.langchain4j:langchain4j-qdrant:1.12.2-beta22'
+    // Qdrant Client (升级到 1.17.0 以匹配服务器版本)
+    implementation 'io.qdrant:client:1.17.0'
+    // gRPC 和 Protobuf 依赖
+    implementation 'io.grpc:grpc-netty-shaded:1.69.0'
+    implementation 'io.grpc:grpc-protobuf:1.69.0'
+    implementation 'io.grpc:grpc-stub:1.69.0'
+    implementation 'com.google.protobuf:protobuf-java:3.25.5'
     // Source: https://mvnrepository.com/artifact/org.reactivestreams/reactive-streams
     implementation 'org.reactivestreams:reactive-streams:1.0.4'
     // 1. LangChain4j 依赖 (统一使用 1.12.2-beta22)
     implementation 'dev.langchain4j:langchain4j-spring-boot-starter:1.12.2-beta22'
-    implementation 'dev.langchain4j:langchain4j-open-ai-spring-boot-starter:1.12.2-beta22' // 修正了名字
+    implementation 'dev.langchain4j:langchain4j-open-ai-spring-boot-starter:1.12.2-beta22'
     implementation 'dev.langchain4j:langchain4j-ollama-spring-boot-starter:1.12.2-beta22'
+    // 添加 Reactor 模块支持 Flux 流式响应
+    implementation 'dev.langchain4j:langchain4j-reactor:1.12.2-beta22'
     // Source: https://mvnrepository.com/artifact/com.alibaba/druid-spring-boot-starter
     implementation 'com.alibaba:druid-spring-boot-starter:1.2.28'
 
@@ -45,6 +57,7 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
 
     // 5. 测试
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

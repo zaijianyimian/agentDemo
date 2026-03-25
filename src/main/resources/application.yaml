@@ -23,4 +23,15 @@ langchain4j:
       base-url: http://localhost:11434
       model-name: nomic-embed-text:latest
 server:
-  port: 8000
+  port: 8001
+  servlet:
+    encoding:
+      charset: utf-8
+app:
+  memory:
+    collection-name: agent_memory
+    top-k: 5
+    min-score: 0.5
+  qdrant:
+    host: localhost
+    port: 6334

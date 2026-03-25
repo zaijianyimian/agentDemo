@@ -3,7 +3,16 @@
     "allow": [
       "WebSearch",
       "WebFetch(domain:docs.langchain4j.dev)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(./gradlew compileJava:*)",
+      "Bash(gradle dependencies:*)",
+      "Bash(./gradlew dependencies:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(./gradlew:*)",
+      "Bash(jar:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

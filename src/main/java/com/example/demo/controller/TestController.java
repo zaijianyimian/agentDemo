@@ -1,4 +1,4 @@
-package com.example.demo.Controller;
+package com.example.demo.controller;
 
 
 import com.example.demo.service.QwenChatService;
@@ -7,7 +7,6 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
 import jakarta.annotation.Resource;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,7 +17,7 @@ import reactor.core.publisher.Flux;
 @RequestMapping("/api")
 public class TestController {
 
-    @Resource(name = "streamQwen")
+    @Resource(name = "streamingChatModel")
     private StreamingChatModel streamingChatModel;
 
     @Resource
@@ -39,7 +38,7 @@ public class TestController {
      * 流式聊天接口 - SSE 方式返回
      * 前端使用 EventSource 接收
      */
-    @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(value = "/chat/stream", produces = "text/event-stream;charset=UTF-8")
     public Flux<String> chatStream(@RequestParam("message") String message) {
         return qwenChatService.chat(message);
     }
