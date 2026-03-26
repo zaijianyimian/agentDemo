@@ -4,6 +4,9 @@ import com.example.demo.properties.AppMemoryProperties;
 import com.example.demo.properties.OllamaEmbeddingProperties;
 import com.example.demo.properties.OpenAiChatProperties;
 import com.example.demo.properties.QdrantProperties;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -57,6 +60,31 @@ public class AiConfiguration {
                 .modelName(properties.getModelName())
                 .baseUrl(properties.getBaseUrl())
                 .build();
+    }
+
+    /**
+     * 用于结构化输出的 ChatModel - 强制返回 JSON 格式
+     */
+    @Bean("structuredChatModel")
+    public ChatModel structuredChatModel(OpenAiChatProperties properties) {
+        return OpenAiChatModel.builder()
+                .apiKey(properties.getApiKey())
+                .modelName(properties.getModelName())
+                .baseUrl(properties.getBaseUrl())
+                .responseFormat("json_object")
+                .build();
+    }
+
+    /**
+     * ObjectMapper Bean - 用于 JSON 序列化/反序列化
+     */
+    @Bean
+    @Primary
+    public ObjectMapper objectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        return mapper;
     }
 
     @Bean("streamingChatModel")

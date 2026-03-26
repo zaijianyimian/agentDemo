@@ -59,6 +59,9 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
 
+    // 邮件监听 - JavaMail API
+    implementation 'com.sun.mail:jakarta.mail:2.0.1'
+
     // 5. 测试
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -66,4 +69,14 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// 编译时使用 UTF-8 编码
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// 处理资源文件时使用 UTF-8 编码
+tasks.withType(ProcessResources).configureEach {
+    filteringCharset = 'UTF-8'
 }

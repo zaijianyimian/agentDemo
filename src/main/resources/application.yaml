@@ -23,10 +23,14 @@ langchain4j:
       base-url: http://localhost:11434
       model-name: nomic-embed-text:latest
 server:
-  port: 8001
+  port: 8000
   servlet:
     encoding:
-      charset: utf-8
+      charset: UTF-8
+      enabled: true
+      force: true
+      force-response: true
+      force-request: true
 app:
   memory:
     collection-name: agent_memory
@@ -35,3 +39,15 @@ app:
   qdrant:
     host: localhost
     port: 6334
+  # 网络搜索配置
+  search:
+    enabled: false
+    # 搜索引擎类型: serper, tavily, bing
+    engine: serper
+    # 搜索API密钥 (选择一个配置)
+    # Serper: https://serper.dev 免费额度 2500次/月
+    # Tavily: https://tavily.com 免费额度 1000次/月
+    # Bing: https://azure.microsoft.com/services/cognitive-services/bing-web-search-api/
+    api-key: your-search-api-key-here
+    # 为节约成本，只保留最相关的3条结果
+    max-results: 3
