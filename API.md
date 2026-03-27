@@ -31,6 +31,27 @@
 | 停止邮件监听 | POST | `/email/listener/stop/{id}` | 停止指定邮箱监听 |
 | 监听状态 | GET | `/email/listener/status` | 获取监听状态 |
 | 邮箱服务器模板 | GET | `/email/templates` | 获取常用邮箱服务器配置 |
+| MCP工具列表 | GET | `/mcp/tools` | 获取所有MCP工具 |
+| MCP启用工具 | GET | `/mcp/tools/enabled` | 获取启用的MCP工具 |
+| MCP工具详情 | GET | `/mcp/tools/{id}` | 获取单个MCP工具 |
+| 添加MCP工具 | POST | `/mcp/tools` | 添加新MCP工具 |
+| 更新MCP工具 | PUT | `/mcp/tools/{id}` | 更新MCP工具 |
+| 删除MCP工具 | DELETE | `/mcp/tools/{id}` | 删除MCP工具 |
+| 切换工具状态 | PUT | `/mcp/tools/{id}/toggle` | 启用/禁用工具 |
+| 执行MCP工具 | POST | `/mcp/tools/{name}/execute` | 执行指定工具 |
+| 测试MCP工具 | POST | `/mcp/tools/{id}/test` | 测试工具执行 |
+| MCP Agent对话 | GET/POST | `/mcp/agent/chat` | AI自动调用工具对话 |
+| MCP Agent流式 | GET | `/mcp/agent/chat/stream` | AI流式对话(SSE) |
+| MCP Agent带记忆 | GET | `/mcp/agent/chat/{sessionId}` | 带会话记忆对话 |
+| 技能列表 | GET | `/skill/list` | 获取所有技能 |
+| 内置技能 | GET | `/skill/builtin` | 获取内置技能 |
+| 技能分类 | GET | `/skill/categories` | 获取技能分类 |
+| 技能详情 | GET | `/skill/{id}` | 获取单个技能 |
+| 添加技能 | POST | `/skill` | 添加新技能 |
+| 更新技能 | PUT | `/skill/{id}` | 更新技能 |
+| 删除技能 | DELETE | `/skill/{id}` | 删除技能 |
+| 绑定工具 | POST | `/skill/{skillId}/tools/{toolId}` | 绑定工具到技能 |
+| 执行技能 | POST | `/skill/{code}/execute` | 执行技能 |
 
 ---
 
@@ -580,6 +601,8 @@ public class SearchResult {
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-03-27 | 1.4.0 | 新增AI技能系统，支持技能分类、工具绑定、链式调用，内置5个常用技能 |
+| 2026-03-27 | 1.3.0 | 新增MCP工具管理功能，支持数据库存储工具配置，AI自动调用工具 |
 | 2026-03-26 | 1.2.0 | 新增邮件监听功能，支持配置多个邮箱监听 |
 | 2026-03-26 | 1.1.0 | 新增网络搜索功能，支持Serper/Tavily/Bing搜索引擎 |
 | 2026-03-26 | 1.0.0 | 初始版本，包含基础聊天、流式响应、结构化输出、向量化等功能 |
@@ -763,3 +786,475 @@ public void init() {
     emailListenerService.setEmailHandler(myEmailHandler);
 }
 ```
+
+---
+
+## MCP 工具管理功能
+
+### 功能说明
+
+MCP (Model Context Protocol) 工具管理功能支持：
+- 数据库存储工具配置，动态管理
+- 支持 HTTP API 和本地脚本两种工具类型
+- AI 自动识别并调用合适的工具
+- 无需重启应用即可增删改工具
+
+### 数据库初始化
+
+执行 `src/main/resources/sql/mcp_tool.sql` 创建表结构。
+
+### 工具类型
+
+| 类型 | 代码 | 说明 |
+|------|------|------|
+| HTTP API | `http_api` | 调用外部 HTTP 接口 |
+| 本地脚本 | `local_script` | 执行本地脚本或命令 |
+
+### 工具管理接口
+
+#### 1. 获取所有工具
+
+```
+GET /api/mcp/tools
+```
+
+**响应:**
+```json
+[
+    {
+        "id": 1,
+        "name": "weather_query",
+        "displayName": "天气查询",
+        "description": "查询指定城市的天气信息",
+        "toolType": "http_api",
+        "config": "{\"url\": \"https://api.weather.com/v1\", \"method\": \"GET\", \"timeout\": 30}",
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}}, \"required\": [\"city\"]}",
+        "enabled": true,
+        "createTime": "2026-03-27T10:00:00",
+        "updateTime": "2026-03-27T10:00:00"
+    }
+]
+```
+
+#### 2. 获取启用的工具
+
+```
+GET /api/mcp/tools/enabled
+```
+
+#### 3. 获取单个工具
+
+```
+GET /api/mcp/tools/{id}
+```
+
+#### 4. 添加工具
+
+```
+POST /api/mcp/tools
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+    "name": "weather_query",
+    "displayName": "天气查询",
+    "description": "查询指定城市的天气信息，返回温度、湿度、天气状况等",
+    "toolType": "http_api",
+    "config": "{\"url\": \"https://api.weather.com/v1/current\", \"method\": \"GET\", \"timeout\": 30}",
+    "inputSchema": "{\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\", \"description\": \"城市名称\"}}, \"required\": [\"city\"]}",
+    "enabled": true
+}
+```
+
+**字段说明:**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| name | String | 是 | 工具唯一标识，只能包含字母、数字、下划线 |
+| displayName | String | 否 | 工具显示名称 |
+| description | String | 是 | 工具描述，AI会根据此描述决定是否调用 |
+| toolType | String | 是 | 工具类型: http_api 或 local_script |
+| config | String | 是 | JSON格式的工具配置 |
+| inputSchema | String | 否 | JSON Schema格式的输入参数定义 |
+| enabled | Boolean | 否 | 是否启用，默认false |
+
+#### 5. 更新工具
+
+```
+PUT /api/mcp/tools/{id}
+Content-Type: application/json
+```
+
+#### 6. 删除工具
+
+```
+DELETE /api/mcp/tools/{id}
+```
+
+#### 7. 切换启用状态
+
+```
+PUT /api/mcp/tools/{id}/toggle
+```
+
+**响应:**
+```
+状态已切换
+```
+
+### 工具执行接口
+
+#### 1. 执行指定工具
+
+```
+POST /api/mcp/tools/{name}/execute
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+    "city": "北京"
+}
+```
+
+**响应:**
+```json
+{
+    "success": true,
+    "result": "{\"temperature\": 25, \"humidity\": 60, \"weather\": \"晴\"}",
+    "error": "",
+    "durationMs": 150
+}
+```
+
+#### 2. 测试工具执行
+
+```
+POST /api/mcp/tools/{id}/test
+Content-Type: application/json
+```
+
+即使工具未启用也可以测试执行。
+
+### 工具配置示例
+
+#### HTTP API 类型
+
+```json
+{
+    "url": "https://api.example.com/endpoint",
+    "method": "POST",
+    "headers": {
+        "Authorization": "Bearer ${API_KEY}",
+        "Content-Type": "application/json"
+    },
+    "timeout": 30
+}
+```
+
+**配置字段:**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| url | String | 是 | API地址 |
+| method | String | 否 | HTTP方法，默认GET |
+| headers | Object | 否 | 请求头，支持环境变量占位符 `${ENV_VAR}` |
+| timeout | Integer | 否 | 超时时间(秒)，默认30 |
+
+#### 本地脚本类型
+
+```json
+{
+    "scriptPath": "./scripts/tool.sh",
+    "timeout": 10,
+    "workingDir": "."
+}
+```
+
+**配置字段:**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| scriptPath | String | 是 | 脚本路径 |
+| timeout | Integer | 否 | 超时时间(秒)，默认30 |
+| workingDir | String | 否 | 工作目录，默认当前目录 |
+
+**支持的脚本类型:**
+
+| 扩展名 | 执行方式 |
+|--------|---------|
+| .sh | bash script.sh |
+| .py | python script.py |
+| .bat/.cmd | cmd /c script.bat |
+| 其他 | 直接执行 |
+
+---
+
+## MCP Agent 对话接口
+
+### 功能说明
+
+MCP Agent 对话接口支持 AI 自动调用已启用的工具。AI 会根据用户消息内容和工具描述自动判断是否需要调用工具。
+
+### 1. 普通对话
+
+```
+GET /api/mcp/agent/chat?message=北京今天天气怎么样
+```
+
+或 POST 方式:
+
+```
+POST /api/mcp/agent/chat
+Content-Type: application/json
+
+{
+    "message": "北京今天天气怎么样"
+}
+```
+
+**响应:**
+```
+根据查询结果，北京今天天气晴朗，气温25°C，湿度60%...
+```
+
+### 2. 流式对话
+
+```
+GET /api/mcp/agent/chat/stream?message=帮我查一下天气
+```
+
+**响应 (SSE):**
+```
+data:根据
+data:查询结果
+data:...
+```
+
+### 3. 带会话记忆的对话
+
+```
+GET /api/mcp/agent/chat/{sessionId}?message=你好
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| sessionId | String | 会话ID，相同ID的对话会保持上下文记忆 |
+| message | String | 用户消息 |
+
+**示例:**
+```
+# 第一次对话
+GET /api/mcp/agent/chat/user123?message=我叫张三
+响应: 你好张三，很高兴认识你！
+
+# 第二次对话（同一sessionId）
+GET /api/mcp/agent/chat/user123?message=我叫什么名字
+响应: 你叫张三。
+```
+
+### 工作流程
+
+1. 用户发送消息
+2. AI 分析消息内容
+3. AI 根据工具描述判断是否需要调用工具
+4. 如需调用，自动执行工具并将结果融入回答
+5. 返回最终响应
+
+### 使用场景
+
+| 场景 | 说明 |
+|------|------|
+| 实时数据查询 | 天气、股票、新闻等需要实时数据的查询 |
+| 外部系统集成 | 调用企业内部API、数据库查询等 |
+| 自动化任务 | 执行脚本、发送通知等 |
+
+---
+
+## AI 技能系统
+
+### 功能说明
+
+AI 技能系统是对 MCP 工具的高级封装：
+- 技能可以绑定多个工具，实现链式调用
+- 支持技能分类管理
+- 内置常用技能，支持用户自定义
+
+### 数据库初始化
+
+执行 `src/main/resources/sql/skill.sql` 创建表结构。
+
+### 技能分类
+
+| 分类 | 代码 | 说明 |
+|------|------|------|
+| 搜索类 | search | 网络搜索、文档搜索等 |
+| 数据类 | data | 天气查询、股票查询、数据库查询等 |
+| 系统类 | system | 文件操作、邮件发送、任务调度等 |
+| AI类 | ai | 对话、内容分析、翻译等 |
+| 自定义 | custom | 用户自定义技能 |
+
+### 内置技能
+
+| 技能编码 | 名称 | 分类 | 说明 |
+|---------|------|------|------|
+| web_search | 网络搜索 | search | 在互联网上搜索信息 |
+| ai_chat | AI 对话 | ai | 与 AI 进行对话 |
+| weather_query | 天气查询 | data | 查询城市天气 |
+| send_email | 发送邮件 | system | 发送邮件通知 |
+| file_operations | 文件操作 | system | 读写本地文件 |
+
+### 技能管理接口
+
+#### 1. 获取所有技能
+
+```
+GET /api/skill/list
+```
+
+**响应:**
+```json
+[
+    {
+        "id": 1,
+        "code": "weather_query",
+        "name": "天气查询",
+        "description": "查询指定城市的天气信息",
+        "category": "data",
+        "icon": "cloud",
+        "enabled": false,
+        "isBuiltin": true
+    }
+]
+```
+
+#### 2. 获取内置技能
+
+```
+GET /api/skill/builtin
+```
+
+#### 3. 获取技能分类
+
+```
+GET /api/skill/categories
+```
+
+**响应:**
+```json
+["search", "data", "system", "ai", "custom"]
+```
+
+#### 4. 获取技能详情
+
+```
+GET /api/skill/{id}
+```
+
+#### 5. 添加技能
+
+```
+POST /api/skill
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+    "code": "my_skill",
+    "name": "我的技能",
+    "description": "自定义技能描述",
+    "category": "custom",
+    "icon": "star",
+    "enabled": true
+}
+```
+
+#### 6. 更新技能
+
+```
+PUT /api/skill/{id}
+Content-Type: application/json
+```
+
+#### 7. 删除技能
+
+```
+DELETE /api/skill/{id}
+```
+
+注意：内置技能不允许删除。
+
+### 技能-工具映射
+
+#### 1. 绑定工具到技能
+
+```
+POST /api/skill/{skillId}/tools/{toolId}?order=0&required=true
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| order | Integer | 调用顺序，数字越小越先执行 |
+| required | Boolean | 是否必须执行 |
+
+#### 2. 解绑工具
+
+```
+DELETE /api/skill/{skillId}/tools/{toolId}
+```
+
+#### 3. 获取技能关联的工具
+
+```
+GET /api/skill/{id}/tools
+```
+
+### 技能执行
+
+#### 执行技能
+
+```
+POST /api/skill/{code}/execute
+Content-Type: application/json
+```
+
+**请求体:**
+```json
+{
+    "city": "北京"
+}
+```
+
+**响应:**
+```json
+{
+    "success": true,
+    "skillCode": "weather_query",
+    "result": {"temperature": 25, "humidity": 60, "weather": "晴"},
+    "toolSteps": [
+        {
+            "toolName": "weather_query_tool",
+            "success": true,
+            "result": "{...}",
+            "durationMs": 150
+        }
+    ],
+    "totalDurationMs": 200
+}
+```
+
+### 链式调用
+
+当一个技能绑定多个工具时，会按 `order` 顺序依次执行：
+
+1. 第一个工具的输入参数来自用户请求
+2. 后续工具可以获取前一个工具的执行结果
+3. 如果某个必须的工具执行失败，整个技能执行失败
