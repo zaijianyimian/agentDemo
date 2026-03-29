@@ -41,7 +41,8 @@ public class ModelManager {
         List<AiModelConfig> configs = configMapper.selectEnabled();
         for (AiModelConfig config : configs) {
             try {
-                createChatModel(config);
+                chatModelCache.put(config.getId(), createChatModel(config));
+                streamingModelCache.put(config.getId(), createStreamingChatModel(config));
                 log.info("Loaded model: {} ({})", config.getName(), config.getModelName());
             } catch (Exception e) {
                 log.error("Failed to load model: {}", config.getName(), e);
@@ -56,7 +57,7 @@ public class ModelManager {
     private ChatModel createChatModel(AiModelConfig config) {
         String decodedApiKey = encodingService.decode(config.getApiKey());
 
-        ChatModel chatModel = OpenAiChatModel.builder()
+        return OpenAiChatModel.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(decodedApiKey)
                 .modelName(config.getModelName())
@@ -65,9 +66,6 @@ public class ModelManager {
                 .logRequests(true)
                 .logResponses(true)
                 .build();
-
-        chatModelCache.put(config.getId(), chatModel);
-        return chatModel;
     }
 
     /**
@@ -76,15 +74,12 @@ public class ModelManager {
     private StreamingChatModel createStreamingChatModel(AiModelConfig config) {
         String decodedApiKey = encodingService.decode(config.getApiKey());
 
-        StreamingChatModel streamingModel = OpenAiStreamingChatModel.builder()
+        return OpenAiStreamingChatModel.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(decodedApiKey)
                 .modelName(config.getModelName())
                 .timeout(Duration.ofSeconds(180))
                 .build();
-
-        streamingModelCache.put(config.getId(), streamingModel);
-        return streamingModel;
     }
 
     /**
@@ -154,8 +149,8 @@ public class ModelManager {
 
         AiModelConfig config = configMapper.selectById(id);
         if (config != null && Boolean.TRUE.equals(config.getEnabled())) {
-            createChatModel(config);
-            createStreamingChatModel(config);
+            chatModelCache.put(id, createChatModel(config));
+            streamingModelCache.put(id, createStreamingChatModel(config));
             log.info("Refreshed model: {}", config.getName());
         }
     }
@@ -178,8 +173,8 @@ public class ModelManager {
                 .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
                 .modelName(config.getModelName())
-                .timeout(Duration.ofSeconds(30))
-                .maxRetries(1)
+                .timeout(Duration.ofSeconds(10))
+                .maxRetries(0)
                 .build();
 
         try {

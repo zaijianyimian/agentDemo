@@ -97,7 +97,7 @@ public class RagService {
      * HTTP REST API 使用端口 6333，gRPC 使用端口 6334
      */
     private void createQdrantCollection(String collectionName) {
-        String host = qdrantProperties.getHost();
+        String host = normalizeHttpHost(qdrantProperties.getHost());
         // HTTP REST API 端口通常是 6333
         int restPort = 6333;
 
@@ -128,11 +128,12 @@ public class RagService {
             if (status == 200) {
                 log.info("Qdrant 集合创建成功: {}", collectionName);
             } else {
-                log.warn("创建集合返回状态: {}", status);
+                throw new IllegalStateException("创建集合返回状态异常: " + status);
             }
             conn.disconnect();
         } catch (Exception e) {
             log.error("创建 Qdrant 合失败: {}", collectionName, e);
+            throw new IllegalStateException("创建知识库向量集合失败: " + collectionName, e);
         }
     }
 
@@ -140,7 +141,7 @@ public class RagService {
      * 删除 Qdrant 集合（HTTP REST API）
      */
     private void deleteQdrantCollection(String collectionName) {
-        String host = qdrantProperties.getHost();
+        String host = normalizeHttpHost(qdrantProperties.getHost());
         int restPort = 6333;
 
         try {
@@ -336,14 +337,19 @@ public class RagService {
                 .minScore(0.5)
                 .build();
 
-        EmbeddingSearchResult<TextSegment> result = store.search(request);
+        try {
+            EmbeddingSearchResult<TextSegment> result = store.search(request);
 
-        StringBuilder context = new StringBuilder();
-        for (EmbeddingMatch<TextSegment> match : result.matches()) {
-            context.append(match.embedded().text()).append("\n\n");
+            StringBuilder context = new StringBuilder();
+            for (EmbeddingMatch<TextSegment> match : result.matches()) {
+                context.append(match.embedded().text()).append("\n\n");
+            }
+
+            return context.isEmpty() ? "未找到相关信息" : context.toString();
+        } catch (Exception e) {
+            log.warn("知识库问答检索失败: baseId={}, collection={}", baseId, kb.getCollectionName(), e);
+            return "知识库检索失败，请检查向量集合状态";
         }
-
-        return context.isEmpty() ? "未找到相关信息" : context.toString();
     }
 
     /**
@@ -364,21 +370,26 @@ public class RagService {
                 .minScore(0.5)
                 .build();
 
-        EmbeddingSearchResult<TextSegment> result = store.search(request);
+        try {
+            EmbeddingSearchResult<TextSegment> result = store.search(request);
 
-        return result.matches().stream()
-                .map(match -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("score", match.score());
-                    map.put("text", match.embedded().text());
-                    Metadata metadata = match.embedded().metadata();
-                    if (metadata != null) {
-                        map.put("docName", metadata.getString("doc_name"));
-                        map.put("docId", metadata.getString("doc_id"));
-                    }
-                    return map;
-                })
-                .collect(Collectors.toList());
+            return result.matches().stream()
+                    .map(match -> {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("score", match.score());
+                        map.put("text", match.embedded().text());
+                        Metadata metadata = match.embedded().metadata();
+                        if (metadata != null) {
+                            map.put("docName", metadata.getString("doc_name"));
+                            map.put("docId", metadata.getString("doc_id"));
+                        }
+                        return map;
+                    })
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("知识库检索失败: baseId={}, collection={}", baseId, kb.getCollectionName(), e);
+            return new ArrayList<>();
+        }
     }
 
     /**
@@ -399,8 +410,15 @@ public class RagService {
      * 更新知识库
      */
     public KnowledgeBase updateKnowledgeBase(KnowledgeBase kb) {
+        KnowledgeBase existing = knowledgeBaseMapper.selectById(kb.getId());
+        if (existing == null) {
+            throw new IllegalArgumentException("知识库不存在: " + kb.getId());
+        }
+
+        kb.setCollectionName(existing.getCollectionName());
+        kb.setDocumentCount(existing.getDocumentCount());
         knowledgeBaseMapper.updateById(kb);
-        return kb;
+        return knowledgeBaseMapper.selectById(kb.getId());
     }
 
     /**
@@ -443,5 +461,15 @@ public class RagService {
             kb.setDocumentCount(knowledgeDocumentMapper.countCompletedByBaseId(kb.getId()));
             knowledgeBaseMapper.updateById(kb);
         }
+    }
+
+    private String normalizeHttpHost(String host) {
+        if (host == null || host.isBlank()) {
+            throw new IllegalArgumentException("Qdrant host 未配置");
+        }
+        if (host.startsWith("http://") || host.startsWith("https://")) {
+            return host;
+        }
+        return "http://" + host;
     }
 }

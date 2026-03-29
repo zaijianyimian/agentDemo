@@ -6,6 +6,14 @@
 - **编码**: UTF-8
 - **数据格式**: JSON
 
+### 文档说明
+
+- 本文档已按 `2026-03-29` 的本地实测结果校正。
+- 所有 `SSE` 接口在浏览器 `EventSource` 下可直接使用；命令行、测试脚本或网关联调时建议显式传 `Accept: text/event-stream`。
+- `POST /api/schedule` 与 `PUT /api/schedule/{id}` 的 `eventTime` 同时支持 `yyyy-MM-ddTHH:mm:ss` 和 `yyyy-MM-dd HH:mm:ss`。
+- `POST /api/model/test` 无论模型连通性成功还是失败，通常都会返回 `HTTP 200`，实际结果写在响应体 `data` 字段中。
+- 知识库查询接口在向量集合异常时会尽量返回可读结果而不是直接抛出 `500`：`/query` 返回失败提示文本，`/search` 返回空列表。
+
 ---
 
 ## 接口列表
@@ -16,9 +24,9 @@
 | 流式聊天 | GET | `/chat/stream` | SSE方式流式返回 | ✅ 已通过(需Accept头) |
 | 流式聊天(JSON) | GET | `/chat/stream/json` | SSE方式JSON格式返回 | ✅ 已通过(需Accept头) |
 | 结构化聊天 | GET | `/chat/structured` | 返回含元数据的完整响应 | ✅ 已通过 |
-| 带会话记忆聊天 | GET | `/chat/complete/session` | 带记忆的完整响应，自动保存历史 | ✅ 新增 |
-| 带会话记忆流式聊天 | GET | `/chat/stream/session` | 带记忆的SSE流式返回 | ✅ 新增 |
-| 带会话记忆流式JSON | GET | `/chat/stream/session/json` | 带记忆的JSON流式返回 | ✅ 新增 |
+| 带会话记忆聊天 | GET | `/chat/complete/session` | 带记忆的完整响应，自动保存历史 | ✅ 已修复并验证 |
+| 带会话记忆流式聊天 | GET | `/chat/stream/session` | 带记忆的SSE流式返回 | ✅ 已修复并验证 |
+| 带会话记忆流式JSON | GET | `/chat/stream/session/json` | 带记忆的JSON流式返回 | ✅ 已修复并验证 |
 | 测试流式响应 | GET | `/chat/stream/test` | 测试接口(带详细日志) | ✅ 新增 |
 | 内容分析 | GET | `/analyze` | 分析文本的重要程度、标签等 | ✅ 已通过 |
 | 文本向量化 | GET | `/embedding` | 返回文本的向量数组 | ❌ 超时(Ollama未启动) |
@@ -86,7 +94,7 @@
 | 删除日程 | DELETE | `/schedule/{id}` | 删除日程 | ✅ 已通过 |
 | 完成日程 | PUT | `/schedule/{id}/complete` | 标记日程完成 | ✅ 已通过 |
 | 取消日程 | PUT | `/schedule/{id}/cancel` | 取消日程 | ✅ 新增 |
-| SSE推送流 | GET | `/schedule/stream` | SSE实时日程推送 | ⏳ 待测 |
+| SSE推送流 | GET | `/schedule/stream` | SSE实时日程推送 | ✅ 已修复并验证 |
 | 解析邮件 | POST | `/schedule/parse-email` | 从邮件提取日程 | ✅ 已通过 |
 | 解析并保存 | POST | `/schedule/parse-and-save` | 解析并保存日程 | ✅ 已通过 |
 | 日程文件列表 | GET | `/schedule/files` | 获取日程文件列表 | ✅ 新增 |
@@ -130,15 +138,15 @@
 | 清空会话消息 | DELETE | `/chat/history/session/{sessionId}/messages` | 清空会话消息 | ✅ 已通过 |
 | 知识库列表 | GET | `/knowledge/list` | 获取所有知识库 | ✅ 新增 |
 | 知识库详情 | GET | `/knowledge/{id}` | 获取知识库详情 | ✅ 新增 |
-| 创建知识库 | POST | `/knowledge` | 创建知识库 | ✅ 新增 |
+| 创建知识库 | POST | `/knowledge` | 创建知识库 | ✅ 已修复并验证 |
 | 更新知识库 | PUT | `/knowledge/{id}` | 更新知识库 | ✅ 新增 |
 | 删除知识库 | DELETE | `/knowledge/{id}` | 删除知识库 | ✅ 新增 |
 | 启用禁用知识库 | PUT | `/knowledge/{id}/toggle` | 切换启用状态 | ✅ 新增 |
 | 上传文档 | POST | `/knowledge/{baseId}/upload` | 上传文档到知识库 | ✅ 新增 |
 | 文档列表 | GET | `/knowledge/{baseId}/documents` | 获取文档列表 | ✅ 新增 |
 | 删除文档 | DELETE | `/knowledge/document/{docId}` | 删除文档 | ✅ 新增 |
-| RAG问答 | GET | `/knowledge/{baseId}/query` | 基于知识库问答 | ✅ 新增 |
-| 语义搜索 | GET | `/knowledge/{baseId}/search` | 搜索相关文档片段 | ✅ 新增 |
+| RAG问答 | GET | `/knowledge/{baseId}/query` | 基于知识库问答 | ✅ 已修复并验证 |
+| 语义搜索 | GET | `/knowledge/{baseId}/search` | 搜索相关文档片段 | ✅ 已修复并验证 |
 | 任务列表 | GET | `/task/list` | 获取所有定时任务 | ✅ 新增 |
 | 任务详情 | GET | `/task/{id}` | 获取任务详情 | ✅ 新增 |
 | 创建任务 | POST | `/task` | 创建定时任务 | ✅ 新增 |
@@ -154,7 +162,7 @@
 | 删除模型 | DELETE | `/model/{id}` | 删除模型配置 | ✅ 新增 |
 | 启用禁用模型 | PUT | `/model/{id}/toggle` | 切换启用状态 | ✅ 新增 |
 | 设置默认模型 | PUT | `/model/{id}/default` | 设置为默认模型 | ✅ 新增 |
-| 测试模型连接 | POST | `/model/test` | 测试模型连接 | ✅ 新增 |
+| 测试模型连接 | POST | `/model/test` | 测试模型连接 | ✅ 已验证(结果见响应体) |
 | 提供商列表 | GET | `/model/providers` | 获取支持的提供商 | ✅ 新增 |
 
 ---
@@ -1498,6 +1506,11 @@ POST /api/schedule
 Content-Type: application/json
 ```
 
+`eventTime` 支持以下两种格式：
+
+- `2026-03-28T14:00:00`
+- `2026-03-28 14:00:00`
+
 **请求体:**
 ```json
 {
@@ -1583,56 +1596,60 @@ Accept: text/event-stream
 
 **响应格式:**
 
-连接建立时推送今日日程：
+连接建立后会先返回一个连接事件：
 ```
-event: init
-data: [{"id":1,"title":"项目评审会议",...}]
+event: connected
+data: schedule-stream-ready
+```
+
+连接保持期间会定时返回心跳：
+```
+event: ping
+data: keep-alive
 ```
 
 新日程创建时推送：
 ```
-event: new-schedule
-data: {"id":2,"title":"新会议","eventTime":"2026-03-29T10:00:00"}
+event: created
+data: {"id":2,"title":"新会议","eventTime":"2026-03-29T10:00:00","status":"pending"}
 ```
 
-日程更新时推送：
+日程更新、完成、取消时推送：
 ```
-event: update-schedule
+event: updated
 data: {"id":1,"status":"completed"}
 ```
 
 日程删除时推送：
 ```
-event: delete-schedule
-data: 1
+event: deleted
+data: {"id":1,"title":"项目评审会议","eventTime":"2026-03-29T10:00:00"}
 ```
 
 **前端使用示例:**
 ```javascript
 const eventSource = new EventSource('/api/schedule/stream');
 
-// 接收初始化数据
-eventSource.addEventListener('init', (e) => {
-    const todaySchedules = JSON.parse(e.data);
-    console.log('今日日程:', todaySchedules);
+eventSource.addEventListener('connected', (e) => {
+    console.log('SSE 已连接:', e.data);
 });
 
 // 接收新日程
-eventSource.addEventListener('new-schedule', (e) => {
+eventSource.addEventListener('created', (e) => {
     const schedule = JSON.parse(e.data);
     console.log('新日程:', schedule);
 });
 
 // 接收更新
-eventSource.addEventListener('update-schedule', (e) => {
+eventSource.addEventListener('updated', (e) => {
     const schedule = JSON.parse(e.data);
     console.log('日程更新:', schedule);
 });
 
 // 接收删除
-eventSource.addEventListener('delete-schedule', (e) => {
-    const eventId = e.data;
-    console.log('日程删除:', eventId);
+eventSource.addEventListener('deleted', (e) => {
+    const schedule = JSON.parse(e.data);
+    console.log('日程删除:', schedule);
 });
 
 eventSource.onerror = (e) => {
@@ -2700,6 +2717,8 @@ POST /api/model/test
 
 测试模型配置是否能正常连接，不保存到数据库。
 
+注意：该接口会调用 `modelManager.testConnection(...)`，当前实现通常返回 `HTTP 200`，并把“连接成功”或“连接失败”写入 `data` 字段。
+
 **请求体:**
 ```json
 {
@@ -2720,8 +2739,8 @@ POST /api/model/test
 如果连接失败：
 ```json
 {
-    "success": false,
-    "message": "连接失败: Invalid API key"
+    "success": true,
+    "data": "连接失败: Invalid API key"
 }
 ```
 
@@ -2776,6 +2795,7 @@ GET /api/chat/complete/session
 |--------|------|------|------|
 | message | String | 是 | 用户消息 |
 | sessionId | Long | 是 | 会话ID |
+| model | Long | 否 | 指定模型ID，不传则使用默认模型 |
 
 **响应:** `String` - 纯文本响应
 
@@ -2792,12 +2812,15 @@ GET /api/chat/stream/session
 
 SSE流式返回，同时保存消息到历史和记忆。
 
+调试脚本或命令行调用时建议显式传 `Accept: text/event-stream`。
+
 **参数:**
 
 | 参数名 | 类型 | 必填 | 描述 |
 |--------|------|------|------|
 | message | String | 是 | 用户消息 |
 | sessionId | Long | 是 | 会话ID |
+| model | Long | 否 | 指定模型ID，不传则使用默认模型 |
 
 **响应:** `text/event-stream` - SSE流式响应
 
@@ -2809,12 +2832,15 @@ GET /api/chat/stream/session/json
 
 SSE JSON格式流式返回，最后包含完整元数据。
 
+调试脚本或命令行调用时建议显式传 `Accept: text/event-stream`。
+
 **参数:**
 
 | 参数名 | 类型 | 必填 | 描述 |
 |--------|------|------|------|
 | message | String | 是 | 用户消息 |
 | sessionId | Long | 是 | 会话ID |
+| model | Long | 否 | 指定模型ID，不传则使用默认模型 |
 
 **响应:** `text/event-stream` - SSE流式响应，JSON格式包装
 

@@ -28,6 +28,7 @@ export interface ScheduleEvent {
   summaryStatus: string
   reminderEnabled: boolean
   status: string
+  filePath?: string
   createTime: string
   updateTime: string
 }
@@ -76,6 +77,74 @@ export interface Skill {
   isBuiltin: boolean
   createTime: string
   updateTime: string
+}
+
+export interface KnowledgeBase {
+  id: number
+  name: string
+  description?: string
+  collectionName: string
+  chunkSize?: number
+  chunkOverlap?: number
+  documentCount?: number
+  enabled: boolean
+  createTime?: string
+  updateTime?: string
+}
+
+export interface KnowledgeDocument {
+  id: number
+  baseId: number
+  fileName: string
+  filePath?: string
+  fileType: string
+  fileSize: number
+  content?: string
+  chunkCount?: number
+  status: string
+  errorMessage?: string
+  createTime?: string
+  updateTime?: string
+}
+
+export interface AiModelConfig {
+  id: number
+  name: string
+  provider: string
+  baseUrl: string
+  modelName: string
+  apiKey?: string
+  apiKeyPreview?: string
+  enabled: boolean
+  isDefault: boolean
+  createTime?: string
+  updateTime?: string
+}
+
+export interface ScheduledTask {
+  id: number
+  name: string
+  description?: string
+  taskType: string
+  cronExpression: string
+  params?: string
+  skillCode?: string
+  enabled: boolean
+  lastExecuteTime?: string | number[] | null
+  lastExecuteResult?: string
+  nextExecuteTime?: string | number[] | null
+  executeCount?: number
+  successCount?: number
+  failCount?: number
+  createTime?: string | number[] | null
+  updateTime?: string | number[] | null
+}
+
+export interface SystemSettings {
+  site_name?: string
+  site_logo?: string
+  default_theme?: 'light' | 'dark' | 'auto'
+  [key: string]: any
 }
 
 // API响应类型

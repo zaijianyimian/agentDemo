@@ -3,13 +3,20 @@ package com.example.demo.controller;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.demo.entity.ScheduleEvent;
 import com.example.demo.mapper.ScheduleEventMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.demo.service.schedule.ScheduleFileService;
 import dev.langchain4j.model.chat.ChatModel;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Sinks;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -35,6 +42,12 @@ public class ScheduleController {
 
     @Resource
     private ScheduleFileService scheduleFileService;
+
+    @Resource
+    private ObjectMapper objectMapper;
+
+    private final Sinks.Many<ServerSentEvent<String>> scheduleEventSink =
+            Sinks.many().multicast().onBackpressureBuffer();
 
     @GetMapping("/list")
     public List<ScheduleEvent> listAll() {
@@ -86,6 +99,26 @@ public class ScheduleController {
                         .ge("event_date", LocalDate.parse(startDate))
                         .le("event_date", LocalDate.parse(endDate))
         );
+    }
+
+    /**
+     * SSE 实时推送日程变更
+     */
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> stream() {
+        Flux<ServerSentEvent<String>> initial = Flux.just(
+                ServerSentEvent.<String>builder()
+                        .event("connected")
+                        .data("schedule-stream-ready")
+                        .build()
+        );
+        Flux<ServerSentEvent<String>> heartbeat = Flux.interval(Duration.ofSeconds(20))
+                .map(tick -> ServerSentEvent.<String>builder()
+                        .event("ping")
+                        .data("keep-alive")
+                        .build());
+
+        return initial.concatWith(scheduleEventSink.asFlux().mergeWith(heartbeat));
     }
 
     // ==================== 日程文件接口 ====================
@@ -194,6 +227,8 @@ public class ScheduleController {
         if (event.getReminderEnabled() == null) event.setReminderEnabled(true);
 
         scheduleEventMapper.insert(event);
+        syncScheduleFile(event.getEventDate());
+        publishScheduleEvent("created", event);
         return ResponseEntity.ok(event);
     }
 
@@ -203,18 +238,30 @@ public class ScheduleController {
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
+        LocalDate previousDate = existing.getEventDate();
         event.setId(id);
+        event.setCreateTime(existing.getCreateTime());
         event.setUpdateTime(LocalDateTime.now());
         if (event.getEventTime() != null) {
             event.setEventDate(event.getEventTime().toLocalDate());
         }
         scheduleEventMapper.updateById(event);
-        return ResponseEntity.ok(scheduleEventMapper.selectById(id));
+        syncScheduleFile(previousDate);
+        syncScheduleFile(event.getEventDate());
+
+        ScheduleEvent updated = scheduleEventMapper.selectById(id);
+        publishScheduleEvent("updated", updated);
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<String> delete(@PathVariable Long id) {
+        ScheduleEvent existing = scheduleEventMapper.selectById(id);
         scheduleEventMapper.deleteById(id);
+        if (existing != null) {
+            syncScheduleFile(existing.getEventDate());
+            publishScheduleEvent("deleted", existing);
+        }
         return ResponseEntity.ok("删除成功");
     }
 
@@ -227,6 +274,8 @@ public class ScheduleController {
         event.setStatus("completed");
         event.setUpdateTime(LocalDateTime.now());
         scheduleEventMapper.updateById(event);
+        syncScheduleFile(event.getEventDate());
+        publishScheduleEvent("completed", event);
         return ResponseEntity.ok("已标记完成");
     }
 
@@ -239,6 +288,8 @@ public class ScheduleController {
         event.setStatus("cancelled");
         event.setUpdateTime(LocalDateTime.now());
         scheduleEventMapper.updateById(event);
+        syncScheduleFile(event.getEventDate());
+        publishScheduleEvent("cancelled", event);
         return ResponseEntity.ok("已取消");
     }
 
@@ -297,6 +348,8 @@ public class ScheduleController {
             }
 
             scheduleEventMapper.insert(event);
+            syncScheduleFile(event.getEventDate());
+            publishScheduleEvent("created_from_email", event);
             log.info("从邮件创建日程: {}", event.getTitle());
             return ResponseEntity.ok(event);
         } catch (Exception e) {
@@ -373,5 +426,52 @@ public class ScheduleController {
             return matcher.group(1);
         }
         return null;
+    }
+
+    private void syncScheduleFile(LocalDate date) {
+        if (date == null) {
+            return;
+        }
+
+        List<ScheduleEvent> events = scheduleEventMapper.selectList(
+                new QueryWrapper<ScheduleEvent>().eq("event_date", date)
+        );
+
+        if (events.isEmpty()) {
+            scheduleFileService.deleteScheduleFile(date);
+            return;
+        }
+
+        String filePath = scheduleFileService.saveScheduleByDate(date, events);
+        if (filePath == null) {
+            return;
+        }
+
+        for (ScheduleEvent item : events) {
+            if (!filePath.equals(item.getFilePath())) {
+                item.setFilePath(filePath);
+                item.setUpdateTime(LocalDateTime.now());
+                scheduleEventMapper.updateById(item);
+            }
+        }
+    }
+
+    private void publishScheduleEvent(String eventType, ScheduleEvent event) {
+        if (event == null) {
+            return;
+        }
+
+        try {
+            String payload = objectMapper.writeValueAsString(Map.of(
+                    "type", eventType,
+                    "event", event
+            ));
+            scheduleEventSink.tryEmitNext(ServerSentEvent.<String>builder()
+                    .event(eventType)
+                    .data(payload)
+                    .build());
+        } catch (JsonProcessingException e) {
+            log.warn("推送日程SSE事件失败: type={}, id={}", eventType, event.getId(), e);
+        }
     }
 }

@@ -1,374 +1,418 @@
 <template>
-  <div class="dashboard">
-    <!-- 统计卡片 -->
-    <n-grid :cols="4" :x-gap="16" :y-gap="16" class="stats-grid">
-      <n-gi>
-        <div class="stat-card" @click="$router.push('/files')">
-          <div class="stat-icon files">
-            <n-icon size="24"><FolderIcon /></n-icon>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ stats.files }}</span>
-            <span class="stat-label">文件数量</span>
-          </div>
+  <div class="page-shell dashboard-page">
+    <section class="metrics-grid">
+      <button
+        v-for="card in metricCards"
+        :key="card.label"
+        class="metric-card"
+        type="button"
+        @click="$router.push(card.path)"
+      >
+        <div class="metric-card__icon" :style="{ '--icon-color': card.color }">
+          <n-icon size="22"><component :is="card.icon" /></n-icon>
         </div>
-      </n-gi>
-      <n-gi>
-        <div class="stat-card" @click="$router.push('/schedule')">
-          <div class="stat-icon schedule">
-            <n-icon size="24"><CalendarIcon /></n-icon>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ stats.schedules }}</span>
-            <span class="stat-label">日程事件</span>
-          </div>
+        <div class="metric-card__copy">
+          <span>{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+          <small>{{ card.hint }}</small>
         </div>
-      </n-gi>
-      <n-gi>
-        <div class="stat-card" @click="$router.push('/tools')">
-          <div class="stat-icon tools">
-            <n-icon size="24"><ToolIcon /></n-icon>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ stats.tools }}</span>
-            <span class="stat-label">MCP工具</span>
-          </div>
-        </div>
-      </n-gi>
-      <n-gi>
-        <div class="stat-card" @click="$router.push('/skills')">
-          <div class="stat-icon skills">
-            <n-icon size="24"><SkillIcon /></n-icon>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ stats.skills }}</span>
-            <span class="stat-label">AI技能</span>
-          </div>
-        </div>
-      </n-gi>
-    </n-grid>
+      </button>
+    </section>
 
-    <!-- 快捷操作 -->
-    <n-card class="action-card" :bordered="false">
-      <n-grid :cols="4" :x-gap="16">
-        <n-gi>
-          <div class="action-item" @click="$router.push('/files')">
-            <div class="action-icon">
-              <n-icon size="32"><UploadIcon /></n-icon>
-            </div>
-            <span class="action-label">上传文件</span>
+    <section class="section-grid">
+      <div class="surface-panel span-8">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Quick Entry</div>
+            <h3>模块总览</h3>
           </div>
-        </n-gi>
-        <n-gi>
-          <div class="action-item" @click="$router.push('/chat')">
-            <div class="action-icon">
-              <n-icon size="32"><ChatIcon /></n-icon>
+        </div>
+        <div class="module-grid">
+          <button
+            v-for="module in modules"
+            :key="module.name"
+            type="button"
+            class="module-card"
+            @click="$router.push(module.path)"
+          >
+            <div class="module-card__icon" :style="{ '--module-color': module.color }">
+              <n-icon size="20"><component :is="module.icon" /></n-icon>
             </div>
-            <span class="action-label">AI对话</span>
-          </div>
-        </n-gi>
-        <n-gi>
-          <div class="action-item" @click="$router.push('/knowledge')">
-            <div class="action-icon knowledge">
-              <n-icon size="32"><BookIcon /></n-icon>
+            <div>
+              <strong>{{ module.name }}</strong>
+              <p>{{ module.description }}</p>
             </div>
-            <span class="action-label">知识库</span>
-          </div>
-        </n-gi>
-        <n-gi>
-          <div class="action-item" @click="$router.push('/tasks')">
-            <div class="action-icon tasks">
-              <n-icon size="32"><TimeIcon /></n-icon>
-            </div>
-            <span class="action-label">定时任务</span>
-          </div>
-        </n-gi>
-      </n-grid>
-    </n-card>
+          </button>
+        </div>
+      </div>
 
-    <!-- 最近文件 -->
-    <n-card title="最近上传文件" class="recent-card" :bordered="false">
-      <template #header-extra>
-        <n-button text @click="$router.push('/files')">查看全部</n-button>
-      </template>
-      <n-list bordered>
-        <n-list-item v-for="file in recentFiles" :key="file.id">
-          <n-thing :title="file.fileName">
-            <template #header-extra>
-              <n-tag :type="getImportanceType(file.importance)" size="small">
-                重要度: {{ file.importance }}
-              </n-tag>
-            </template>
-            <template #description>
-              <div class="file-meta">
-                <span>{{ file.fileType }} | {{ formatSize(file.fileSize) }}</span>
-                <span>{{ formatTime(file.createTime) }}</span>
-              </div>
-              <div class="file-tags">
-                <n-tag v-for="tag in file.tags?.split(',').slice(0, 3)" :key="tag" size="small" round>
-                  {{ tag }}
-                </n-tag>
-              </div>
-            </template>
-          </n-thing>
-        </n-list-item>
-        <n-empty v-if="recentFiles.length === 0" description="暂无文件" />
-      </n-list>
-    </n-card>
+      <div class="surface-panel span-4">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Today</div>
+            <h3>今日日程</h3>
+          </div>
+          <n-button text @click="$router.push('/schedule')">查看全部</n-button>
+        </div>
+        <div v-if="todaySchedules.length" class="timeline-list">
+          <div v-for="event in todaySchedules" :key="event.id" class="timeline-item">
+            <span class="timeline-dot"></span>
+            <div class="timeline-copy">
+              <strong>{{ event.title }}</strong>
+              <p>{{ formatTime(event.eventTime) }}<span v-if="event.location"> · {{ event.location }}</span></p>
+            </div>
+            <n-tag size="small" :type="event.status === 'completed' ? 'success' : 'warning'">
+              {{ event.status === 'completed' ? '已完成' : '待处理' }}
+            </n-tag>
+          </div>
+        </div>
+        <n-empty v-else description="今天没有待跟进的日程" />
+      </div>
 
-    <!-- 今日日程 -->
-    <n-card title="今日日程" class="schedule-card" :bordered="false">
-      <template #header-extra>
-        <n-button text @click="$router.push('/schedule')">查看全部</n-button>
-      </template>
-      <n-list bordered>
-        <n-list-item v-for="event in todaySchedules" :key="event.id">
-          <n-thing :title="event.title">
-            <template #header-extra>
-              <n-tag v-if="event.status === 'completed'" type="success" size="small">已完成</n-tag>
-              <n-tag v-else type="warning" size="small">待处理</n-tag>
-            </template>
-            <template #description>
-              <div class="schedule-meta">
-                <span v-if="event.eventTime">{{ formatTime(event.eventTime) }}</span>
-                <span v-if="event.location">{{ event.location }}</span>
-              </div>
-            </template>
-          </n-thing>
-        </n-list-item>
-        <n-empty v-if="todaySchedules.length === 0" description="今日无日程" />
-      </n-list>
-    </n-card>
+      <div class="surface-panel span-6">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Latest Files</div>
+            <h3>最近文件</h3>
+          </div>
+          <n-button text @click="$router.push('/files')">文件中心</n-button>
+        </div>
+        <div v-if="recentFiles.length" class="activity-list">
+          <div v-for="file in recentFiles" :key="file.id" class="activity-row">
+            <div>
+              <strong>{{ file.fileName }}</strong>
+              <p>{{ file.fileType.toUpperCase() }} · {{ formatSize(file.fileSize) }}</p>
+            </div>
+            <n-tag size="small" :type="getImportanceType(file.importance)">
+              {{ file.importance ?? 0 }}
+            </n-tag>
+          </div>
+        </div>
+        <n-empty v-else description="暂无文件数据" />
+      </div>
+
+      <div class="surface-panel span-6">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Coverage</div>
+            <h3>接口入口覆盖</h3>
+          </div>
+        </div>
+        <div class="coverage-list">
+          <div class="coverage-item">
+            <span>已接入主模块</span>
+            <strong>14 / 14</strong>
+          </div>
+          <div class="coverage-item">
+            <span>服务层封装</span>
+            <strong>统一 `api.ts`</strong>
+          </div>
+          <div class="coverage-item">
+            <span>主题方向</span>
+            <strong>Amber Citrus</strong>
+          </div>
+          <div class="coverage-item">
+            <span>设计语言</span>
+            <strong>暖橙玻璃面板</strong>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
-  NGrid,
-  NGi,
-  NCard,
-  NList,
-  NListItem,
-  NThing,
-  NTag,
   NButton,
+  NEmpty,
   NIcon,
-  NEmpty
+  NTag
 } from 'naive-ui'
 import {
-  FolderOutline as FolderIcon,
-  CalendarOutline as CalendarIcon,
-  ConstructOutline as ToolIcon,
-  RocketOutline as SkillIcon,
-  CloudUploadOutline as UploadIcon,
+  BookOutline as KnowledgeIcon,
   ChatbubblesOutline as ChatIcon,
-  BookOutline as BookIcon,
-  TimeOutline as TimeIcon
+  CubeOutline as ModelIcon,
+  FolderOutline as FolderIcon,
+  MailOutline as MailIcon,
+  RocketOutline as SkillIcon,
+  SearchOutline as SearchIcon,
+  SettingsOutline as SettingsIcon,
+  TimeOutline as TaskIcon,
+  ConstructOutline as ToolIcon
 } from '@vicons/ionicons5'
-import { fileService, scheduleService, mcpToolService, skillService } from '@/services/api'
+import {
+  fileService,
+  knowledgeService,
+  mcpToolService,
+  modelService,
+  scheduleService,
+  skillService,
+  taskService
+} from '@/services/api'
 import type { Document, ScheduleEvent } from '@/types'
 import dayjs from 'dayjs'
 
-// 统计数据
 const stats = ref({
   files: 0,
   schedules: 0,
   tools: 0,
-  skills: 0
+  skills: 0,
+  models: 0,
+  tasks: 0,
+  knowledge: 0
 })
 
-// 最近文件
 const recentFiles = ref<Document[]>([])
-
-// 今日日程
 const todaySchedules = ref<ScheduleEvent[]>([])
 
-// 加载统计数据
-const loadStats = async () => {
+const metricCards = computed(() => [
+  { label: '文件', value: stats.value.files, hint: '内容分析与检索', path: '/files', icon: FolderIcon, color: '#f59e0b' },
+  { label: '模型', value: stats.value.models, hint: '默认模型与连接测试', path: '/models', icon: ModelIcon, color: '#fb923c' },
+  { label: '知识库', value: stats.value.knowledge, hint: 'RAG 与文档向量化', path: '/knowledge', icon: KnowledgeIcon, color: '#fbbf24' },
+  { label: '任务', value: stats.value.tasks, hint: '自动化执行与计划流程', path: '/tasks', icon: TaskIcon, color: '#f97316' }
+])
+
+const modules = [
+  { name: 'AI 聊天', path: '/chat', description: '会话、流式与 MCP Agent 对话', icon: ChatIcon, color: '#f59e0b' },
+  { name: '知识库', path: '/knowledge', description: '创建库、上传文档、检索片段', icon: KnowledgeIcon, color: '#fbbf24' },
+  { name: '定时任务', path: '/tasks', description: 'Cron、技能执行与手动触发', icon: TaskIcon, color: '#fb923c' },
+  { name: '网络搜索', path: '/search', description: '搜索、总结、历史与兴趣画像', icon: SearchIcon, color: '#fdba74' },
+  { name: '工具管理', path: '/tools', description: 'MCP 工具配置、验证与执行', icon: ToolIcon, color: '#f97316' },
+  { name: '技能管理', path: '/skills', description: '分类、绑定工具、执行与导出', icon: SkillIcon, color: '#f59e0b' },
+  { name: '邮件配置', path: '/email', description: '邮箱、监听、测试与模板', icon: MailIcon, color: '#fb923c' },
+  { name: '系统设置', path: '/settings', description: '模型、Qdrant、搜索与文件参数', icon: SettingsIcon, color: '#fbbf24' }
+]
+
+const loadDashboard = async () => {
   try {
-    const [filesRes, schedulesRes, toolsRes, skillsRes] = await Promise.all([
+    const [filesRes, schedulesRes, toolsRes, skillsRes, modelsRes, tasksRes, knowledgeRes] = await Promise.all([
       fileService.list(),
       scheduleService.list(),
       mcpToolService.list(),
-      skillService.list()
+      skillService.list(),
+      modelService.list(),
+      taskService.list(),
+      knowledgeService.list()
     ])
 
+    const allSchedules = schedulesRes || []
+    const today = dayjs().format('YYYY-MM-DD')
+
     stats.value = {
-      files: filesRes.total || 0,
-      schedules: schedulesRes.length || 0,
-      tools: toolsRes.total || 0,
-      skills: skillsRes.total || 0
+      files: filesRes.data?.length || filesRes.total || 0,
+      schedules: allSchedules.length || 0,
+      tools: toolsRes.data?.length || toolsRes.total || 0,
+      skills: skillsRes.data?.length || skillsRes.total || 0,
+      models: modelsRes.data?.length || 0,
+      tasks: tasksRes.data?.length || 0,
+      knowledge: knowledgeRes.data?.length || 0
     }
 
-    // 取最近3个文件
-    recentFiles.value = (filesRes.data || []).slice(0, 3)
-    // 今日日程
-    todaySchedules.value = schedulesRes.filter(e => e.eventDate === dayjs().format('YYYY-MM-DD')).slice(0, 3)
+    recentFiles.value = (filesRes.data || []).slice(0, 4)
+    todaySchedules.value = allSchedules.filter(item => item.eventDate === today).slice(0, 4)
   } catch (error) {
-    console.error('加载统计数据失败:', error)
+    console.error('加载仪表盘失败:', error)
   }
 }
 
-// 获取重要程度标签类型
-const getImportanceType = (importance: number) => {
+const getImportanceType = (importance = 0) => {
   if (importance >= 8) return 'error'
   if (importance >= 5) return 'warning'
   return 'success'
 }
 
-// 格式化文件大小
 const formatSize = (size: number) => {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
-// 格式化时间
-const formatTime = (time: string) => {
-  return dayjs(time).format('YYYY-MM-DD HH:mm')
+const formatTime = (time?: string) => {
+  if (!time) return '未设置'
+  return dayjs(time).format('HH:mm')
 }
 
-onMounted(() => {
-  loadStats()
-})
+onMounted(loadDashboard)
 </script>
 
 <style scoped>
-.dashboard {
+.mini-stat,
+.metric-card,
+.module-card,
+.timeline-item,
+.activity-row,
+.coverage-item {
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mini-stat {
+  padding: 16px;
+  border-radius: 20px;
+}
+
+.mini-stat span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.mini-stat strong {
+  font-size: 1.4rem;
+}
+
+.metrics-grid {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
-.stats-grid {
-  margin-bottom: 0;
-}
-
-.stat-card {
-  background: linear-gradient(135deg, var(--bg-card) 0%, #1A2332 100%);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 20px;
+.metric-card {
   display: flex;
   align-items: center;
   gap: 16px;
+  padding: 18px;
+  border-radius: 24px;
+  text-align: left;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  box-shadow: var(--shadow-sm);
 }
 
-.stat-card:hover {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 20px rgba(255, 139, 0, 0.15);
-  transform: translateY(-2px);
+.metric-card:hover,
+.module-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--primary-color) 55%, white 12%);
+  box-shadow: var(--shadow-glow);
 }
 
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
+.metric-card__icon,
+.module-card__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #fff7ed;
+  background: linear-gradient(135deg, var(--icon-color, #f59e0b), color-mix(in srgb, var(--icon-color, #f59e0b) 72%, #fde68a 28%));
 }
 
-.stat-icon.files {
-  background: linear-gradient(135deg, #FF6B00, #FFB733);
+.metric-card__icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
 }
 
-.stat-icon.schedule {
-  background: linear-gradient(135deg, #00D9A5, #00B386);
-}
-
-.stat-icon.tools {
-  background: linear-gradient(135deg, #00D9FF, #0099CC);
-}
-
-.stat-icon.skills {
-  background: linear-gradient(135deg, #FF4757, #FF6B81);
-}
-
-.stat-info {
+.metric-card__copy {
   display: flex;
   flex-direction: column;
+  gap: 3px;
 }
 
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.stat-label {
-  font-size: 14px;
+.metric-card__copy span,
+.module-card p,
+.activity-row p,
+.timeline-copy p,
+.coverage-item span {
   color: var(--text-secondary);
 }
 
-.action-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+.metric-card__copy strong {
+  font-size: 1.8rem;
+  line-height: 1;
 }
 
-.action-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 8px;
-}
-
-.action-item:hover {
-  background: rgba(255, 139, 0, 0.1);
-}
-
-.action-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+.section-head {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: white;
-  margin-bottom: 12px;
-  box-shadow: 0 4px 20px rgba(255, 139, 0, 0.3);
-}
-
-.action-icon.knowledge {
-  background: linear-gradient(135deg, #9B59B6, #8E44AD);
-}
-
-.action-icon.tasks {
-  background: linear-gradient(135deg, #3498DB, #2980B9);
-}
-
-.action-label {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.recent-card,
-.schedule-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-}
-
-.file-meta,
-.schedule-meta {
-  display: flex;
+  justify-content: space-between;
   gap: 12px;
-  color: var(--text-secondary);
-  font-size: 12px;
+  margin-bottom: 18px;
 }
 
-.file-tags {
+.section-head h3 {
+  font-size: 1.2rem;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.module-card {
   display: flex;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.module-card__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  --icon-color: var(--module-color);
+}
+
+.module-card strong,
+.timeline-copy strong,
+.activity-row strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.timeline-list,
+.activity-list,
+.coverage-list {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-item,
+.activity-row,
+.coverage-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 20px;
+}
+
+.timeline-item {
+  align-items: flex-start;
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
   margin-top: 8px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.12);
+}
+
+.timeline-copy {
+  flex: 1;
+}
+
+.coverage-item strong {
+  color: var(--text-primary);
+}
+
+@media (max-width: 1100px) {
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .metrics-grid,
+  .module-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

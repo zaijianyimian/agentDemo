@@ -1,96 +1,112 @@
 <template>
-  <div class="tasks-page">
-    <!-- 操作栏 -->
-    <n-card class="action-card" :bordered="false">
-      <n-space>
-        <n-button type="primary" @click="showCreateModal = true">
-          <template #icon><n-icon><AddIcon /></n-icon></template>
-          创建任务
-        </n-button>
-        <n-button @click="loadTasks">
-          <template #icon><n-icon><RefreshIcon /></n-icon></template>
-          刷新
-        </n-button>
-      </n-space>
-    </n-card>
+  <div class="page-shell">
+    <section class="page-hero hero-grid">
+      <div>
+        <div class="page-eyebrow">Automation Board</div>
+        <h2>把计划任务、执行结果和技能调度放到一个面板里。</h2>
+        <p>前端直接承接任务增删改查、手动执行和类型选择，适合集中维护自动化流程。</p>
+      </div>
+      <div class="hero-side">
+        <div class="hero-stat"><span>任务总数</span><strong>{{ tasks.length }}</strong></div>
+        <div class="hero-stat"><span>启用中</span><strong>{{ enabledCount }}</strong></div>
+        <div class="hero-stat"><span>任务类型</span><strong>{{ taskTypeOptions.length }}</strong></div>
+      </div>
+    </section>
 
-    <!-- 任务列表 -->
-    <n-card class="task-list-card" :bordered="false">
-      <n-data-table
-        :columns="columns"
-        :data="tasks"
-        :loading="loading"
-        :row-key="(row: ScheduledTask) => row.id"
-        striped
-      />
-    </n-card>
+    <section class="section-grid">
+      <div class="surface-panel span-4">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Actions</div>
+            <h3>快速操作</h3>
+          </div>
+        </div>
+        <div class="quick-actions">
+          <n-button type="primary" size="large" @click="openCreateModal">
+            <template #icon><n-icon><AddIcon /></n-icon></template>
+            创建任务
+          </n-button>
+          <n-button size="large" @click="loadTasks">
+            <template #icon><n-icon><RefreshIcon /></n-icon></template>
+            刷新
+          </n-button>
+          <div class="task-type-list">
+            <span v-for="item in taskTypeOptions" :key="item.value" class="task-type-pill">{{ item.label }}</span>
+          </div>
+        </div>
+      </div>
 
-    <!-- 创建/编辑任务弹窗 -->
-    <n-modal v-model:show="showCreateModal" preset="card" :title="editingTask ? '编辑任务' : '创建任务'" style="width: 600px">
-      <n-form ref="formRef" :model="form" :rules="formRules">
-        <n-form-item label="任务名称" path="name">
-          <n-input v-model:value="form.name" placeholder="请输入任务名称" />
-        </n-form-item>
-        <n-form-item label="任务描述" path="description">
-          <n-input v-model:value="form.description" type="textarea" placeholder="请输入任务描述" />
-        </n-form-item>
-        <n-form-item label="任务类型" path="taskType">
-          <n-select
-            v-model:value="form.taskType"
-            :options="taskTypeOptions"
-            placeholder="请选择任务类型"
-          />
-        </n-form-item>
-        <n-form-item v-if="form.taskType === 'SKILL'" label="技能代码" path="skillCode">
-          <n-input v-model:value="form.skillCode" placeholder="请输入要执行的技能代码" />
-        </n-form-item>
-        <n-form-item label="Cron表达式" path="cronExpression">
-          <n-input v-model:value="form.cronExpression" placeholder="如: 0 0 8 * * ? (每天8点执行)">
-            <template #suffix>
-              <n-tooltip trigger="hover">
-                <template #trigger>
-                  <n-icon style="cursor: pointer"><HelpIcon /></n-icon>
-                </template>
-                <div>
-                  <p>秒 分 时 日 月 周</p>
-                  <p>0 0 8 * * ? 每天8点</p>
-                  <p>0 0/30 * * * ? 每30分钟</p>
-                  <p>0 0 20 * * ? 每天20点</p>
-                </div>
-              </n-tooltip>
-            </template>
-          </n-input>
-        </n-form-item>
-        <n-form-item label="任务参数" path="params">
-          <n-input
-            v-model:value="form.params"
-            type="textarea"
-            :rows="3"
-            placeholder="JSON格式参数，如: {&quot;key&quot;: &quot;value&quot;}"
-          />
-        </n-form-item>
+      <div class="surface-panel span-8">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Overview</div>
+            <h3>任务列表</h3>
+          </div>
+        </div>
+        <n-data-table
+          :columns="columns"
+          :data="tasks"
+          :loading="loading"
+          :row-key="(row: ScheduledTask) => row.id"
+          striped
+        />
+      </div>
+    </section>
+
+    <n-modal v-model:show="showCreateModal" preset="card" :title="editingTask ? '编辑任务' : '创建任务'" style="width: min(680px, 92vw)">
+      <n-form ref="formRef" :model="form" :rules="formRules" label-placement="top">
+        <n-grid :cols="2" :x-gap="16">
+          <n-form-item-gi label="任务名称" path="name">
+            <n-input v-model:value="form.name" placeholder="请输入任务名称" />
+          </n-form-item-gi>
+          <n-form-item-gi label="任务类型" path="taskType">
+            <n-select v-model:value="form.taskType" :options="taskTypeOptions" placeholder="请选择任务类型" />
+          </n-form-item-gi>
+          <n-form-item-gi span="2" label="任务描述" path="description">
+            <n-input v-model:value="form.description" type="textarea" placeholder="请输入任务描述" />
+          </n-form-item-gi>
+          <n-form-item-gi v-if="form.taskType === 'SKILL'" span="2" label="技能代码" path="skillCode">
+            <n-input v-model:value="form.skillCode" placeholder="请输入要执行的技能代码" />
+          </n-form-item-gi>
+          <n-form-item-gi span="2" label="Cron 表达式" path="cronExpression">
+            <n-input v-model:value="form.cronExpression" placeholder="如: 0 0 8 * * ?">
+              <template #suffix>
+                <n-tooltip trigger="hover">
+                  <template #trigger>
+                    <n-icon style="cursor: pointer"><HelpIcon /></n-icon>
+                  </template>
+                  <div>
+                    <p>秒 分 时 日 月 周</p>
+                    <p>0 0 8 * * ? 每天8点</p>
+                    <p>0 0/30 * * * ? 每30分钟</p>
+                  </div>
+                </n-tooltip>
+              </template>
+            </n-input>
+          </n-form-item-gi>
+          <n-form-item-gi span="2" label="任务参数" path="params">
+            <n-input v-model:value="form.params" type="textarea" :rows="3" placeholder='JSON 格式参数，如 {"key":"value"}' />
+          </n-form-item-gi>
+        </n-grid>
       </n-form>
       <template #footer>
         <n-space justify="end">
           <n-button @click="showCreateModal = false">取消</n-button>
-          <n-button type="primary" @click="submitForm" :loading="submitLoading">
-            {{ editingTask ? '更新' : '创建' }}
-          </n-button>
+          <n-button type="primary" @click="submitForm" :loading="submitLoading">{{ editingTask ? '更新' : '创建' }}</n-button>
         </n-space>
       </template>
     </n-modal>
 
-    <!-- 执行结果弹窗 -->
-    <n-modal v-model:show="showResultModal" preset="card" title="执行结果" style="width: 600px">
+    <n-modal v-model:show="showResultModal" preset="card" title="执行结果" style="width: min(720px, 92vw)">
       <n-descriptions label-placement="left" :column="1" bordered>
         <n-descriptions-item label="任务名称">{{ currentTask?.name }}</n-descriptions-item>
         <n-descriptions-item label="执行时间">{{ formatTime(currentTask?.lastExecuteTime || '') }}</n-descriptions-item>
         <n-descriptions-item label="下次执行">{{ formatTime(currentTask?.nextExecuteTime || '') }}</n-descriptions-item>
-        <n-descriptions-item label="执行次数">{{ currentTask?.executeCount }} (成功: {{ currentTask?.successCount }}, 失败: {{ currentTask?.failCount }})</n-descriptions-item>
+        <n-descriptions-item label="执行次数">{{ currentTask?.executeCount || 0 }} (成功: {{ currentTask?.successCount || 0 }}, 失败: {{ currentTask?.failCount || 0 }})</n-descriptions-item>
       </n-descriptions>
       <n-divider>执行结果</n-divider>
       <n-scrollbar style="max-height: 300px">
-        <pre class="result-content">{{ currentTask?.lastExecuteResult }}</pre>
+        <pre class="result-content">{{ currentTask?.lastExecuteResult || '暂无执行结果' }}</pre>
       </n-scrollbar>
     </n-modal>
   </div>
@@ -99,21 +115,21 @@
 <script setup lang="ts">
 import { ref, h, onMounted } from 'vue'
 import {
-  NCard,
-  NSpace,
   NButton,
-  NIcon,
   NDataTable,
-  NModal,
-  NForm,
-  NFormItem,
-  NInput,
-  NSelect,
-  NTag,
   NDescriptions,
   NDescriptionsItem,
   NDivider,
+  NForm,
+  NFormItemGi,
+  NGrid,
+  NIcon,
+  NInput,
+  NModal,
+  NSelect,
   NScrollbar,
+  NSpace,
+  NTag,
   NTooltip,
   useMessage,
   useDialog,
@@ -130,23 +146,24 @@ import {
 } from '@vicons/ionicons5'
 import { taskService } from '@/services/api'
 import dayjs from 'dayjs'
+import { computed } from 'vue'
 
 interface ScheduledTask {
   id: number
   name: string
-  description: string
+  description?: string
   taskType: string
   cronExpression: string
-  params: string
-  skillCode: string
-  lastExecuteTime: string | number[] | null
-  lastExecuteResult: string
-  nextExecuteTime: string | number[] | null
-  executeCount: number
-  successCount: number
-  failCount: number
+  params?: string
+  skillCode?: string
+  lastExecuteTime?: string | number[] | null
+  lastExecuteResult?: string
+  nextExecuteTime?: string | number[] | null
+  executeCount?: number
+  successCount?: number
+  failCount?: number
   enabled: boolean
-  createTime: string | number[] | null
+  createTime?: string | number[] | null
 }
 
 const message = useMessage()
@@ -180,6 +197,8 @@ const taskTypeOptions = [
   { label: 'AI对话', value: 'CHAT' },
   { label: '提醒', value: 'REMINDER' }
 ]
+
+const enabledCount = computed(() => tasks.value.filter(item => item.enabled).length)
 
 const columns: DataTableColumns<ScheduledTask> = [
   { title: '任务名称', key: 'name', ellipsis: { tooltip: true } },
@@ -263,6 +282,19 @@ const submitForm = async () => {
   }
 }
 
+const openCreateModal = () => {
+  editingTask.value = null
+  form.value = {
+    name: '',
+    description: '',
+    taskType: 'SKILL',
+    cronExpression: '',
+    params: '',
+    skillCode: ''
+  }
+  showCreateModal.value = true
+}
+
 const executeTask = async (task: ScheduledTask) => {
   try {
     message.loading('正在执行任务...')
@@ -342,25 +374,14 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.tasks-page {
-  display: grid;
-  gap: 16px;
-}
-
-.action-card,
-.task-list-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-}
-
-.result-content {
-  background: var(--bg-input);
-  padding: 16px;
-  border-radius: 8px;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: var(--text-primary);
-}
+.hero-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(260px,.85fr); gap:20px; }
+.hero-side, .quick-actions { display:grid; gap:12px; }
+.hero-stat, .task-type-pill { border:1px solid var(--border-color); background:rgba(255,255,255,.05); }
+.hero-stat { padding:16px 18px; border-radius:20px; }
+.hero-stat span { color:var(--text-secondary); font-size:.86rem; }
+.hero-stat strong { display:block; margin-top:6px; font-size:1.3rem; }
+.task-type-list { display:flex; flex-wrap:wrap; gap:10px; }
+.task-type-pill { padding:8px 12px; border-radius:999px; color:var(--text-secondary); font-size:.86rem; }
+.result-content { background: var(--bg-input); padding:16px; border-radius:14px; font-size:12px; white-space:pre-wrap; word-break:break-all; color:var(--text-primary); }
+@media (max-width: 900px) { .hero-grid { grid-template-columns:1fr; } }
 </style>

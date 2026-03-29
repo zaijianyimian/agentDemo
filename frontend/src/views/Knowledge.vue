@@ -1,55 +1,127 @@
 <template>
-  <div class="knowledge-page">
-    <!-- 知识库列表 -->
-    <n-card class="kb-list-card" :bordered="false">
-      <template #header>
-        <n-space justify="space-between">
-          <span class="card-title">知识库列表</span>
+  <div class="page-shell">
+    <section class="page-hero hero-grid">
+      <div>
+        <div class="page-eyebrow">Knowledge Workspace</div>
+        <h2>把知识库、文档和检索结果放到同一张工作台。</h2>
+        <p>这里直接承接后端知识库接口，支持建库、上传文档、切换启用状态以及语义搜索。</p>
+      </div>
+      <div class="hero-side">
+        <div class="hero-stat"><span>知识库</span><strong>{{ knowledgeBases.length }}</strong></div>
+        <div class="hero-stat"><span>当前文档</span><strong>{{ documents.length }}</strong></div>
+        <div class="hero-stat"><span>当前选中</span><strong>{{ selectedKb?.name || '未选择' }}</strong></div>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="surface-panel span-4">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Library</div>
+            <h3>知识库列表</h3>
+          </div>
           <n-button type="primary" @click="showCreateModal = true">
             <template #icon><n-icon><AddIcon /></n-icon></template>
-            创建知识库
+            创建
           </n-button>
-        </n-space>
-      </template>
+        </div>
 
-      <n-grid :cols="3" :x-gap="16" :y-gap="16" responsive="screen">
-        <n-grid-item v-for="kb in knowledgeBases" :key="kb.id">
-          <n-card class="kb-item" :bordered="true" hoverable @click="selectKb(kb)">
-            <n-space vertical>
-              <n-space justify="space-between">
-                <span class="kb-name">{{ kb.name }}</span>
-                <n-tag :type="kb.enabled ? 'success' : 'default'" size="small">
-                  {{ kb.enabled ? '启用' : '禁用' }}
-                </n-tag>
-              </n-space>
-              <p class="kb-desc">{{ kb.description || '暂无描述' }}</p>
-              <n-space>
-                <n-tag size="small">文档: {{ kb.documentCount || 0 }}</n-tag>
-                <n-tag size="small">分块: {{ kb.chunkSize || 500 }}</n-tag>
-              </n-space>
-            </n-space>
-          </n-card>
-        </n-grid-item>
-      </n-grid>
+        <div v-if="knowledgeBases.length" class="kb-list">
+          <button
+            v-for="kb in knowledgeBases"
+            :key="kb.id"
+            type="button"
+            :class="['kb-card', { active: selectedKb?.id === kb.id }]"
+            @click="selectKb(kb)"
+          >
+            <div class="kb-card__head">
+              <strong>{{ kb.name }}</strong>
+              <n-tag :type="kb.enabled ? 'success' : 'default'" size="small" round>
+                {{ kb.enabled ? '启用' : '禁用' }}
+              </n-tag>
+            </div>
+            <p>{{ kb.description || '暂无描述' }}</p>
+            <div class="kb-card__meta">
+              <span>文档 {{ kb.documentCount || 0 }}</span>
+              <span>分块 {{ kb.chunkSize || 500 }}</span>
+            </div>
+          </button>
+        </div>
+        <n-empty v-else description="暂无知识库" />
+      </div>
 
-      <n-empty v-if="!knowledgeBases.length" description="暂无知识库" />
-    </n-card>
+      <div class="surface-panel span-8">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Documents</div>
+            <h3>{{ selectedKb ? `${selectedKb.name} 文档区` : '请先选择知识库' }}</h3>
+          </div>
+          <n-space v-if="selectedKb">
+            <n-button type="primary" @click="showUploadModal = true">
+              <template #icon><n-icon><UploadIcon /></n-icon></template>
+              上传文档
+            </n-button>
+            <n-button @click="toggleKbEnabled">{{ selectedKb.enabled ? '禁用' : '启用' }}</n-button>
+            <n-button type="error" @click="deleteKb">
+              <template #icon><n-icon><TrashIcon /></n-icon></template>
+              删除
+            </n-button>
+          </n-space>
+        </div>
 
-    <!-- 创建知识库弹窗 -->
-    <n-modal v-model:show="showCreateModal" preset="card" title="创建知识库" style="width: 500px">
-      <n-form ref="createFormRef" :model="createForm" :rules="createRules">
+        <n-data-table
+          v-if="selectedKb"
+          :columns="docColumns"
+          :data="documents"
+          :loading="docLoading"
+          :row-key="(row: KnowledgeDocument) => row.id"
+          striped
+        />
+        <n-empty v-else description="左侧选择一个知识库后即可查看文档" />
+      </div>
+
+      <div class="surface-panel span-12" v-if="selectedKb">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Semantic Search</div>
+            <h3>RAG 搜索</h3>
+          </div>
+        </div>
+        <div class="query-box">
+          <n-input v-model:value="queryText" type="textarea" :rows="3" placeholder="输入问题，系统会从知识库中检索相关片段..." />
+          <div class="query-actions">
+            <n-input-number v-model:value="queryTopK" :min="1" :max="20" />
+            <n-button type="primary" @click="executeQuery" :loading="queryLoading">搜索</n-button>
+          </div>
+        </div>
+        <div v-if="searchResults.length" class="search-grid">
+          <div v-for="(item, index) in searchResults" :key="index" class="search-card">
+            <div class="search-card__head">
+              <n-tag size="small" type="info" round>{{ item.docName }}</n-tag>
+              <span>{{ (item.score * 100).toFixed(1) }}%</span>
+            </div>
+            <p>{{ item.text }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <n-modal v-model:show="showCreateModal" preset="card" title="创建知识库" style="width: min(540px, 92vw)">
+      <n-form ref="createFormRef" :model="createForm" :rules="createRules" label-placement="top">
         <n-form-item label="名称" path="name">
           <n-input v-model:value="createForm.name" placeholder="请输入知识库名称" />
         </n-form-item>
         <n-form-item label="描述" path="description">
           <n-input v-model:value="createForm.description" type="textarea" placeholder="请输入描述" />
         </n-form-item>
-        <n-form-item label="分块大小" path="chunkSize">
-          <n-input-number v-model:value="createForm.chunkSize" :min="100" :max="2000" />
-        </n-form-item>
-        <n-form-item label="分块重叠" path="chunkOverlap">
-          <n-input-number v-model:value="createForm.chunkOverlap" :min="0" :max="200" />
-        </n-form-item>
+        <n-grid :cols="2" :x-gap="16">
+          <n-form-item-gi label="分块大小" path="chunkSize">
+            <n-input-number v-model:value="createForm.chunkSize" :min="100" :max="2000" style="width:100%" />
+          </n-form-item-gi>
+          <n-form-item-gi label="分块重叠" path="chunkOverlap">
+            <n-input-number v-model:value="createForm.chunkOverlap" :min="0" :max="200" style="width:100%" />
+          </n-form-item-gi>
+        </n-grid>
       </n-form>
       <template #footer>
         <n-space justify="end">
@@ -59,118 +131,38 @@
       </template>
     </n-modal>
 
-    <!-- 知识库详情 -->
-    <n-card v-if="selectedKb" class="kb-detail-card" :bordered="false">
-      <template #header>
-        <n-space justify="space-between">
-          <span class="card-title">{{ selectedKb.name }} - 文档管理</span>
-          <n-space>
-            <n-button type="primary" @click="showUploadModal = true">
-              <template #icon><n-icon><UploadIcon /></n-icon></template>
-              上传文档
-            </n-button>
-            <n-button @click="toggleKbEnabled">
-              {{ selectedKb.enabled ? '禁用' : '启用' }}
-            </n-button>
-            <n-button type="error" @click="deleteKb">
-              <template #icon><n-icon><TrashIcon /></n-icon></template>
-              删除
-            </n-button>
-          </n-space>
-        </n-space>
-      </template>
-
-      <!-- 文档列表 -->
-      <n-data-table
-        :columns="docColumns"
-        :data="documents"
-        :loading="docLoading"
-        :row-key="(row: KnowledgeDocument) => row.id"
-        striped
-      />
-
-      <!-- 上传文档弹窗 -->
-      <n-modal v-model:show="showUploadModal" preset="card" title="上传文档" style="width: 500px">
-        <n-upload
-          :custom-request="handleUpload"
-          :show-file-list="true"
-          accept=".txt,.md"
-          :max="5"
-        >
-          <n-upload-dragger>
-            <div class="upload-area">
-              <n-icon size="48" class="upload-icon"><UploadIcon /></n-icon>
-              <p class="upload-text">点击或拖拽文件到此处上传</p>
-              <p class="upload-hint">支持 txt, md 格式，文件会被分块并向量化存储</p>
-            </div>
-          </n-upload-dragger>
-        </n-upload>
-      </n-modal>
-    </n-card>
-
-    <!-- RAG 问答 -->
-    <n-card v-if="selectedKb" class="query-card" :bordered="false">
-      <template #header>
-        <span class="card-title">RAG 智能问答</span>
-      </template>
-
-      <n-space vertical>
-        <n-input
-          v-model:value="queryText"
-          type="textarea"
-          placeholder="输入问题，系统会从知识库中检索相关内容..."
-          :rows="3"
-        />
-        <n-space>
-          <n-input-number v-model:value="queryTopK" :min="1" :max="20" label="返回条数" />
-          <n-button type="primary" @click="executeQuery" :loading="queryLoading">
-            搜索
-          </n-button>
-        </n-space>
-
-        <!-- 搜索结果 -->
-        <n-divider v-if="searchResults.length">搜索结果</n-divider>
-        <n-list v-if="searchResults.length" bordered>
-          <n-list-item v-for="(item, index) in searchResults" :key="index">
-            <n-space vertical>
-              <n-space justify="space-between">
-                <n-tag type="info" size="small">{{ item.docName }}</n-tag>
-                <n-tag size="small">相关度: {{ (item.score * 100).toFixed(1) }}%</n-tag>
-              </n-space>
-              <n-ellipsis :line-clamp="3" expand-trigger="click">
-                {{ item.text }}
-              </n-ellipsis>
-            </n-space>
-          </n-list-item>
-        </n-list>
-      </n-space>
-    </n-card>
+    <n-modal v-model:show="showUploadModal" preset="card" title="上传文档" style="width: min(560px, 92vw)">
+      <n-upload :custom-request="handleUpload" :show-file-list="true" accept=".txt,.md" :max="5">
+        <n-upload-dragger>
+          <div class="upload-area">
+            <n-icon size="44" class="upload-icon"><UploadIcon /></n-icon>
+            <p>点击或拖拽文件到此处上传</p>
+            <span>支持 txt、md，上传后将自动分块并向量化。</span>
+          </div>
+        </n-upload-dragger>
+      </n-upload>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, h, onMounted } from 'vue'
 import {
-  NCard,
-  NGrid,
-  NGridItem,
-  NSpace,
   NButton,
+  NDataTable,
+  NEmpty,
+  NForm,
+  NFormItem,
+  NFormItemGi,
+  NGrid,
+  NSpace,
   NIcon,
   NTag,
   NModal,
-  NForm,
-  NFormItem,
   NInput,
   NInputNumber,
-  NDataTable,
   NUpload,
   NUploadDragger,
-  NDivider,
-  NList,
-  NListItem,
-  NEllipsis,
-  NEmpty,
   useMessage,
   type DataTableColumns,
   type UploadCustomRequestOptions
@@ -180,31 +172,9 @@ import {
   CloudUploadOutline as UploadIcon,
   TrashOutline as TrashIcon
 } from '@vicons/ionicons5'
-import axios from 'axios'
 import dayjs from 'dayjs'
-
-interface KnowledgeBase {
-  id: number
-  name: string
-  description: string
-  collectionName: string
-  chunkSize: number
-  chunkOverlap: number
-  documentCount: number
-  enabled: boolean
-  createTime: string
-}
-
-interface KnowledgeDocument {
-  id: number
-  baseId: number
-  fileName: string
-  fileType: string
-  fileSize: number
-  chunkCount: number
-  status: string
-  createTime: string
-}
+import type { KnowledgeBase, KnowledgeDocument } from '@/types'
+import { knowledgeService } from '@/services/api'
 
 interface SearchResult {
   score: number
@@ -250,7 +220,7 @@ const searchResults = ref<SearchResult[]>([])
 // 文档表格列
 const docColumns: DataTableColumns<KnowledgeDocument> = [
   { title: '文件名', key: 'fileName', ellipsis: { tooltip: true } },
-  { title: '类型', key: 'fileType', width: 80, render: row => h(NTag, { size: 'small' }, { default: () => row.fileType.toUpperCase() }) },
+  { title: '类型', key: 'fileType', width: 80, render: row => h(NTag, { size: 'small' }, { default: () => (row.fileType || '-').toUpperCase() }) },
   { title: '大小', key: 'fileSize', width: 100, render: row => formatSize(row.fileSize) },
   { title: '分块数', key: 'chunkCount', width: 80 },
   { title: '状态', key: 'status', width: 100, render: row => h(NTag, { type: getStatusType(row.status), size: 'small' }, { default: () => row.status }) },
@@ -272,8 +242,8 @@ const docColumns: DataTableColumns<KnowledgeDocument> = [
 const loadKnowledgeBases = async () => {
   kbLoading.value = true
   try {
-    const res = await axios.get('/api/knowledge/list')
-    knowledgeBases.value = res.data.data || []
+    const res = await knowledgeService.list()
+    knowledgeBases.value = res.data || []
   } catch (error) {
     message.error('加载知识库失败')
   } finally {
@@ -291,8 +261,8 @@ const selectKb = async (kb: KnowledgeBase) => {
 const loadDocuments = async (baseId: number) => {
   docLoading.value = true
   try {
-    const res = await axios.get(`/api/knowledge/${baseId}/documents`)
-    documents.value = res.data.data || []
+    const res = await knowledgeService.listDocuments(baseId)
+    documents.value = res.data || []
   } catch (error) {
     message.error('加载文档失败')
   } finally {
@@ -305,14 +275,14 @@ const createKb = async () => {
   try {
     await createFormRef.value?.validate()
     createLoading.value = true
-    const res = await axios.post('/api/knowledge', createForm.value)
-    if (res.data.success) {
+    const res = await knowledgeService.create(createForm.value)
+    if (res.success) {
       message.success('创建成功')
       showCreateModal.value = false
       createForm.value = { name: '', description: '', chunkSize: 500, chunkOverlap: 50 }
       loadKnowledgeBases()
     } else {
-      message.error(res.data.message || '创建失败')
+      message.error(res.message || '创建失败')
     }
   } catch (error) {
     message.error('创建失败')
@@ -325,17 +295,14 @@ const createKb = async () => {
 const handleUpload = async ({ file }: UploadCustomRequestOptions) => {
   if (!selectedKb.value) return
   try {
-    message.loading('正在上传并处理文档...')
-    const formData = new FormData()
-    formData.append('file', file.file as File)
-    const res = await axios.post(`/api/knowledge/${selectedKb.value.id}/upload`, formData)
-    if (res.data.success) {
+    const res = await knowledgeService.upload(selectedKb.value.id, file.file as File)
+    if (res.success) {
       message.success('上传成功')
       showUploadModal.value = false
       loadDocuments(selectedKb.value.id)
       loadKnowledgeBases()
     } else {
-      message.error(res.data.message || '上传失败')
+      message.error(res.message || '上传失败')
     }
   } catch (error) {
     message.error('上传失败')
@@ -345,8 +312,8 @@ const handleUpload = async ({ file }: UploadCustomRequestOptions) => {
 // 删除文档
 const deleteDoc = async (doc: KnowledgeDocument) => {
   try {
-    const res = await axios.delete(`/api/knowledge/document/${doc.id}`)
-    if (res.data.success) {
+    const res = await knowledgeService.deleteDocument(doc.id)
+    if (res.success) {
       message.success('删除成功')
       loadDocuments(selectedKb.value!.id)
       loadKnowledgeBases()
@@ -360,9 +327,9 @@ const deleteDoc = async (doc: KnowledgeDocument) => {
 const toggleKbEnabled = async () => {
   if (!selectedKb.value) return
   try {
-    const res = await axios.put(`/api/knowledge/${selectedKb.value.id}/toggle`)
-    if (res.data.success) {
-      selectedKb.value = res.data.data
+    const res = await knowledgeService.toggle(selectedKb.value.id)
+    if (res.success) {
+      selectedKb.value = res.data || null
       loadKnowledgeBases()
     }
   } catch (error) {
@@ -374,8 +341,8 @@ const toggleKbEnabled = async () => {
 const deleteKb = async () => {
   if (!selectedKb.value) return
   try {
-    const res = await axios.delete(`/api/knowledge/${selectedKb.value.id}`)
-    if (res.data.success) {
+    const res = await knowledgeService.delete(selectedKb.value.id)
+    if (res.success) {
       message.success('删除成功')
       selectedKb.value = null
       documents.value = []
@@ -391,10 +358,8 @@ const executeQuery = async () => {
   if (!selectedKb.value || !queryText.value) return
   queryLoading.value = true
   try {
-    const res = await axios.get(`/api/knowledge/${selectedKb.value.id}/search`, {
-      params: { query: queryText.value, topK: queryTopK.value }
-    })
-    searchResults.value = res.data.data || []
+    const res = await knowledgeService.search(selectedKb.value.id, queryText.value, queryTopK.value)
+    searchResults.value = res.data || []
     if (!searchResults.value.length) {
       message.info('未找到相关内容')
     }
@@ -418,8 +383,8 @@ function formatSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
-function formatTime(time: string) {
-  return dayjs(time).format('YYYY-MM-DD HH:mm')
+function formatTime(time?: string) {
+  return time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-'
 }
 
 onMounted(() => {
@@ -428,62 +393,24 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.knowledge-page {
-  display: grid;
-  gap: 16px;
-}
-
-.card-title {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.kb-list-card,
-.kb-detail-card,
-.query-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-}
-
-.kb-item {
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.kb-item:hover {
-  border-color: var(--primary-color);
-}
-
-.kb-name {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.kb-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.upload-area {
-  padding: 40px;
-  text-align: center;
-}
-
-.upload-icon {
-  color: var(--primary-color);
-  margin-bottom: 16px;
-}
-
-.upload-text {
-  font-size: 14px;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.upload-hint {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
+.hero-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(260px,.85fr); gap:20px; }
+.hero-side { display:grid; gap:12px; }
+.hero-stat, .kb-card, .search-card { border:1px solid var(--border-color); background:rgba(255,255,255,.05); }
+.hero-stat { padding:16px 18px; border-radius:20px; }
+.hero-stat span { color:var(--text-secondary); font-size:.86rem; }
+.hero-stat strong { display:block; margin-top:6px; font-size:1.3rem; }
+.kb-list, .search-grid { display:grid; gap:12px; }
+.kb-card { padding:16px; border-radius:22px; text-align:left; cursor:pointer; transition:all .25s ease; }
+.kb-card.active, .kb-card:hover { border-color:var(--primary-color); box-shadow:var(--shadow-glow); transform:translateY(-2px); }
+.kb-card__head, .search-card__head, .query-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.kb-card p, .kb-card__meta, .search-card p, .upload-area span { color:var(--text-secondary); }
+.kb-card__meta { display:flex; gap:12px; margin-top:10px; font-size:.86rem; }
+.query-box { display:grid; gap:14px; margin-bottom:16px; }
+.query-actions { justify-content:flex-end; }
+.search-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.search-card { padding:16px; border-radius:20px; }
+.upload-area { padding:36px; text-align:center; }
+.upload-area p { margin:10px 0 6px; }
+.upload-icon { color:var(--primary-color); }
+@media (max-width: 900px) { .hero-grid, .search-grid { grid-template-columns:1fr; } }
 </style>

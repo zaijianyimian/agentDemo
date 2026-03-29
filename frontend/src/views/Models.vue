@@ -1,66 +1,103 @@
 <template>
-  <div class="models-page">
-    <!-- 操作栏 -->
-    <n-card class="action-card" :bordered="false">
-      <n-space>
-        <n-button type="primary" @click="showCreateModal = true">
-          <template #icon><n-icon><AddIcon /></n-icon></template>
-          添加模型
-        </n-button>
-        <n-button @click="loadModels">
-          <template #icon><n-icon><RefreshIcon /></n-icon></template>
-          刷新
-        </n-button>
-      </n-space>
-    </n-card>
+  <div class="page-shell">
+    <section class="page-hero hero-grid">
+      <div>
+        <div class="page-eyebrow">Model Registry</div>
+        <h2>管理默认模型、连接状态和提供商切换。</h2>
+        <p>这里统一承接后端的模型 CRUD、默认模型切换和连接测试，让模型能力入口更清晰。</p>
+      </div>
+      <div class="hero-actions">
+        <div class="hero-stat">
+          <span>总模型</span>
+          <strong>{{ models.length }}</strong>
+        </div>
+        <div class="hero-stat">
+          <span>启用中</span>
+          <strong>{{ enabledCount }}</strong>
+        </div>
+        <div class="hero-stat">
+          <span>默认</span>
+          <strong>{{ defaultModel?.name || '未设置' }}</strong>
+        </div>
+      </div>
+    </section>
 
-    <!-- 模型列表 -->
-    <n-card class="model-list-card" :bordered="false">
-      <n-data-table
-        :columns="columns"
-        :data="models"
-        :loading="loading"
-        :row-key="(row: AiModelConfig) => row.id"
-        striped
-      />
-    </n-card>
+    <section class="section-grid">
+      <div class="surface-panel span-4">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Actions</div>
+            <h3>快速操作</h3>
+          </div>
+        </div>
+        <div class="quick-actions">
+          <n-button type="primary" size="large" @click="openCreateModal">
+            <template #icon><n-icon><AddIcon /></n-icon></template>
+            添加模型
+          </n-button>
+          <n-button size="large" @click="loadModels">
+            <template #icon><n-icon><RefreshIcon /></n-icon></template>
+            刷新列表
+          </n-button>
+          <div class="provider-pills">
+            <span v-for="provider in providerOptions.slice(0, 4)" :key="provider.value" class="provider-pill">
+              {{ provider.label }}
+            </span>
+          </div>
+        </div>
+      </div>
 
-    <!-- 创建/编辑模型弹窗 -->
-    <n-modal v-model:show="showCreateModal" preset="card" :title="editingModel ? '编辑模型' : '添加模型'" style="width: 600px">
-      <n-form ref="formRef" :model="form" :rules="formRules">
-        <n-form-item label="模型名称" path="name">
-          <n-input v-model:value="form.name" placeholder="如：通义千问、DeepSeek" />
-        </n-form-item>
-        <n-form-item label="提供商" path="provider">
-          <n-select
-            v-model:value="form.provider"
-            :options="providerOptions"
-            placeholder="选择提供商"
-            @update:value="onProviderChange"
-          />
-        </n-form-item>
-        <n-form-item label="API 地址" path="baseUrl">
-          <n-input v-model:value="form.baseUrl" placeholder="如：https://api.openai.com/v1" />
-        </n-form-item>
-        <n-form-item label="模型名称" path="modelName">
-          <n-input v-model:value="form.modelName" placeholder="如：gpt-4、qwen-plus、deepseek-chat" />
-        </n-form-item>
-        <n-form-item label="API Key" path="apiKey">
-          <n-input
-            v-model:value="form.apiKey"
-            type="password"
-            show-password-on="click"
-            placeholder="输入 API Key"
-          />
-        </n-form-item>
+      <div class="surface-panel span-8">
+        <div class="section-head">
+          <div>
+            <div class="page-eyebrow">Overview</div>
+            <h3>模型面板</h3>
+          </div>
+        </div>
+        <n-data-table
+          :columns="columns"
+          :data="models"
+          :loading="loading"
+          :row-key="(row: AiModelConfig) => row.id"
+          striped
+        />
+      </div>
+    </section>
+
+    <n-modal v-model:show="showCreateModal" preset="card" :title="editingModel ? '编辑模型' : '添加模型'" style="width: min(680px, 92vw)">
+      <n-form ref="formRef" :model="form" :rules="formRules" label-placement="top">
+        <n-grid :cols="2" :x-gap="16">
+          <n-form-item-gi label="展示名称" path="name">
+            <n-input v-model:value="form.name" placeholder="如：通义千问 / DeepSeek" />
+          </n-form-item-gi>
+          <n-form-item-gi label="提供商" path="provider">
+            <n-select
+              v-model:value="form.provider"
+              :options="providerOptions"
+              placeholder="选择提供商"
+              @update:value="onProviderChange"
+            />
+          </n-form-item-gi>
+          <n-form-item-gi span="2" label="API 地址" path="baseUrl">
+            <n-input v-model:value="form.baseUrl" placeholder="如：https://api.openai.com/v1" />
+          </n-form-item-gi>
+          <n-form-item-gi label="模型名称" path="modelName">
+            <n-input v-model:value="form.modelName" placeholder="如：gpt-4.1 / qwen-plus" />
+          </n-form-item-gi>
+          <n-form-item-gi label="API Key" path="apiKey">
+            <n-input v-model:value="form.apiKey" type="password" show-password-on="click" placeholder="输入 API Key" />
+          </n-form-item-gi>
+        </n-grid>
       </n-form>
       <template #footer>
-        <n-space justify="end">
+        <n-space justify="space-between">
           <n-button @click="testConnection" :loading="testLoading">测试连接</n-button>
-          <n-button @click="showCreateModal = false">取消</n-button>
-          <n-button type="primary" @click="submitForm" :loading="submitLoading">
-            {{ editingModel ? '更新' : '创建' }}
-          </n-button>
+          <n-space>
+            <n-button @click="showCreateModal = false">取消</n-button>
+            <n-button type="primary" @click="submitForm" :loading="submitLoading">
+              {{ editingModel ? '更新' : '创建' }}
+            </n-button>
+          </n-space>
         </n-space>
       </template>
     </n-modal>
@@ -68,45 +105,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, h, onMounted } from 'vue'
+import { computed, h, onMounted, ref } from 'vue'
 import {
-  NCard,
-  NSpace,
   NButton,
-  NIcon,
   NDataTable,
-  NModal,
   NForm,
-  NFormItem,
+  NFormItemGi,
+  NGrid,
+  NIcon,
   NInput,
+  NModal,
   NSelect,
+  NSpace,
   NTag,
-  useMessage,
   useDialog,
+  useMessage,
   type DataTableColumns
 } from 'naive-ui'
 import {
   AddOutline as AddIcon,
   RefreshOutline as RefreshIcon,
-  StarOutline as StarIcon,
   Star as StarFilledIcon,
+  StarOutline as StarIcon,
   TrashOutline as TrashIcon
 } from '@vicons/ionicons5'
-import axios from 'axios'
 import dayjs from 'dayjs'
-
-interface AiModelConfig {
-  id: number
-  name: string
-  provider: string
-  baseUrl: string
-  modelName: string
-  apiKeyPreview: string
-  isDefault: boolean
-  enabled: boolean
-  createTime: string
-  updateTime: string
-}
+import type { AiModelConfig } from '@/types'
+import { modelService } from '@/services/api'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -117,6 +142,7 @@ const editingModel = ref<AiModelConfig | null>(null)
 const testLoading = ref(false)
 const submitLoading = ref(false)
 const formRef = ref()
+const providerOptions = ref<Array<{ label: string; value: string; baseUrl: string }>>([])
 
 const form = ref({
   name: '',
@@ -134,29 +160,22 @@ const formRules = {
   apiKey: { required: true, message: '请输入 API Key', trigger: 'blur' }
 }
 
-const providerOptions = ref([
-  { label: 'OpenAI', value: 'openai', baseUrl: 'https://api.openai.com/v1' },
-  { label: '阿里云（通义千问）', value: 'aliyun', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-  { label: 'DeepSeek', value: 'deepseek', baseUrl: 'https://api.deepseek.com/v1' },
-  { label: 'Anthropic（Claude）', value: 'anthropic', baseUrl: 'https://api.anthropic.com/v1' },
-  { label: '智谱AI（GLM）', value: 'glm', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
-  { label: 'Moonshot（Kimi）', value: 'moonshot', baseUrl: 'https://api.moonshot.cn/v1' },
-  { label: '自定义', value: 'other', baseUrl: '' }
-])
+const enabledCount = computed(() => models.value.filter(item => item.enabled).length)
+const defaultModel = computed(() => models.value.find(item => item.isDefault))
 
 const columns: DataTableColumns<AiModelConfig> = [
-  { title: '名称', key: 'name', width: 120 },
-  { title: '提供商', key: 'provider', width: 100, render: row => h(NTag, { size: 'small' }, { default: () => row.provider }) },
-  { title: '模型', key: 'modelName', width: 120 },
+  { title: '名称', key: 'name', width: 160 },
+  { title: '提供商', key: 'provider', width: 120, render: row => h(NTag, { size: 'small', round: true }, { default: () => row.provider }) },
+  { title: '模型', key: 'modelName', width: 160 },
   { title: 'API 地址', key: 'baseUrl', ellipsis: { tooltip: true } },
-  { title: 'API Key', key: 'apiKeyPreview', width: 120 },
+  { title: 'Key 预览', key: 'apiKeyPreview', width: 140 },
   {
     title: '默认',
     key: 'isDefault',
     width: 80,
     render: row => h(NButton, {
-      size: 'small',
       quaternary: true,
+      circle: true,
       type: row.isDefault ? 'warning' : 'default',
       onClick: () => setDefault(row)
     }, { icon: () => h(NIcon, null, { default: () => h(row.isDefault ? StarFilledIcon : StarIcon) }) })
@@ -164,16 +183,17 @@ const columns: DataTableColumns<AiModelConfig> = [
   {
     title: '状态',
     key: 'enabled',
-    width: 80,
-    render: row => h(NTag, { type: row.enabled ? 'success' : 'default', size: 'small' }, { default: () => row.enabled ? '启用' : '禁用' })
+    width: 90,
+    render: row => h(NTag, { type: row.enabled ? 'success' : 'default', size: 'small', round: true }, { default: () => row.enabled ? '启用' : '禁用' })
   },
   { title: '创建时间', key: 'createTime', width: 160, render: row => formatTime(row.createTime) },
   {
     title: '操作',
     key: 'actions',
-    width: 150,
+    width: 170,
     render: row => h(NSpace, null, {
       default: () => [
+        h(NButton, { size: 'small', quaternary: true, onClick: () => editModel(row) }, { default: () => '编辑' }),
         h(NButton, { size: 'small', quaternary: true, onClick: () => toggleEnabled(row) }, { default: () => row.enabled ? '禁用' : '启用' }),
         h(NButton, { size: 'small', quaternary: true, type: 'error', onClick: () => confirmDelete(row) }, { icon: () => h(NIcon, null, { default: () => h(TrashIcon) }) })
       ]
@@ -184,9 +204,9 @@ const columns: DataTableColumns<AiModelConfig> = [
 const loadModels = async () => {
   loading.value = true
   try {
-    const res = await axios.get('/api/model/list')
-    models.value = res.data.data || []
-  } catch (error) {
+    const res = await modelService.list()
+    models.value = res.data || []
+  } catch {
     message.error('加载模型失败')
   } finally {
     loading.value = false
@@ -194,97 +214,85 @@ const loadModels = async () => {
 }
 
 const loadProviders = async () => {
-  try {
-    const res = await axios.get('/api/model/providers')
-    if (res.data.success && res.data.data) {
-      providerOptions.value = res.data.data.map((p: any) => ({
-        label: p.label,
-        value: p.value,
-        baseUrl: p.baseUrl
-      }))
-    }
-  } catch (error) {
-    console.error('加载提供商失败', error)
-  }
+  const res = await modelService.providers()
+  providerOptions.value = res.data || []
 }
 
 const onProviderChange = (value: string) => {
-  const provider = providerOptions.value.find(p => p.value === value)
-  if (provider && provider.baseUrl) {
-    form.value.baseUrl = provider.baseUrl
+  const provider = providerOptions.value.find(item => item.value === value)
+  if (provider?.baseUrl) form.value.baseUrl = provider.baseUrl
+}
+
+const openCreateModal = () => {
+  editingModel.value = null
+  form.value = {
+    name: '',
+    provider: 'aliyun',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    modelName: '',
+    apiKey: ''
   }
+  showCreateModal.value = true
+}
+
+const editModel = (model: AiModelConfig) => {
+  editingModel.value = model
+  form.value = {
+    name: model.name,
+    provider: model.provider,
+    baseUrl: model.baseUrl,
+    modelName: model.modelName,
+    apiKey: ''
+  }
+  showCreateModal.value = true
 }
 
 const testConnection = async () => {
+  await formRef.value?.validate()
+  testLoading.value = true
   try {
-    await formRef.value?.validate()
-    testLoading.value = true
-    const res = await axios.post('/api/model/test', form.value)
-    if (res.data.success) {
-      message.success(res.data.data)
-    } else {
-      message.error(res.data.message || '测试失败')
-    }
-  } catch (error: any) {
-    message.error('测试失败: ' + (error.response?.data?.message || error.message))
+    const res = await modelService.test(form.value)
+    const msg = res.data || res.message || '测试完成'
+    if (msg.includes('连接失败')) message.warning(msg)
+    else message.success(msg)
   } finally {
     testLoading.value = false
   }
 }
 
 const submitForm = async () => {
+  await formRef.value?.validate()
+  submitLoading.value = true
   try {
-    await formRef.value?.validate()
-    submitLoading.value = true
-
-    if (editingModel.value) {
-      const res = await axios.put(`/api/model/${editingModel.value.id}`, form.value)
-      if (res.data.success) {
-        message.success('更新成功')
-        showCreateModal.value = false
-        loadModels()
-      } else {
-        message.error(res.data.message || '更新失败')
-      }
+    const res = editingModel.value
+      ? await modelService.update(editingModel.value.id, form.value)
+      : await modelService.create(form.value)
+    if (res.success) {
+      message.success(editingModel.value ? '更新成功' : '创建成功')
+      showCreateModal.value = false
+      loadModels()
     } else {
-      const res = await axios.post('/api/model', form.value)
-      if (res.data.success) {
-        message.success('创建成功')
-        showCreateModal.value = false
-        loadModels()
-      } else {
-        message.error(res.data.message || '创建失败')
-      }
+      message.error(res.message || '保存失败')
     }
-  } catch (error: any) {
-    message.error('操作失败: ' + (error.response?.data?.message || error.message))
   } finally {
     submitLoading.value = false
   }
 }
 
 const toggleEnabled = async (model: AiModelConfig) => {
-  try {
-    const res = await axios.put(`/api/model/${model.id}/toggle`)
-    if (res.data.success) {
-      message.success(model.enabled ? '已禁用' : '已启用')
-      loadModels()
-    }
-  } catch (error) {
-    message.error('操作失败')
-  }
+  const res = await modelService.toggle(model.id)
+  if (res.success) {
+    message.success(model.enabled ? '已禁用' : '已启用')
+    loadModels()
+  } else message.error(res.message || '操作失败')
 }
 
 const setDefault = async (model: AiModelConfig) => {
-  try {
-    const res = await axios.put(`/api/model/${model.id}/default`)
-    if (res.data.success) {
-      message.success('已设置为默认模型')
-      loadModels()
-    }
-  } catch (error) {
-    message.error('操作失败')
-  }
+  const res = await modelService.setDefault(model.id)
+  if (res.success) {
+    message.success('已设置为默认模型')
+    loadModels()
+  } else message.error(res.message || '设置失败')
 }
 
 const confirmDelete = (model: AiModelConfig) => {
@@ -294,40 +302,30 @@ const confirmDelete = (model: AiModelConfig) => {
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: async () => {
-      try {
-        const res = await axios.delete(`/api/model/${model.id}`)
-        if (res.data.success) {
-          message.success('删除成功')
-          loadModels()
-        }
-      } catch (error) {
-        message.error('删除失败')
-      }
+      const res = await modelService.delete(model.id)
+      if (res.success) {
+        message.success('删除成功')
+        loadModels()
+      } else message.error(res.message || '删除失败')
     }
   })
 }
 
-function formatTime(time: string) {
-  if (!time) return '-'
-  return dayjs(time).format('YYYY-MM-DD HH:mm')
-}
+const formatTime = (time?: string) => time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-'
 
-onMounted(() => {
-  loadModels()
-  loadProviders()
+onMounted(async () => {
+  await Promise.all([loadModels(), loadProviders()])
 })
 </script>
 
 <style scoped>
-.models-page {
-  display: grid;
-  gap: 16px;
-}
-
-.action-card,
-.model-list-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-}
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr); gap: 20px; }
+.hero-actions, .quick-actions { display: grid; gap: 14px; }
+.hero-stat, .provider-pill { border: 1px solid var(--border-color); background: rgba(255,255,255,.05); }
+.hero-stat { padding: 16px 18px; border-radius: 20px; }
+.hero-stat span { color: var(--text-secondary); font-size: .86rem; }
+.hero-stat strong { display:block; margin-top:6px; font-size:1.3rem; }
+.provider-pills { display:flex; flex-wrap:wrap; gap:10px; }
+.provider-pill { padding:8px 12px; border-radius:999px; color:var(--text-secondary); font-size:.86rem; }
+@media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
 </style>

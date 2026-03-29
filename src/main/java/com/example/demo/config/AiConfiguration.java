@@ -7,6 +7,8 @@ import com.example.demo.properties.QdrantProperties;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -17,6 +19,9 @@ import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import jakarta.annotation.PostConstruct;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -90,11 +95,23 @@ public class AiConfiguration {
     @Bean
     @Primary
     public ObjectMapper objectMapper() {
+        DateTimeFormatter flexibleDateTimeFormatter = new DateTimeFormatterBuilder()
+                .appendPattern("yyyy-MM-dd")
+                .optionalStart().appendLiteral(' ').optionalEnd()
+                .optionalStart().appendLiteral('T').optionalEnd()
+                .appendPattern("HH:mm:ss")
+                .toFormatter();
+
+        JavaTimeModule javaTimeModule = new JavaTimeModule();
+        javaTimeModule.addDeserializer(
+                LocalDateTime.class,
+                new LocalDateTimeDeserializer(flexibleDateTimeFormatter)
+        );
+
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        // 注册 JavaTimeModule 支持 Java 8 日期时间类型
-        mapper.findAndRegisterModules();
+        mapper.registerModule(javaTimeModule);
         // 禁用日期时间作为时间戳
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return mapper;

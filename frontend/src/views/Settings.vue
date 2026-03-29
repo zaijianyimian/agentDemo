@@ -630,7 +630,7 @@ import {
   PulseOutline as PulseIcon,
   CloseOutline as CloseIcon
 } from '@vicons/ionicons5'
-import axios from 'axios'
+import { embeddingService, searchService, settingsService } from '@/services/api'
 import { useThemeStore } from '@/stores/theme'
 
 const message = useMessage()
@@ -703,9 +703,9 @@ const searchEngineOptions = [
 // 加载所有设置
 const loadAllSettings = async () => {
   try {
-    const res = await axios.get('/api/settings')
-    if (res.data.success && res.data.data) {
-      const data = res.data.data
+    const res = await settingsService.getAll()
+    if (res.success && res.data) {
+      const data = res.data
 
       if (data.system) {
         systemSettings.value = { ...systemSettings.value, ...data.system }
@@ -747,17 +747,15 @@ const selectTheme = (theme: 'light' | 'dark' | 'auto') => {
 // Logo上传处理
 const handleLogoUpload = async ({ file }: { file: { file: File | null } }) => {
   if (!file.file) return
-  const formData = new FormData()
-  formData.append('file', file.file)
   try {
-    const res = await axios.post('/api/file/upload/image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    if (res.data.success && res.data.data?.url) {
-      systemSettings.value.site_logo = res.data.data.url
+    const res = await settingsService.uploadImage(file.file)
+    const uploadData = res.data as any
+    const logoUrl = typeof uploadData === 'string' ? uploadData : uploadData?.url
+    if (res.success && logoUrl) {
+      systemSettings.value.site_logo = logoUrl
       message.success('Logo上传成功')
     } else {
-      message.error(res.data.message || '上传失败')
+      message.error(res.message || '上传失败')
     }
   } catch (error: any) {
     message.error('上传失败: ' + (error.response?.data?.message || error.message))
@@ -773,7 +771,7 @@ const removeLogo = () => {
 const saveSystemSettings = async () => {
   saving.value = true
   try {
-    await axios.put('/api/settings/system', systemSettings.value)
+    await settingsService.updateSystem(systemSettings.value)
     message.success('保存成功')
   } catch (error) {
     message.error('保存失败')
@@ -786,7 +784,7 @@ const saveSystemSettings = async () => {
 const saveModelSettings = async () => {
   saving.value = true
   try {
-    await axios.put('/api/settings/model', modelSettings.value)
+    await settingsService.updateModel(modelSettings.value)
     message.success('保存成功')
   } catch (error) {
     message.error('保存失败')
@@ -799,7 +797,7 @@ const saveModelSettings = async () => {
 const saveQdrantSettings = async () => {
   saving.value = true
   try {
-    await axios.put('/api/settings/qdrant', qdrantSettings.value)
+    await settingsService.updateQdrant(qdrantSettings.value)
     message.success('保存成功')
   } catch (error) {
     message.error('保存失败')
@@ -812,11 +810,11 @@ const saveQdrantSettings = async () => {
 const testQdrantConnection = async () => {
   testing.value = true
   try {
-    const res = await axios.get('/api/embedding/test')
-    if (res.data.success) {
+    const res = await embeddingService.test()
+    if (res.success) {
       message.success('向量数据库连接正常')
     } else {
-      message.error(res.data.message || '连接失败')
+      message.error(res.message || '连接失败')
     }
   } catch (error: any) {
     message.error('连接失败: ' + (error.response?.data?.message || error.message))
@@ -829,7 +827,7 @@ const testQdrantConnection = async () => {
 const saveSearchSettings = async () => {
   saving.value = true
   try {
-    await axios.put('/api/settings/search', searchSettings.value)
+    await settingsService.updateSearch(searchSettings.value)
     message.success('保存成功')
   } catch (error) {
     message.error('保存失败')
@@ -842,11 +840,11 @@ const saveSearchSettings = async () => {
 const testSearchConnection = async () => {
   testing.value = true
   try {
-    const res = await axios.get('/api/search/test')
-    if (res.data.success) {
+    const res = await searchService.test()
+    if (res.success) {
       message.success('搜索功能正常')
     } else {
-      message.error(res.data.message || '搜索失败')
+      message.error(res.message || '搜索失败')
     }
   } catch (error: any) {
     message.error('测试失败: ' + (error.response?.data?.message || error.message))
@@ -859,7 +857,7 @@ const testSearchConnection = async () => {
 const saveScheduleSettings = async () => {
   saving.value = true
   try {
-    await axios.put('/api/settings/schedule', scheduleSettings.value)
+    await settingsService.updateSchedule(scheduleSettings.value)
     message.success('保存成功')
   } catch (error) {
     message.error('保存失败')
@@ -872,7 +870,7 @@ const saveScheduleSettings = async () => {
 const saveFileSettings = async () => {
   saving.value = true
   try {
-    await axios.put('/api/settings/file', fileSettings.value)
+    await settingsService.updateFile(fileSettings.value)
     message.success('保存成功')
   } catch (error) {
     message.error('保存失败')

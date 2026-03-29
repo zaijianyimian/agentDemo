@@ -27,6 +27,12 @@ public class ChatWithMemoryService {
     @Resource
     private ModelManager modelManager;
 
+    @Resource(name = "chatModel")
+    private ChatModel defaultChatModel;
+
+    @Resource(name = "streamingChatModel")
+    private StreamingChatModel defaultStreamingChatModel;
+
     /**
      * 带记忆的聊天接口
      */
@@ -57,14 +63,19 @@ public class ChatWithMemoryService {
      * @param modelId 模型ID，null时使用默认模型
      */
     public ChatWithMemory getChatWithMemory(Long modelId) {
-        // 如果未指定模型，使用默认模型
-        Long effectiveModelId = modelId;
-        if (effectiveModelId == null) {
-            effectiveModelId = modelManager.getDefaultModelId();
+        if (modelId == null) {
+            return chatWithMemoryCache.computeIfAbsent(0L, id -> {
+                log.info("Creating ChatWithMemory for application default model");
+                return AiServices.builder(ChatWithMemory.class)
+                        .chatModel(defaultChatModel)
+                        .streamingChatModel(defaultStreamingChatModel)
+                        .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(20))
+                        .build();
+            });
         }
 
         // 从缓存获取或创建新实例
-        return chatWithMemoryCache.computeIfAbsent(effectiveModelId, id -> {
+        return chatWithMemoryCache.computeIfAbsent(modelId, id -> {
             ChatModel chatModel = modelManager.getChatModel(id);
             StreamingChatModel streamingModel = modelManager.getStreamingChatModel(id);
             log.info("Creating ChatWithMemory for modelId: {}", id);

@@ -38,7 +38,7 @@ public class ScheduleEvent {
     /**
      * 事件时间
      */
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd['T'][' ']HH:mm:ss")
     private LocalDateTime eventTime;
 
     /**

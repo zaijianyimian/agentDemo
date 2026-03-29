@@ -1,0 +1,1106 @@
+[
+  {
+    "name": "model-providers",
+    "method": "GET",
+    "path": "/model/providers",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"baseUrl\":\"https://api.openai.com/v1\",\"label\":\"OpenAI\",\"value\":\"openai\"},{\"baseUrl\":\"https://dashscope.aliyuncs.com/compatible-mode/v1\""
+  },
+  {
+    "name": "model-list",
+    "method": "GET",
+    "path": "/model/list",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"modelName\":\"gpt-4-turbo\",\"baseUrl\":\"https://dashscope.aliyuncs.com/compatible-mode/v1\",\"isDefault\":false,\"provider\":\"aliyun\",\"createTi"
+  },
+  {
+    "name": "settings-all",
+    "method": "GET",
+    "path": "/settings",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"schedule\":{\"user_email\":\"your_mail@example.com\",\"daily_summary_cron\":\"0 0 20 * * ?\",\"storage_path\":\"./data/schedules\",\"morning_reminder_cron"
+  },
+  {
+    "name": "email-templates",
+    "method": "GET",
+    "path": "/email/templates",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"name\":\"QQ邮箱\",\"host\":\"imap.qq.com\",\"port\":993,\"sslEnabled\":true,\"protocol\":\"imap\"},{\"name\":\"163邮箱\",\"host\":\"imap.163.com\",\"port\":993,\"sslEnabled\":true,\"protocol\":\"imap\"},{\"name\":\""
+  },
+  {
+    "name": "email-enabled",
+    "method": "GET",
+    "path": "/email/config/enabled",
+    "status": 200,
+    "ok": true,
+    "note": "[]"
+  },
+  {
+    "name": "email-listener-status",
+    "method": "GET",
+    "path": "/email/listener/status",
+    "status": 200,
+    "ok": true,
+    "note": "{}"
+  },
+  {
+    "name": "skill-list",
+    "method": "GET",
+    "path": "/skill/list",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":1,\"code\":\"web_search\",\"name\":\"网络搜索\",\"description\":\"在互联网上搜索相关信息，返回搜索结果\",\"category\":\"search\",\"icon\":\"search\",\"enabled\":true,\"isBuiltin\":true,\"config\":null,\"remark\":null,\"creat"
+  },
+  {
+    "name": "skill-enabled",
+    "method": "GET",
+    "path": "/skill/enabled",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":1,\"code\":\"web_search\",\"name\":\"网络搜索\",\"description\":\"在互联网上搜索相关信息，返回搜索结果\",\"category\":\"search\",\"icon\":\"search\",\"enabled\":true,\"isBuiltin\":true,\"config\":null,\"remark\":null,\"creat"
+  },
+  {
+    "name": "skill-builtin",
+    "method": "GET",
+    "path": "/skill/builtin",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":1,\"code\":\"web_search\",\"name\":\"网络搜索\",\"description\":\"在互联网上搜索相关信息，返回搜索结果\",\"category\":\"search\",\"icon\":\"search\",\"enabled\":true,\"isBuiltin\":true,\"config\":null,\"remark\":null,\"creat"
+  },
+  {
+    "name": "skill-categories",
+    "method": "GET",
+    "path": "/skill/categories",
+    "status": 200,
+    "ok": true,
+    "note": "[\"ai\",\"custom\",\"data\",\"search\",\"system\",\"test\"]"
+  },
+  {
+    "name": "mcp-tools",
+    "method": "GET",
+    "path": "/mcp/tools",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":1,\"name\":\"updated_tool\",\"displayName\":\"天气查询\",\"description\":\"updated description\",\"toolType\":\"HTTP_API\",\"config\":\"{\\\"url\\\": \\\"https://api.example.com/weather\\\", \\\"method\\\": \\"
+  },
+  {
+    "name": "mcp-tools-enabled",
+    "method": "GET",
+    "path": "/mcp/tools/enabled",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":1,\"name\":\"updated_tool\",\"displayName\":\"天气查询\",\"description\":\"updated description\",\"toolType\":\"HTTP_API\",\"config\":\"{\\\"url\\\": \\\"https://api.example.com/weather\\\", \\\"method\\\": \\"
+  },
+  {
+    "name": "schedule-list",
+    "method": "GET",
+    "path": "/schedule/list",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":1,\"title\":\"updated_schedule\",\"description\":\"test\",\"eventTime\":null,\"eventDate\":null,\"location\":null,\"sourceEmailId\":null,\"sourceEmail\":null,\"reminderStatus\":\"pending\",\"summa"
+  },
+  {
+    "name": "schedule-latest",
+    "method": "GET",
+    "path": "/schedule/latest",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":1,\"title\":\"updated_schedule\",\"description\":\"test\",\"eventTime\":null,\"eventDate\":null,\"location\":null,\"sourceEmailId\":null,\"sourceEmail\":null,\"reminderStatus\":\"pending\",\"summa"
+  },
+  {
+    "name": "schedule-today",
+    "method": "GET",
+    "path": "/schedule/today",
+    "status": 200,
+    "ok": true,
+    "note": "[]"
+  },
+  {
+    "name": "schedule-tomorrow",
+    "method": "GET",
+    "path": "/schedule/tomorrow",
+    "status": 200,
+    "ok": true,
+    "note": "[]"
+  },
+  {
+    "name": "schedule-files",
+    "method": "GET",
+    "path": "/schedule/files",
+    "status": 200,
+    "ok": true,
+    "note": "[\"schedule-2026-03-29.md\"]"
+  },
+  {
+    "name": "file-list",
+    "method": "GET",
+    "path": "/file/list",
+    "status": 200,
+    "ok": true,
+    "note": "{\"total\":1,\"data\":[{\"id\":5,\"fileName\":\"test_upload.txt\",\"filePath\":\".\\\\data\\\\documents\\\\9fc594ce-3ad9-4e9f-a6b1-aa782bbbdbde.txt\",\"fileType\":\"txt\",\"fileSize\":29,\"content\":\"Test fil"
+  },
+  {
+    "name": "file-search",
+    "method": "GET",
+    "path": "/file/search?minImportance=1&maxImportance=5",
+    "status": 200,
+    "ok": true,
+    "note": "{\"total\":1,\"data\":[{\"id\":5,\"fileName\":\"test_upload.txt\",\"filePath\":\".\\\\data\\\\documents\\\\9fc594ce-3ad9-4e9f-a6b1-aa782bbbdbde.txt\",\"fileType\":\"txt\",\"fileSize\":29,\"content\":\"Test fil"
+  },
+  {
+    "name": "note-list",
+    "method": "GET",
+    "path": "/note/list",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":2,\"title\":\"UpdatedNote\",\"content\":\"\",\"filePath\":\"data/notes/2.md\",\"tags\":null,\"aiSummary\":null,\"isPinned\":true,\"createTime\":\"2026-"
+  },
+  {
+    "name": "snippet-list",
+    "method": "GET",
+    "path": "/snippet/list",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":4,\"title\":\"HelloWorld\",\"code\":\"public class Hello { public static void main(String[] args) { System.out.println(\\\"Hello\\\"); } }\",\""
+  },
+  {
+    "name": "task-list",
+    "method": "GET",
+    "path": "/task/list",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":1,\"name\":\"UpdatedTask\",\"description\":\"这是一个测试\",\"taskType\":\"CHAT\",\"cronExpression\":\"0 0 18 * * ?\",\"params\":\"早安\",\"skillCode\":null,\"la"
+  },
+  {
+    "name": "task-types",
+    "method": "GET",
+    "path": "/task/types",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[\"SKILL\",\"CHAT\",\"REMINDER\"],\"total\":null}"
+  },
+  {
+    "name": "knowledge-list",
+    "method": "GET",
+    "path": "/knowledge/list",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":2,\"name\":\"TestKB\",\"description\":\"Test knowledge base\",\"collectionName\":\"kb_60a724cc_bbb6_42\",\"embeddingModel\":\"nomic-embed-text\",\""
+  },
+  {
+    "name": "search-history",
+    "method": "GET",
+    "path": "/search/history",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":2,\"query\":\"java\",\"searchMode\":\"normal\",\"resultCount\":3,\"hasSummary\":false,\"durationMs\":763,\"sessionId\":null,\"sourceIp\":null,\"creat"
+  },
+  {
+    "name": "search-hot",
+    "method": "GET",
+    "path": "/search/hot",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"query\":\"java\",\"count\":2}],\"total\":null}"
+  },
+  {
+    "name": "search-statistics",
+    "method": "GET",
+    "path": "/search/statistics",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"totalSearches\":2,\"recentSearches\":[{\"id\":2,\"query\":\"java\",\"searchMode\":\"normal\",\"resultCount\":3,\"hasSummary\":false,\"durationMs\":763,\"se"
+  },
+  {
+    "name": "search-interests",
+    "method": "GET",
+    "path": "/search/interests",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":1,\"tag\":\"java\",\"category\":\"other\",\"weight\":2,\"relatedKeywords\":\"[\\\"java\\\"]\",\"lastSearchTime\":\"2026-03-29T16:49:47\",\"searchCount\":2"
+  },
+  {
+    "name": "search-top-interests",
+    "method": "GET",
+    "path": "/search/interests/top",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":1,\"tag\":\"java\",\"category\":\"other\",\"weight\":2,\"relatedKeywords\":\"[\\\"java\\\"]\",\"lastSearchTime\":\"2026-03-29T16:49:47\",\"searchCount\":2"
+  },
+  {
+    "name": "search-interest-report",
+    "method": "GET",
+    "path": "/search/interests/report",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"totalSearchWeight\":2,\"totalInterests\":1,\"categoryDistribution\":[{\"other\":2}],\"categoryInterests\":{\"other\":[{\"id\":1,\"tag\":\"java\",\"catego"
+  },
+  {
+    "name": "chat-history-sessions",
+    "method": "GET",
+    "path": "/chat/history/sessions",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":4,\"title\":\"UpdatedTitle\",\"summary\":null,\"messageCount\":5,\"lastMessageTime\":\"2026-03-29 09:42:04\",\"createTime\":\"2026-03-28 20:55:54"
+  },
+  {
+    "name": "code-types",
+    "method": "GET",
+    "path": "/code/types",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[\"entity\",\"service\",\"controller\",\"mapper\",\"dto\",\"vue\",\"typescript\",\"sql\"],\"total\":null}"
+  },
+  {
+    "name": "code-analyze",
+    "method": "GET",
+    "path": "/code/analyze",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"fileCounts\":{\".name\":1,\".sh\":3,\".css\":2588,\".properties\":5,\".eslintrc\":74,\".gitattributes\":1,\".meta\":3,\".node\":8,\".vue\":18,\".bin\":17,\"."
+  },
+  {
+    "name": "model-create",
+    "method": "POST",
+    "path": "/model",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"modelName\":\"gpt-4o-mini\",\"baseUrl\":\"https://api.openai.com/v1\",\"isDefault\":false,\"provider\":\"openai\",\"createTime\":\"2026-03-29T18:04:57."
+  },
+  {
+    "name": "model-detail",
+    "method": "GET",
+    "path": "/model/6",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"modelName\":\"gpt-4o-mini\",\"baseUrl\":\"https://api.openai.com/v1\",\"isDefault\":false,\"provider\":\"openai\",\"createTime\":\"2026-03-29T18:04:58\""
+  },
+  {
+    "name": "model-update",
+    "method": "PUT",
+    "path": "/model/6",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"modelName\":\"gpt-4.1-mini\",\"baseUrl\":\"https://api.openai.com/v1\",\"isDefault\":false,\"provider\":\"openai\",\"createTime\":\"2026-03-29T18:04:58"
+  },
+  {
+    "name": "model-toggle",
+    "method": "PUT",
+    "path": "/model/6/toggle",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"modelName\":\"gpt-4.1-mini\",\"baseUrl\":\"https://api.openai.com/v1\",\"isDefault\":false,\"provider\":\"openai\",\"createTime\":\"2026-03-29T18:04:58"
+  },
+  {
+    "name": "model-default",
+    "method": "PUT",
+    "path": "/model/6/default",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"modelName\":\"gpt-4.1-mini\",\"baseUrl\":\"https://api.openai.com/v1\",\"isDefault\":true,\"provider\":\"openai\",\"createTime\":\"2026-03-29T18:04:58\""
+  },
+  {
+    "name": "model-delete",
+    "method": "DELETE",
+    "path": "/model/6",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":null,\"total\":null}"
+  },
+  {
+    "name": "model-test",
+    "method": "POST",
+    "path": "/model/test",
+    "status": "-1",
+    "ok": false,
+    "note": "The request was canceled due to the configured HttpClient.Timeout of 40 seconds elapsing."
+  },
+  {
+    "name": "chat-session-create",
+    "method": "POST",
+    "path": "/chat/history/session?title=AuditSession",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":9,\"title\":\"AuditSession\",\"summary\":null,\"messageCount\":0,\"lastMessageTime\":null,\"createTime\":\"2026-03-29 18:05:38\",\"updateTime\":\"20"
+  },
+  {
+    "name": "chat-session-detail",
+    "method": "GET",
+    "path": "/chat/history/session/9",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":9,\"title\":\"AuditSession\",\"summary\":null,\"messageCount\":0,\"lastMessageTime\":null,\"createTime\":\"2026-03-29 18:05:38\",\"updateTime\":\"20"
+  },
+  {
+    "name": "chat-session-update-title",
+    "method": "PUT",
+    "path": "/chat/history/session/9/title?title=AuditSession2",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":9,\"title\":\"AuditSession2\",\"summary\":null,\"messageCount\":0,\"lastMessageTime\":null,\"createTime\":\"2026-03-29 18:05:38\",\"updateTime\":\"2"
+  },
+  {
+    "name": "chat-session-add-message",
+    "method": "POST",
+    "path": "/chat/history/session/9/message?role=user&content=hello-audit",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":24,\"sessionId\":9,\"role\":\"user\",\"content\":\"hello-audit\",\"model\":null,\"tokenCount\":null,\"createTime\":\"2026-03-29 18:05:38\"},\"total\":n"
+  },
+  {
+    "name": "chat-session-messages",
+    "method": "GET",
+    "path": "/chat/history/session/9/messages",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":24,\"sessionId\":9,\"role\":\"user\",\"content\":\"hello-audit\",\"model\":null,\"tokenCount\":null,\"createTime\":\"2026-03-29 18:05:38\"}],\"total\""
+  },
+  {
+    "name": "note-create",
+    "method": "POST",
+    "path": "/note",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":4,\"title\":\"Audit Note\",\"content\":\"note content\",\"filePath\":\"data/notes/4.md\",\"tags\":\"audit\",\"aiSummary\":null,\"isPinned\":false,\"crea"
+  },
+  {
+    "name": "note-detail",
+    "method": "GET",
+    "path": "/note/4",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":4,\"title\":\"Audit Note\",\"content\":\"note content\",\"filePath\":\"data/notes/4.md\",\"tags\":\"audit\",\"aiSummary\":null,\"isPinned\":false,\"crea"
+  },
+  {
+    "name": "note-update",
+    "method": "PUT",
+    "path": "/note/4",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":4,\"title\":\"Audit Note Updated\",\"content\":\"updated\",\"filePath\":null,\"tags\":\"audit2\",\"aiSummary\":null,\"isPinned\":null,\"createTime\":nu"
+  },
+  {
+    "name": "note-pin",
+    "method": "PUT",
+    "path": "/note/4/pin",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":4,\"title\":\"Audit Note Updated\",\"content\":\"note content\",\"filePath\":\"data/notes/4.md\",\"tags\":\"audit2\",\"aiSummary\":null,\"isPinned\":tr"
+  },
+  {
+    "name": "note-search",
+    "method": "GET",
+    "path": "/note/search?keyword=Audit",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":4,\"title\":\"Audit Note Updated\",\"content\":\"note content\",\"filePath\":\"data/notes/4.md\",\"tags\":\"audit2\",\"aiSummary\":null,\"isPinned\":t"
+  },
+  {
+    "name": "snippet-create",
+    "method": "POST",
+    "path": "/snippet",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":5,\"title\":\"AuditSnippet\",\"code\":\"class A {}\",\"language\":\"java\",\"description\":\"audit snippet\",\"tags\":null,\"createTime\":\"2026-03-29 1"
+  },
+  {
+    "name": "snippet-detail",
+    "method": "GET",
+    "path": "/snippet/5",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":5,\"title\":\"AuditSnippet\",\"code\":\"class A {}\",\"language\":\"java\",\"description\":\"audit snippet\",\"tags\":null,\"createTime\":\"2026-03-29 1"
+  },
+  {
+    "name": "snippet-update",
+    "method": "PUT",
+    "path": "/snippet/5",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":5,\"title\":\"AuditSnippet2\",\"code\":\"class B {}\",\"language\":\"java\",\"description\":\"updated\",\"tags\":null,\"createTime\":null,\"updateTime\":"
+  },
+  {
+    "name": "snippet-language",
+    "method": "GET",
+    "path": "/snippet/language/java",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":5,\"title\":\"AuditSnippet2\",\"code\":\"class B {}\",\"language\":\"java\",\"description\":\"updated\",\"tags\":null,\"createTime\":\"2026-03-29 18:05"
+  },
+  {
+    "name": "snippet-search",
+    "method": "GET",
+    "path": "/snippet/search?keyword=AuditSnippet",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[{\"id\":5,\"title\":\"AuditSnippet2\",\"code\":\"class B {}\",\"language\":\"java\",\"description\":\"updated\",\"tags\":null,\"createTime\":\"2026-03-29 18:05"
+  },
+  {
+    "name": "snippet-explain",
+    "method": "POST",
+    "path": "/snippet/5/explain",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":\"这是一个空的 Java 类定义，名为 `B`。  \\n- **功能**：仅声明一个名为 `B` 的类，不包含任何字段、方法、构造器或注解；编译后生成 `B.class` 字节码文件。  \\n- **用法**：通常作为占位符、学习示例，或用于后续扩展（如继承、实现接口、添加"
+  },
+  {
+    "name": "schedule-create",
+    "method": "POST",
+    "path": "/schedule",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"服务器内部错误，请稍后重试\",\"error\":\"INTERNAL_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "schedule-parse-email",
+    "method": "POST",
+    "path": "/schedule/parse-email",
+    "status": 200,
+    "ok": true,
+    "note": "{\"id\":null,\"title\":\"会议通知\",\"description\":\"请于2026-03-30 14:00在会议室A开会\",\"eventTime\":\"2026-03-30 14:00:00\",\"eventDate\":null,\"location\":\"会议室A\",\"sourceEmailId\":null,\"sourceEmail\":null,\"re"
+  },
+  {
+    "name": "schedule-parse-save",
+    "method": "POST",
+    "path": "/schedule/parse-and-save",
+    "status": 200,
+    "ok": true,
+    "note": "{\"id\":10,\"title\":\"客户电话\",\"description\":\"请在2026-03-30 16:00回电\",\"eventTime\":\"2026-03-30 16:00:00\",\"eventDate\":\"2026-03-30\",\"location\":\"上海办公室\",\"sourceEmailId\":null,\"sourceEmail\":\"b@tes"
+  },
+  {
+    "name": "schedule-stream-doc",
+    "method": "GET",
+    "path": "/schedule/stream",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"服务器内部错误，请稍后重试\",\"error\":\"INTERNAL_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "task-create",
+    "method": "POST",
+    "path": "/task",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":4,\"name\":\"AuditTask\",\"description\":\"audit\",\"taskType\":\"REMINDER\",\"cronExpression\":\"0 0 12 * * ?\",\"params\":\"{\\\"message\\\":\\\"hello\\\"}\""
+  },
+  {
+    "name": "task-detail",
+    "method": "GET",
+    "path": "/task/4",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":4,\"name\":\"AuditTask\",\"description\":\"audit\",\"taskType\":\"REMINDER\",\"cronExpression\":\"0 0 12 * * ?\",\"params\":\"{\\\"message\\\":\\\"hello\\\"}\""
+  },
+  {
+    "name": "task-update",
+    "method": "PUT",
+    "path": "/task/4",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":4,\"name\":\"AuditTask2\",\"description\":\"updated\",\"taskType\":\"REMINDER\",\"cronExpression\":\"0 15 12 * * ?\",\"params\":\"{}\",\"skillCode\":null"
+  },
+  {
+    "name": "task-toggle",
+    "method": "PUT",
+    "path": "/task/4/toggle",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":4,\"name\":\"AuditTask2\",\"description\":\"updated\",\"taskType\":\"REMINDER\",\"cronExpression\":\"0 15 12 * * ?\",\"params\":\"{}\",\"skillCode\":null"
+  },
+  {
+    "name": "task-execute",
+    "method": "POST",
+    "path": "/task/4/execute",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":\"提醒已触发: updated\",\"total\":null}"
+  },
+  {
+    "name": "email-config-create",
+    "method": "POST",
+    "path": "/email/config",
+    "status": 200,
+    "ok": true,
+    "note": "添加成功"
+  },
+  {
+    "name": "email-config-list",
+    "method": "GET",
+    "path": "/email/config/list",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":2,\"email\":\"audit@example.com\",\"password\":\"pwd\",\"host\":\"imap.example.com\",\"protocol\":\"imap\",\"port\":993,\"sslEnabled\":true,\"enabled\":false,\"folder\":\"INBOX\",\"pollInterval\":30,\"r"
+  },
+  {
+    "name": "email-config-detail",
+    "method": "GET",
+    "path": "/email/config/2",
+    "status": 200,
+    "ok": true,
+    "note": "{\"id\":2,\"email\":\"audit@example.com\",\"password\":\"pwd\",\"host\":\"imap.example.com\",\"protocol\":\"imap\",\"port\":993,\"sslEnabled\":true,\"enabled\":false,\"folder\":\"INBOX\",\"pollInterval\":30,\"re"
+  },
+  {
+    "name": "email-config-update",
+    "method": "PUT",
+    "path": "/email/config",
+    "status": 200,
+    "ok": true,
+    "note": "更新成功"
+  },
+  {
+    "name": "email-config-test-saved",
+    "method": "POST",
+    "path": "/email/config/2/test",
+    "status": 200,
+    "ok": true,
+    "note": "{\"message\":\"连接失败：无法连接到邮件服务器，请检查服务器地址和端口\",\"durationMs\":156,\"success\":false,\"errorDetail\":\"Couldn't connect to host, port: imap.example.com, 993; timeout 10000\",\"messageCount\":0}"
+  },
+  {
+    "name": "email-listener-start",
+    "method": "POST",
+    "path": "/email/listener/start/2",
+    "status": 200,
+    "ok": true,
+    "note": "已启动监听: audit@example.com"
+  },
+  {
+    "name": "email-listener-stop",
+    "method": "POST",
+    "path": "/email/listener/stop/2",
+    "status": 200,
+    "ok": true,
+    "note": "已停止监听: audit@example.com"
+  },
+  {
+    "name": "email-config-delete",
+    "method": "DELETE",
+    "path": "/email/config/2",
+    "status": 200,
+    "ok": true,
+    "note": "删除成功"
+  },
+  {
+    "name": "email-config-test-new",
+    "method": "POST",
+    "path": "/email/config/test",
+    "status": 200,
+    "ok": true,
+    "note": "{\"message\":\"连接失败：无法连接到邮件服务器，请检查服务器地址和端口\",\"durationMs\":6,\"success\":false,\"errorDetail\":\"Couldn't connect to host, port: imap.example.com, 993; timeout 10000\",\"messageCount\":0}"
+  },
+  {
+    "name": "email-listener-reload",
+    "method": "POST",
+    "path": "/email/listener/reload",
+    "status": 200,
+    "ok": true,
+    "note": "已重载所有邮箱监听"
+  },
+  {
+    "name": "knowledge-create",
+    "method": "POST",
+    "path": "/knowledge",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":3,\"name\":\"AuditKB\",\"description\":\"audit kb\",\"collectionName\":\"kb_650dc8e7_955e_44\",\"embeddingModel\":null,\"chunkSize\":500,\"chunkOver"
+  },
+  {
+    "name": "knowledge-detail",
+    "method": "GET",
+    "path": "/knowledge/3",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":3,\"name\":\"AuditKB\",\"description\":\"audit kb\",\"collectionName\":\"kb_650dc8e7_955e_44\",\"embeddingModel\":\"nomic-embed-text\",\"chunkSize\":"
+  },
+  {
+    "name": "knowledge-update",
+    "method": "PUT",
+    "path": "/knowledge/3",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":3,\"name\":\"AuditKB2\",\"description\":\"updated\",\"collectionName\":\"audit_kb\",\"embeddingModel\":null,\"chunkSize\":600,\"chunkOverlap\":50,\"do"
+  },
+  {
+    "name": "knowledge-toggle",
+    "method": "PUT",
+    "path": "/knowledge/3/toggle",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":3,\"name\":\"AuditKB2\",\"description\":\"updated\",\"collectionName\":\"audit_kb\",\"embeddingModel\":\"nomic-embed-text\",\"chunkSize\":600,\"chunkO"
+  },
+  {
+    "name": "knowledge-documents",
+    "method": "GET",
+    "path": "/knowledge/3/documents",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":[],\"total\":null}"
+  },
+  {
+    "name": "knowledge-query",
+    "method": "GET",
+    "path": "/knowledge/3/query?question=what%20is%20this&topK=3",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":\"知识库不存在或未启用\",\"total\":null}"
+  },
+  {
+    "name": "knowledge-search",
+    "method": "GET",
+    "path": "/knowledge/3/search?query=test&topK=3",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"服务器内部错误，请稍后重试\",\"error\":\"INTERNAL_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "file-upload",
+    "method": "POST",
+    "path": "/file/upload",
+    "status": 200,
+    "ok": true,
+    "note": "{\"data\":{\"id\":6,\"sentiment\":\"POSITIVE\",\"status\":\"analyzed\",\"importance\":9,\"summary\":\"该测试文件聚焦于Spring Boot框架的核心实践，涵盖项目结构设计、依赖管理、配置文件使用及控制器与服务层的设计模式，内容专业、实用，对Java开发者具有高度指导价值和正向促进作用。\","
+  },
+  {
+    "name": "file-detail",
+    "method": "GET",
+    "path": "/file/6",
+    "status": 200,
+    "ok": true,
+    "note": "{\"data\":{\"id\":6,\"fileName\":\"test_upload.txt\",\"filePath\":\".\\\\data\\\\documents\\\\b136f709-bf4d-4963-a358-79c5af343e4b.txt\",\"fileType\":\"txt\",\"fileSize\":289,\"content\":\"这是一个测试文件，包含一些重要的技术"
+  },
+  {
+    "name": "file-delete",
+    "method": "DELETE",
+    "path": "/file/6",
+    "status": 200,
+    "ok": true,
+    "note": "{\"message\":\"文档删除成功\",\"success\":true}"
+  },
+  {
+    "name": "knowledge-upload",
+    "method": "POST",
+    "path": "/knowledge/3/upload",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"id\":2,\"baseId\":3,\"fileName\":\"test_upload.txt\",\"filePath\":\".\\\\data\\\\knowledge\\\\audit_kb\\\\5dfa4bb1-5385-4067-83f9-8562ee313704.txt\",\"file"
+  },
+  {
+    "name": "knowledge-delete-document",
+    "method": "DELETE",
+    "path": "/knowledge/document/2",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":null,\"total\":null}"
+  },
+  {
+    "name": "mcp-tools-refresh-list",
+    "method": "GET",
+    "path": "/mcp/tools",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":1,\"name\":\"updated_tool\",\"displayName\":\"天气查询\",\"description\":\"updated description\",\"toolType\":\"HTTP_API\",\"config\":\"{\\\"url\\\": \\\"https://api.example.com/weather\\\", \\\"method\\\": \\"
+  },
+  {
+    "name": "mcp-tool-detail",
+    "method": "GET",
+    "path": "/mcp/tools/1",
+    "status": 200,
+    "ok": true,
+    "note": "{\"id\":1,\"name\":\"updated_tool\",\"displayName\":\"天气查询\",\"description\":\"updated description\",\"toolType\":\"HTTP_API\",\"config\":\"{\\\"url\\\": \\\"https://api.example.com/weather\\\", \\\"method\\\": \\\""
+  },
+  {
+    "name": "mcp-tool-validate",
+    "method": "POST",
+    "path": "/mcp/tools/1/validate",
+    "status": 200,
+    "ok": true,
+    "note": "{\"toolType\":\"HTTP_API\",\"toolName\":\"updated_tool\",\"valid\":true}"
+  },
+  {
+    "name": "mcp-tool-test",
+    "method": "POST",
+    "path": "/mcp/tools/1/test",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":false,\"result\":null,\"error\":\"执行失败: I/O error on GET request for \\\"https://api.example.com/weather\\\": api.example.com\",\"durationMs\":43}"
+  },
+  {
+    "name": "skill-detail",
+    "method": "GET",
+    "path": "/skill/1",
+    "status": 200,
+    "ok": true,
+    "note": "{\"id\":1,\"code\":\"web_search\",\"name\":\"网络搜索\",\"description\":\"在互联网上搜索相关信息，返回搜索结果\",\"category\":\"search\",\"icon\":\"search\",\"enabled\":true,\"isBuiltin\":true,\"config\":null,\"remark\":null,\"create"
+  },
+  {
+    "name": "skill-tools",
+    "method": "GET",
+    "path": "/skill/1/tools",
+    "status": 200,
+    "ok": true,
+    "note": "[]"
+  },
+  {
+    "name": "skill-bind",
+    "method": "POST",
+    "path": "/skill/1/tools/=9&required=false",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"服务器内部错误，请稍后重试\",\"error\":\"INTERNAL_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "skill-unbind",
+    "method": "DELETE",
+    "path": "/skill/1/tools/1",
+    "status": 200,
+    "ok": true,
+    "note": "解绑成功"
+  },
+  {
+    "name": "skill-code",
+    "method": "GET",
+    "path": "/skill/code/web_search",
+    "status": 200,
+    "ok": true,
+    "note": "{\"id\":1,\"code\":\"web_search\",\"name\":\"网络搜索\",\"description\":\"在互联网上搜索相关信息，返回搜索结果\",\"category\":\"search\",\"icon\":\"search\",\"enabled\":true,\"isBuiltin\":true,\"config\":null,\"remark\":null,\"create"
+  },
+  {
+    "name": "skill-execute",
+    "method": "POST",
+    "path": "/skill/web_search/execute",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":false,\"skillCode\":\"web_search\",\"result\":null,\"error\":\"技能未关联任何工具\",\"toolSteps\":null,\"totalDurationMs\":0}"
+  },
+  {
+    "name": "skill-test",
+    "method": "POST",
+    "path": "/skill/1/test",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":false,\"skillCode\":\"web_search\",\"result\":null,\"error\":\"技能未关联任何工具\",\"toolSteps\":null,\"totalDurationMs\":0}"
+  },
+  {
+    "name": "skill-reload",
+    "method": "POST",
+    "path": "/skill/reload",
+    "status": 200,
+    "ok": true,
+    "note": "{\"count\":0,\"message\":\"成功加载 0 个技能\",\"success\":true}"
+  },
+  {
+    "name": "skill-create",
+    "method": "POST",
+    "path": "/skill",
+    "status": 200,
+    "ok": true,
+    "note": "添加成功"
+  },
+  {
+    "name": "skill-import",
+    "method": "POST",
+    "path": "/skill/import",
+    "status": 200,
+    "ok": true,
+    "note": "{\"message\":\"技能导入成功\",\"success\":true}"
+  },
+  {
+    "name": "skill-list-after",
+    "method": "GET",
+    "path": "/skill/list",
+    "status": 200,
+    "ok": true,
+    "note": "[{\"id\":1,\"code\":\"web_search\",\"name\":\"网络搜索\",\"description\":\"在互联网上搜索相关信息，返回搜索结果\",\"category\":\"search\",\"icon\":\"search\",\"enabled\":true,\"isBuiltin\":true,\"config\":null,\"remark\":null,\"creat"
+  },
+  {
+    "name": "skill-update",
+    "method": "PUT",
+    "path": "/skill/13",
+    "status": 200,
+    "ok": true,
+    "note": "更新成功"
+  },
+  {
+    "name": "skill-toggle",
+    "method": "PUT",
+    "path": "/skill/13/toggle",
+    "status": 200,
+    "ok": true,
+    "note": "状态已切换"
+  },
+  {
+    "name": "skill-export",
+    "method": "GET",
+    "path": "/skill/13/export",
+    "status": 200,
+    "ok": true,
+    "note": "{\"data\":\"{\\r\\n  \\\"code\\\" : \\\"audit_skill\\\",\\r\\n  \\\"name\\\" : \\\"Audit Skill Updated\\\",\\r\\n  \\\"description\\\" : \\\"upd\\\",\\r\\n  \\\"category\\\" : \\\"audit\\\",\\r\\n  \\\"icon\\\" : \\\"bug\\\",\\r\\n  \\\""
+  },
+  {
+    "name": "skill-delete",
+    "method": "DELETE",
+    "path": "/skill/13",
+    "status": 200,
+    "ok": true,
+    "note": "删除成功"
+  },
+  {
+    "name": "analyze",
+    "method": "GET",
+    "path": "/analyze?content=hello%20world",
+    "status": 200,
+    "ok": true,
+    "note": "{\"importance\":1,\"tags\":[\"greeting\",\"basic\"],\"sentiment\":\"POSITIVE\",\"summary\":\"A simple, friendly greeting commonly used to introduce or initiate communication.\"}"
+  },
+  {
+    "name": "embedding",
+    "method": "GET",
+    "path": "/embedding?text=hello",
+    "status": 200,
+    "ok": true,
+    "note": "[0.017889164,-0.0058526504,-0.17529091,-0.013723884,0.034010787,0.044742387,0.0124144675,-0.002564168,-0.0147762215,-0.039306562,-0.00919498,0.05171057,0.057712696,0.057206195,0.04"
+  },
+  {
+    "name": "embedding-full",
+    "method": "GET",
+    "path": "/embedding/full?text=hello",
+    "status": 200,
+    "ok": true,
+    "note": "{}"
+  },
+  {
+    "name": "search",
+    "method": "GET",
+    "path": "/search?query=OpenAI",
+    "status": 200,
+    "ok": true,
+    "note": "{\"query\":\"OpenAI\",\"results\":[{\"title\":\"OpenAI | OpenAI\",\"url\":\"https://openai.com/\",\"snippet\":\"We believe our research will eventually lead to artificial general intelligence, a sy"
+  },
+  {
+    "name": "search-summary",
+    "method": "GET",
+    "path": "/search/summary?query=OpenAI",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"未知错误，请稍后重试\",\"error\":\"UNKNOWN_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "search-chat",
+    "method": "GET",
+    "path": "/search/chat?message=OpenAI",
+    "status": 200,
+    "ok": true,
+    "note": "{\"content\":\"OpenAI 是一家美国人工智能（AI）研究组织，由非营利基金会和受控的营利性公共利益公司组成（来源：Wikipedia）。其使命是确保人工通用智能（AGI）造福全人类，目标是开发能解决人类水平问题的系统，并致力于构建安全、有益的 AGI（来源：openai.com；X - Twitter）。\",\"importance\":9,\"tag"
+  },
+  {
+    "name": "search-chat-stream",
+    "method": "GET",
+    "path": "/search/chat/stream?message=OpenAI",
+    "status": 200,
+    "ok": true,
+    "note": "{\"content\":\"Open\",\"importance\":null,\"tags\":null,\"sentiment\":null,\"summary\":null,\"isComplete\":false}{\"content\":\"AI 是一家\",\"importance\":null,\"tags\":null,\"sentiment\":null,\"summary\":null"
+  },
+  {
+    "name": "chat-complete-session",
+    "method": "GET",
+    "path": "/chat/complete/session?message=hello&sessionId=9",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"服务器内部错误，请稍后重试\",\"error\":\"INTERNAL_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "chat-stream-session",
+    "method": "GET",
+    "path": "/chat/stream/session?message=hello&sessionId=9",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"未知错误，请稍后重试\",\"error\":\"UNKNOWN_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "chat-stream-session-json",
+    "method": "GET",
+    "path": "/chat/stream/session/json?message=hello&sessionId=9",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"未知错误，请稍后重试\",\"error\":\"UNKNOWN_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "chat-complete",
+    "method": "GET",
+    "path": "/chat/complete?message=hello",
+    "status": 200,
+    "ok": true,
+    "note": "Hello! How can I help you today? 😊"
+  },
+  {
+    "name": "chat-stream",
+    "method": "GET",
+    "path": "/chat/stream?message=hello",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"未知错误，请稍后重试\",\"error\":\"UNKNOWN_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "chat-stream-json",
+    "method": "GET",
+    "path": "/chat/stream/json?message=hello",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"未知错误，请稍后重试\",\"error\":\"UNKNOWN_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "chat-structured",
+    "method": "GET",
+    "path": "/chat/structured?message=hello",
+    "status": 200,
+    "ok": true,
+    "note": "{\"content\":\"Hello! How can I help you today? \\uD83D\\uDE0A\",\"importance\":1,\"tags\":[\"greeting\",\"assistance\"],\"sentiment\":\"POSITIVE\",\"summary\":\"A friendly, welcoming greeting offering"
+  },
+  {
+    "name": "chat-stream-test",
+    "method": "GET",
+    "path": "/chat/stream/test?message=hello",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"未知错误，请稍后重试\",\"error\":\"UNKNOWN_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "memory-extract-store",
+    "method": "POST",
+    "path": "/memory/extract-store",
+    "status": 200,
+    "ok": true,
+    "note": "{\"sessionId\":\"audit-session\",\"summary\":\"user: I like java assistant: noted\",\"category\":\"general\",\"tags\":[\"general\"],\"importance\":20,\"shouldStore\":false,\"createAt\":\"2026-03-29T10:06"
+  },
+  {
+    "name": "memory-search",
+    "method": "GET",
+    "path": "/memory/search?query=java&sessionId=audit-session",
+    "status": 200,
+    "ok": true,
+    "note": "[]"
+  },
+  {
+    "name": "mcp-agent-chat",
+    "method": "GET",
+    "path": "/mcp/agent/chat?message=hello",
+    "status": 200,
+    "ok": true,
+    "note": "Hello! How can I assist you today?"
+  },
+  {
+    "name": "mcp-agent-chat-post",
+    "method": "POST",
+    "path": "/mcp/agent/chat",
+    "status": 200,
+    "ok": true,
+    "note": "Hello again! How can I help you?"
+  },
+  {
+    "name": "mcp-agent-chat-stream",
+    "method": "GET",
+    "path": "/mcp/agent/chat/stream?message=hello",
+    "status": 200,
+    "ok": true,
+    "note": "Hello! How can I assist you today?"
+  },
+  {
+    "name": "mcp-agent-chat-memory",
+    "method": "GET",
+    "path": "/mcp/agent/chat/audit-session?message=hello",
+    "status": 200,
+    "ok": true,
+    "note": "Hello! How can I assist you today?"
+  },
+  {
+    "name": "mcp-agent-chat-stream-memory",
+    "method": "GET",
+    "path": "/mcp/agent/chat/stream/audit-session?message=hello",
+    "status": 500,
+    "ok": false,
+    "note": "{\"message\":\"未知错误，请稍后重试\",\"error\":\"UNKNOWN_ERROR\",\"success\":false}"
+  },
+  {
+    "name": "code-generate",
+    "method": "POST",
+    "path": "/code/generate",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"success\":true,\"code\":\"package com.example.demo.entity;\\n\\nimport com.baomidou.mybatisplus.annotation.IdType;\\nimport com.baomidou.mybat"
+  },
+  {
+    "name": "code-save",
+    "method": "POST",
+    "path": "/code/save",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":{\"success\":true,\"code\":\"public class AuditSaved {}\",\"fileName\":\"AuditSaved.java\",\"filePath\":\"D:\\\\javaproject\\\\agentDemo\\\\.\\\\generated\\\\au"
+  },
+  {
+    "name": "code-review",
+    "method": "POST",
+    "path": "/code/review",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":\"对提供的 Java 代码 `public class X {}` 进行审查，结论如下（需强调：该代码极度简化，无实际功能，但正因其“空”而暴露出若干关键问题）：\\n\\n---\\n\\n### 1. 代码质量和最佳实践  \\n✅ **符合基本语法规范**：类声明合法，`pub"
+  },
+  {
+    "name": "code-convert",
+    "method": "POST",
+    "path": "/code/convert",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":\"print(\\\"x\\\")\",\"total\":null}"
+  },
+  {
+    "name": "chat-session-clear",
+    "method": "DELETE",
+    "path": "/chat/history/session/9/messages",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":null,\"total\":null}"
+  },
+  {
+    "name": "chat-session-delete",
+    "method": "DELETE",
+    "path": "/chat/history/session/9",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":null,\"total\":null}"
+  },
+  {
+    "name": "note-delete",
+    "method": "DELETE",
+    "path": "/note/4",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":null,\"total\":null}"
+  },
+  {
+    "name": "snippet-delete",
+    "method": "DELETE",
+    "path": "/snippet/5",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":null,\"total\":null}"
+  },
+  {
+    "name": "task-delete",
+    "method": "DELETE",
+    "path": "/task/4",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":null,\"total\":null}"
+  },
+  {
+    "name": "knowledge-delete",
+    "method": "DELETE",
+    "path": "/knowledge/3",
+    "status": 200,
+    "ok": true,
+    "note": "{\"success\":true,\"message\":\"success\",\"data\":null,\"total\":null}"
+  }
+]

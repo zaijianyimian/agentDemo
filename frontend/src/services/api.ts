@@ -1,5 +1,24 @@
 import axios from 'axios'
-import type { ApiResponse, Document, ScheduleEvent, EmailConfig, McpTool, Skill, SearchResult, ChatSession, ChatMessageEntity, Note, CodeSnippet, CodeGenerateRequest, CodeGenerateResponse } from '@/types'
+import type {
+  ApiResponse,
+  Document,
+  ScheduleEvent,
+  EmailConfig,
+  McpTool,
+  Skill,
+  SearchResult,
+  ChatSession,
+  ChatMessageEntity,
+  Note,
+  CodeSnippet,
+  CodeGenerateRequest,
+  CodeGenerateResponse,
+  KnowledgeBase,
+  KnowledgeDocument,
+  AiModelConfig,
+  ScheduledTask,
+  SystemSettings
+} from '@/types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -71,6 +90,21 @@ export const scheduleService = {
     return response.data
   },
 
+  latest: async (limit = 5): Promise<ScheduleEvent[]> => {
+    const response = await api.get('/schedule/latest', { params: { limit } })
+    return response.data
+  },
+
+  range: async (startDate: string, endDate: string): Promise<ScheduleEvent[]> => {
+    const response = await api.get('/schedule/range', { params: { startDate, endDate } })
+    return response.data
+  },
+
+  get: async (id: number): Promise<ScheduleEvent> => {
+    const response = await api.get(`/schedule/${id}`)
+    return response.data
+  },
+
   create: async (data: Partial<ScheduleEvent>): Promise<ScheduleEvent> => {
     const response = await api.post('/schedule', data)
     return response.data
@@ -88,6 +122,41 @@ export const scheduleService = {
 
   complete: async (id: number): Promise<void> => {
     const response = await api.put(`/schedule/${id}/complete`)
+    return response.data
+  },
+
+  cancel: async (id: number): Promise<void> => {
+    const response = await api.put(`/schedule/${id}/cancel`)
+    return response.data
+  },
+
+  parseEmail: async (payload: { subject: string; from: string; content: string }): Promise<ScheduleEvent> => {
+    const response = await api.post('/schedule/parse-email', payload)
+    return response.data
+  },
+
+  parseAndSave: async (payload: { subject: string; from: string; content: string }): Promise<ScheduleEvent> => {
+    const response = await api.post('/schedule/parse-and-save', payload)
+    return response.data
+  },
+
+  listFiles: async (): Promise<string[]> => {
+    const response = await api.get('/schedule/files')
+    return response.data
+  },
+
+  getFileByDate: async (date: string): Promise<ApiResponse<Record<string, any>>> => {
+    const response = await api.get(`/schedule/file/date/${date}`)
+    return response.data
+  },
+
+  getFileByName: async (fileName: string): Promise<ApiResponse<Record<string, any>>> => {
+    const response = await api.get(`/schedule/file/${fileName}`)
+    return response.data
+  },
+
+  getFileByEventId: async (id: number): Promise<ApiResponse<Record<string, any>>> => {
+    const response = await api.get(`/schedule/${id}/file`)
     return response.data
   }
 }
@@ -131,6 +200,21 @@ export const emailService = {
 
   getTemplates: async (): Promise<ApiResponse<any>> => {
     const response = await api.get('/email/templates')
+    return response.data
+  },
+
+  getEnabledConfigs: async (): Promise<ApiResponse<EmailConfig[]>> => {
+    const response = await api.get('/email/config/enabled')
+    return response.data
+  },
+
+  getConfig: async (id: number): Promise<ApiResponse<EmailConfig>> => {
+    const response = await api.get(`/email/config/${id}`)
+    return response.data
+  },
+
+  reloadListeners: async (): Promise<ApiResponse<void>> => {
+    const response = await api.post('/email/listener/reload')
     return response.data
   },
 
@@ -199,6 +283,16 @@ export const mcpToolService = {
   execute: async (name: string, params: any): Promise<ApiResponse<any>> => {
     const response = await api.post(`/mcp/tools/${name}/execute`, params)
     return response.data
+  },
+
+  test: async (id: number): Promise<ApiResponse<any>> => {
+    const response = await api.post(`/mcp/tools/${id}/test`)
+    return response.data
+  },
+
+  validate: async (id: number): Promise<ApiResponse<any>> => {
+    const response = await api.post(`/mcp/tools/${id}/validate`)
+    return response.data
   }
 }
 
@@ -219,6 +313,21 @@ export const skillService = {
     return response.data
   },
 
+  getEnabled: async (): Promise<ApiResponse<Skill[]>> => {
+    const response = await api.get('/skill/enabled')
+    return response.data
+  },
+
+  getByCategory: async (category: string): Promise<ApiResponse<Skill[]>> => {
+    const response = await api.get(`/skill/category/${category}`)
+    return response.data
+  },
+
+  getByCode: async (code: string): Promise<ApiResponse<Skill>> => {
+    const response = await api.get(`/skill/code/${code}`)
+    return response.data
+  },
+
   get: async (id: number): Promise<ApiResponse<Skill>> => {
     const response = await api.get(`/skill/${id}`)
     return response.data
@@ -236,6 +345,26 @@ export const skillService = {
 
   delete: async (id: number): Promise<ApiResponse<void>> => {
     const response = await api.delete(`/skill/${id}`)
+    return response.data
+  },
+
+  toggle: async (id: number): Promise<ApiResponse<Skill>> => {
+    const response = await api.put(`/skill/${id}/toggle`)
+    return response.data
+  },
+
+  bindTool: async (skillId: number, toolId: number): Promise<ApiResponse<void>> => {
+    const response = await api.post(`/skill/${skillId}/tools/${toolId}`)
+    return response.data
+  },
+
+  unbindTool: async (skillId: number, toolId: number): Promise<ApiResponse<void>> => {
+    const response = await api.delete(`/skill/${skillId}/tools/${toolId}`)
+    return response.data
+  },
+
+  getTools: async (id: number): Promise<ApiResponse<McpTool[]>> => {
+    const response = await api.get(`/skill/${id}/tools`)
     return response.data
   },
 
@@ -262,6 +391,11 @@ export const skillService = {
   exportSkill: async (id: number): Promise<ApiResponse<string>> => {
     const response = await api.get(`/skill/${id}/export`)
     return response.data
+  },
+
+  test: async (id: number): Promise<ApiResponse<any>> => {
+    const response = await api.post(`/skill/${id}/test`)
+    return response.data
   }
 }
 
@@ -276,6 +410,38 @@ export const chatService = {
   // MCP Agent聊天
   mcpChat: async (message: string): Promise<string> => {
     const response = await api.get('/mcp/agent/chat', { params: { message } })
+    return response.data
+  },
+
+  chatWithSession: async (message: string, sessionId: number, model?: number): Promise<string> => {
+    const response = await api.get('/chat/complete/session', { params: { message, sessionId, model } })
+    return response.data
+  },
+
+  structured: async (message: string): Promise<ApiResponse<any> | any> => {
+    const response = await api.get('/chat/structured', { params: { message } })
+    return response.data
+  },
+
+  analyze: async (content: string): Promise<ApiResponse<any> | any> => {
+    const response = await api.get('/analyze', { params: { content } })
+    return response.data
+  }
+}
+
+export const embeddingService = {
+  get: async (text: string): Promise<any> => {
+    const response = await api.get('/embedding', { params: { text } })
+    return response.data
+  },
+
+  getFull: async (text: string): Promise<any> => {
+    const response = await api.get('/embedding/full', { params: { text } })
+    return response.data
+  },
+
+  test: async (): Promise<ApiResponse<any>> => {
+    const response = await api.get('/embedding/test')
     return response.data
   }
 }
@@ -294,6 +460,11 @@ export const searchService = {
 
   searchChat: async (message: string): Promise<string> => {
     const response = await api.get('/search/chat', { params: { message } })
+    return response.data
+  },
+
+  test: async (): Promise<ApiResponse<any>> => {
+    const response = await api.get('/search/test')
     return response.data
   },
 
@@ -346,6 +517,18 @@ export const searchService = {
 
   deleteInterest: async (id: number): Promise<ApiResponse<void>> => {
     const response = await api.delete(`/search/interests/${id}`)
+    return response.data
+  }
+}
+
+export const memoryService = {
+  extractAndStore: async (sessionId: string, dialogues: string[]): Promise<ApiResponse<any>> => {
+    const response = await api.post('/memory/extract-store', { sessionId, dialogues })
+    return response.data
+  },
+
+  search: async (query: string, topK = 5): Promise<ApiResponse<any[]>> => {
+    const response = await api.get('/memory/search', { params: { query, topK } })
     return response.data
   }
 }
@@ -446,6 +629,11 @@ export const noteService = {
   togglePin: async (id: number): Promise<ApiResponse<Note>> => {
     const response = await api.put(`/note/${id}/pin`)
     return response.data
+  },
+
+  search: async (keyword: string): Promise<ApiResponse<Note[]>> => {
+    const response = await api.get('/note/search', { params: { keyword } })
+    return response.data
   }
 }
 
@@ -484,6 +672,11 @@ export const snippetService = {
   // 搜索片段
   search: async (keyword: string): Promise<ApiResponse<CodeSnippet[]>> => {
     const response = await api.get('/snippet/search', { params: { keyword } })
+    return response.data
+  },
+
+  listByLanguage: async (language: string): Promise<ApiResponse<CodeSnippet[]>> => {
+    const response = await api.get(`/snippet/language/${language}`)
     return response.data
   },
 
@@ -533,28 +726,136 @@ export const codeGenService = {
   }
 }
 
+export const knowledgeService = {
+  list: async (): Promise<ApiResponse<KnowledgeBase[]>> => {
+    const response = await api.get('/knowledge/list')
+    return response.data
+  },
+
+  get: async (id: number): Promise<ApiResponse<KnowledgeBase>> => {
+    const response = await api.get(`/knowledge/${id}`)
+    return response.data
+  },
+
+  create: async (data: Partial<KnowledgeBase>): Promise<ApiResponse<KnowledgeBase>> => {
+    const response = await api.post('/knowledge', data)
+    return response.data
+  },
+
+  update: async (id: number, data: Partial<KnowledgeBase>): Promise<ApiResponse<KnowledgeBase>> => {
+    const response = await api.put(`/knowledge/${id}`, data)
+    return response.data
+  },
+
+  delete: async (id: number): Promise<ApiResponse<void>> => {
+    const response = await api.delete(`/knowledge/${id}`)
+    return response.data
+  },
+
+  toggle: async (id: number): Promise<ApiResponse<KnowledgeBase>> => {
+    const response = await api.put(`/knowledge/${id}/toggle`)
+    return response.data
+  },
+
+  upload: async (baseId: number, file: File): Promise<ApiResponse<KnowledgeDocument>> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post(`/knowledge/${baseId}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
+  },
+
+  listDocuments: async (baseId: number): Promise<ApiResponse<KnowledgeDocument[]>> => {
+    const response = await api.get(`/knowledge/${baseId}/documents`)
+    return response.data
+  },
+
+  deleteDocument: async (docId: number): Promise<ApiResponse<void>> => {
+    const response = await api.delete(`/knowledge/document/${docId}`)
+    return response.data
+  },
+
+  query: async (baseId: number, question: string, topK = 5): Promise<ApiResponse<string>> => {
+    const response = await api.get(`/knowledge/${baseId}/query`, { params: { question, topK } })
+    return response.data
+  },
+
+  search: async (baseId: number, query: string, topK = 10): Promise<ApiResponse<any[]>> => {
+    const response = await api.get(`/knowledge/${baseId}/search`, { params: { query, topK } })
+    return response.data
+  }
+}
+
+export const modelService = {
+  list: async (): Promise<ApiResponse<AiModelConfig[]>> => {
+    const response = await api.get('/model/list')
+    return response.data
+  },
+
+  get: async (id: number): Promise<ApiResponse<AiModelConfig>> => {
+    const response = await api.get(`/model/${id}`)
+    return response.data
+  },
+
+  create: async (data: Partial<AiModelConfig>): Promise<ApiResponse<AiModelConfig>> => {
+    const response = await api.post('/model', data)
+    return response.data
+  },
+
+  update: async (id: number, data: Partial<AiModelConfig>): Promise<ApiResponse<AiModelConfig>> => {
+    const response = await api.put(`/model/${id}`, data)
+    return response.data
+  },
+
+  delete: async (id: number): Promise<ApiResponse<void>> => {
+    const response = await api.delete(`/model/${id}`)
+    return response.data
+  },
+
+  toggle: async (id: number): Promise<ApiResponse<AiModelConfig>> => {
+    const response = await api.put(`/model/${id}/toggle`)
+    return response.data
+  },
+
+  setDefault: async (id: number): Promise<ApiResponse<AiModelConfig>> => {
+    const response = await api.put(`/model/${id}/default`)
+    return response.data
+  },
+
+  test: async (data: Partial<AiModelConfig>): Promise<ApiResponse<string>> => {
+    const response = await api.post('/model/test', data)
+    return response.data
+  },
+
+  providers: async (): Promise<ApiResponse<Array<{ value: string; label: string; baseUrl: string }>>> => {
+    const response = await api.get('/model/providers')
+    return response.data
+  }
+}
+
 // 定时任务服务
 export const taskService = {
   // 获取任务列表
-  list: async (): Promise<ApiResponse<any[]>> => {
+  list: async (): Promise<ApiResponse<ScheduledTask[]>> => {
     const response = await api.get('/task/list')
     return response.data
   },
 
   // 获取任务详情
-  get: async (id: number): Promise<ApiResponse<any>> => {
+  get: async (id: number): Promise<ApiResponse<ScheduledTask>> => {
     const response = await api.get(`/task/${id}`)
     return response.data
   },
 
   // 创建任务
-  create: async (data: Partial<any>): Promise<ApiResponse<any>> => {
+  create: async (data: Partial<ScheduledTask>): Promise<ApiResponse<ScheduledTask>> => {
     const response = await api.post('/task', data)
     return response.data
   },
 
   // 更新任务
-  update: async (id: number, data: Partial<any>): Promise<ApiResponse<any>> => {
+  update: async (id: number, data: Partial<ScheduledTask>): Promise<ApiResponse<ScheduledTask>> => {
     const response = await api.put(`/task/${id}`, data)
     return response.data
   },
@@ -566,7 +867,7 @@ export const taskService = {
   },
 
   // 启用/禁用任务
-  toggle: async (id: number): Promise<ApiResponse<any>> => {
+  toggle: async (id: number): Promise<ApiResponse<ScheduledTask>> => {
     const response = await api.put(`/task/${id}/toggle`)
     return response.data
   },
@@ -580,6 +881,52 @@ export const taskService = {
   // 获取任务类型列表
   getTypes: async (): Promise<ApiResponse<string[]>> => {
     const response = await api.get('/task/types')
+    return response.data
+  }
+}
+
+export const settingsService = {
+  getAll: async (): Promise<ApiResponse<Record<string, any>>> => {
+    const response = await api.get('/settings')
+    return response.data
+  },
+
+  updateSystem: async (payload: SystemSettings): Promise<ApiResponse<any>> => {
+    const response = await api.put('/settings/system', payload)
+    return response.data
+  },
+
+  updateModel: async (payload: Record<string, any>): Promise<ApiResponse<any>> => {
+    const response = await api.put('/settings/model', payload)
+    return response.data
+  },
+
+  updateQdrant: async (payload: Record<string, any>): Promise<ApiResponse<any>> => {
+    const response = await api.put('/settings/qdrant', payload)
+    return response.data
+  },
+
+  updateSearch: async (payload: Record<string, any>): Promise<ApiResponse<any>> => {
+    const response = await api.put('/settings/search', payload)
+    return response.data
+  },
+
+  updateSchedule: async (payload: Record<string, any>): Promise<ApiResponse<any>> => {
+    const response = await api.put('/settings/schedule', payload)
+    return response.data
+  },
+
+  updateFile: async (payload: Record<string, any>): Promise<ApiResponse<any>> => {
+    const response = await api.put('/settings/file', payload)
+    return response.data
+  },
+
+  uploadImage: async (file: File): Promise<ApiResponse<string>> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post('/file/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
     return response.data
   }
 }

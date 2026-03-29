@@ -2,111 +2,157 @@
   <n-config-provider :theme="naiveTheme" :theme-overrides="themeOverrides">
     <n-message-provider>
       <n-dialog-provider>
-        <n-layout has-sider class="main-layout">
-          <!-- 侧边栏 -->
-          <n-layout-sider
-          bordered
-          collapse-mode="width"
-          :collapsed-width="64"
-          :width="240"
-          :native-scrollbar="false"
-          show-trigger="bar"
-          class="app-sider"
-        >
-          <div class="logo-area">
-            <div class="logo-icon">
-              <svg viewBox="0 0 40 40" fill="none">
-                <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="2"/>
-                <path d="M20 8 L28 20 L20 32 L12 20 Z" fill="currentColor"/>
-              </svg>
-            </div>
-            <span class="logo-text" v-show="!collapsed">AI Agent</span>
-          </div>
+        <div class="app-shell">
+          <div class="app-shell__glow glow-a"></div>
+          <div class="app-shell__glow glow-b"></div>
 
-          <n-menu
-            :value="currentRoute"
-            :options="menuOptions"
-            :collapsed="collapsed"
-            @update:value="handleMenuClick"
-            class="app-menu"
-          />
-        </n-layout-sider>
+          <n-layout has-sider class="shell-layout">
+            <n-layout-sider
+              bordered
+              collapse-mode="width"
+              :collapsed-width="72"
+              :width="288"
+              :native-scrollbar="false"
+              :collapsed="collapsed"
+              :show-trigger="false"
+              class="app-sider"
+            >
+              <div class="sider-panel">
+                <div class="brand-block" @click="router.push('/')">
+                  <div class="brand-mark">
+                    <span class="brand-mark__spark"></span>
+                    <n-icon size="22"><SparklesIcon /></n-icon>
+                  </div>
+                  <div v-show="!collapsed" class="brand-copy">
+                    <strong>Amber Agent</strong>
+                    <span>Orange command center</span>
+                  </div>
+                </div>
 
-        <!-- 主内容区 -->
-        <n-layout>
-          <n-layout-header bordered class="app-header">
-            <div class="header-left">
-              <h2 class="page-title">{{ currentTitle }}</h2>
-            </div>
-            <div class="header-right">
-              <!-- 主题切换按钮 -->
-              <n-tooltip trigger="hover">
-                <template #trigger>
-                  <n-button quaternary circle @click="toggleTheme" class="theme-toggle-btn">
+                <n-menu
+                  :value="currentRoute"
+                  :options="menuOptions"
+                  :collapsed="collapsed"
+                  :collapsed-width="72"
+                  :collapsed-icon-size="20"
+                  class="app-menu"
+                  @update:value="handleMenuClick"
+                />
+
+                <div v-show="!collapsed" class="sider-footer">
+                  <div class="status-pill">
+                    <span class="status-pill__dot"></span>
+                    <span>{{ actualTheme === 'dark' ? '夜间橙焰' : '日间琥珀' }}</span>
+                  </div>
+                  <div class="status-pill">
+                    <span class="status-pill__dot status-pill__dot--soft"></span>
+                    <span>{{ route.path }}</span>
+                  </div>
+                </div>
+              </div>
+            </n-layout-sider>
+
+            <n-layout class="main-panel">
+              <n-layout-header class="app-header">
+                <div class="header-left">
+                  <n-button quaternary circle class="icon-btn" @click="collapsed = !collapsed">
                     <template #icon>
-                      <n-icon size="20">
-                        <MoonIcon v-if="actualTheme === 'light'" />
-                        <SunnyIcon v-else />
+                      <n-icon size="18">
+                        <MenuIcon v-if="collapsed" />
+                        <MenuOpenIcon v-else />
                       </n-icon>
                     </template>
                   </n-button>
-                </template>
-                {{ actualTheme === 'dark' ? '切换到日间模式' : '切换到夜间模式' }}
-              </n-tooltip>
-            </div>
-          </n-layout-header>
+                  <div class="header-copy">
+                    <span class="header-kicker">{{ currentSection }}</span>
+                    <h1 class="page-title">{{ currentTitle }}</h1>
+                    <p class="page-subtitle">{{ currentDescription }}</p>
+                  </div>
+                </div>
 
-          <n-layout-content class="app-content">
-            <router-view />
-          </n-layout-content>
-        </n-layout>
-      </n-layout>
+                <div class="header-right">
+                  <div class="header-chip">
+                    <span class="header-chip__label">接口入口</span>
+                    <strong>{{ menuOptions.length }}</strong>
+                  </div>
+                  <div class="header-chip header-chip--ghost">
+                    <span class="header-chip__label">主题</span>
+                    <strong>{{ actualTheme === 'dark' ? 'Dark' : 'Light' }}</strong>
+                  </div>
+                  <n-tooltip trigger="hover">
+                    <template #trigger>
+                      <n-button quaternary circle class="icon-btn" @click="toggleTheme">
+                        <template #icon>
+                          <n-icon size="18">
+                            <MoonIcon v-if="actualTheme === 'light'" />
+                            <SunnyIcon v-else />
+                          </n-icon>
+                        </template>
+                      </n-button>
+                    </template>
+                    {{ actualTheme === 'dark' ? '切换到日间模式' : '切换到夜间模式' }}
+                  </n-tooltip>
+                </div>
+              </n-layout-header>
+
+              <n-layout-content class="app-content">
+                <div class="content-frame">
+                  <router-view />
+                </div>
+              </n-layout-content>
+            </n-layout>
+          </n-layout>
+        </div>
       </n-dialog-provider>
     </n-message-provider>
   </n-config-provider>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, h, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
-  NConfigProvider,
-  NLayout,
-  NLayoutSider,
-  NLayoutHeader,
-  NLayoutContent,
-  NMenu,
   NButton,
-  NIcon,
-  NMessageProvider,
+  NConfigProvider,
   NDialogProvider,
+  NIcon,
+  NLayout,
+  NLayoutContent,
+  NLayoutHeader,
+  NLayoutSider,
+  NMenu,
+  NMessageProvider,
   NTooltip,
   darkTheme
 } from 'naive-ui'
 import {
-  FolderOutline as FolderIcon,
-  ChatbubblesOutline as ChatIcon,
+  BookOutline as KnowledgeIcon,
   CalendarOutline as CalendarIcon,
-  MailOutline as MailIcon,
-  SearchOutline as SearchIcon,
-  ConstructOutline as ToolIcon,
-  RocketOutline as SkillIcon,
-  GridOutline as DashboardIcon,
-  MoonOutline as MoonIcon,
-  SunnyOutline as SunnyIcon,
-  DocumentTextOutline as NotebookIcon,
+  ChatbubblesOutline as ChatIcon,
   CodeSlashOutline as CodeIcon,
+  CubeOutline as ModelIcon,
+  DocumentTextOutline as NotebookIcon,
+  FolderOutline as FolderIcon,
+  GridOutline as DashboardIcon,
+  MailOutline as MailIcon,
+  MenuOutline as MenuIcon,
+  MenuSharp as MenuOpenIcon,
+  MoonOutline as MoonIcon,
+  RocketOutline as SkillIcon,
+  SearchOutline as SearchIcon,
   SettingsOutline as SettingsIcon,
-  CubeOutline as ModelIcon
+  SparklesOutline as SparklesIcon,
+  SunnyOutline as SunnyIcon,
+  TimeOutline as TaskIcon,
+  ConstructOutline as ToolIcon
 } from '@vicons/ionicons5'
 import { useThemeStore } from '@/stores/theme'
 
 const router = useRouter()
 const route = useRoute()
-const collapsed = ref(false)
 const themeStore = useThemeStore()
+const collapsed = ref(false)
 
-// 实际应用的主题（考虑 auto 模式）
 const actualTheme = computed(() => {
   if (themeStore.mode === 'auto') {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -114,325 +160,382 @@ const actualTheme = computed(() => {
   return themeStore.mode
 })
 
-// Naive UI 主题
-const naiveTheme = computed(() => {
-  return actualTheme.value === 'dark' ? darkTheme : null
-})
+const naiveTheme = computed(() => actualTheme.value === 'dark' ? darkTheme : null)
 
-// 温暖橙黄色主题 - 夜间模式
+const commonTheme = {
+  common: {
+    primaryColor: '#f59e0b',
+    primaryColorHover: '#fbbf24',
+    primaryColorPressed: '#ea580c',
+    primaryColorSuppl: '#fb923c',
+    infoColor: '#f59e0b',
+    successColor: '#10b981',
+    warningColor: '#f59e0b',
+    errorColor: '#ef4444',
+    borderRadius: '18px',
+    borderRadiusSmall: '12px',
+    fontFamily: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif"
+  },
+  Card: {
+    borderRadius: '24px'
+  },
+  Button: {
+    borderRadiusMedium: '16px',
+    borderRadiusSmall: '14px'
+  },
+  Input: {
+    borderRadius: '16px'
+  },
+  Select: {
+    peers: {
+      InternalSelection: {
+        borderRadius: '16px'
+      }
+    }
+  }
+}
+
 const darkThemeOverrides = {
-  common: {
-    primaryColor: '#FF9F43',
-    primaryColorHover: '#FECA57',
-    primaryColorPressed: '#E17055',
-    primaryColorSuppl: '#FFBE76',
-    borderRadius: '12px',
-    borderRadiusSmall: '8px',
-    fontFamily: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif"
+  ...commonTheme,
+  Layout: {
+    color: '#160f07',
+    siderColor: '#20140a',
+    headerColor: 'rgba(31, 20, 10, 0.75)'
   },
   Menu: {
-    itemTextColor: '#A8A29E',
-    itemTextColorHover: '#FAFAF9',
-    itemTextColorActive: '#FF9F43',
-    itemTextColorActiveHover: '#FECA57',
-    itemColorActive: 'rgba(255, 159, 67, 0.1)',
-    itemColorActiveHover: 'rgba(255, 159, 67, 0.15)',
-    arrowColor: '#A8A29E',
-    itemBorderRadius: '12px'
+    itemTextColor: '#f5e8d8',
+    itemTextColorHover: '#fff7ed',
+    itemTextColorActive: '#fbbf24',
+    itemTextColorActiveHover: '#fcd34d',
+    itemColorHover: 'rgba(251, 191, 36, 0.08)',
+    itemColorActive: 'rgba(251, 191, 36, 0.14)',
+    itemColorActiveHover: 'rgba(251, 191, 36, 0.18)',
+    itemBorderRadius: '16px'
   },
   Card: {
-    color: '#292524',
-    borderColor: '#44403C',
-    titleTextColor: '#FAFAF9',
-    textColor: '#A8A29E',
-    borderRadius: '16px'
-  },
-  Button: {
-    textColorPrimary: '#FFFFFF',
-    colorPrimary: '#FF9F43',
-    colorHoverPrimary: '#FECA57',
-    colorPressedPrimary: '#E17055',
-    borderRadiusMedium: '12px'
-  },
-  Input: {
-    color: '#3D3835',
-    colorFocus: '#3D3835',
-    borderColor: '#44403C',
-    borderColorHover: '#FF9F43',
-    borderColorFocus: '#FF9F43',
-    textColor: '#FAFAF9',
-    placeholderColor: '#78716C',
-    borderRadius: '12px'
-  },
-  Layout: {
-    siderColor: '#1C1917',
-    headerColor: '#292524',
-    color: '#1C1917'
+    color: 'rgba(46, 27, 11, 0.82)',
+    borderColor: 'rgba(251, 191, 36, 0.14)',
+    titleTextColor: '#fff7ed',
+    textColor: '#f6ddc5'
   },
   DataTable: {
-    thColor: '#292524',
-    tdColor: '#292524',
-    thTextColor: '#FAFAF9',
-    tdTextColor: '#A8A29E',
-    borderColor: '#44403C'
-  },
-  List: {
-    textColor: '#FAFAF9',
-    color: '#292524',
-    borderColor: '#44403C'
-  },
-  Modal: {
-    color: '#292524',
-    borderRadius: '16px'
-  },
-  Dialog: {
-    color: '#292524'
+    thColor: 'rgba(63, 36, 11, 0.9)',
+    tdColor: 'rgba(33, 21, 12, 0.78)',
+    borderColor: 'rgba(251, 191, 36, 0.12)'
   }
 }
 
-// 日间模式主题
 const lightThemeOverrides = {
-  common: {
-    primaryColor: '#F97316',
-    primaryColorHover: '#FDBA74',
-    primaryColorPressed: '#EA580C',
-    primaryColorSuppl: '#FB923C',
-    borderRadius: '12px',
-    borderRadiusSmall: '8px',
-    fontFamily: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif"
+  ...commonTheme,
+  Layout: {
+    color: '#fff7ed',
+    siderColor: '#fffaf2',
+    headerColor: 'rgba(255, 251, 245, 0.76)'
   },
   Menu: {
-    itemTextColor: '#57534E',
-    itemTextColorHover: '#1C1917',
-    itemTextColorActive: '#F97316',
-    itemTextColorActiveHover: '#EA580C',
-    itemColorActive: 'rgba(249, 115, 22, 0.1)',
-    itemColorActiveHover: 'rgba(249, 115, 22, 0.15)',
-    arrowColor: '#57534E',
-    itemBorderRadius: '12px'
+    itemTextColor: '#7c4a14',
+    itemTextColorHover: '#451a03',
+    itemTextColorActive: '#c2410c',
+    itemTextColorActiveHover: '#9a3412',
+    itemColorHover: 'rgba(245, 158, 11, 0.08)',
+    itemColorActive: 'rgba(245, 158, 11, 0.14)',
+    itemColorActiveHover: 'rgba(245, 158, 11, 0.18)',
+    itemBorderRadius: '16px'
   },
   Card: {
-    color: '#FFFFFF',
-    borderColor: '#E7E5E4',
-    titleTextColor: '#1C1917',
-    textColor: '#57534E',
-    borderRadius: '16px'
-  },
-  Button: {
-    textColorPrimary: '#FFFFFF',
-    colorPrimary: '#F97316',
-    colorHoverPrimary: '#FDBA74',
-    colorPressedPrimary: '#EA580C',
-    borderRadiusMedium: '12px'
-  },
-  Input: {
-    color: '#FEF7ED',
-    colorFocus: '#FFFFFF',
-    borderColor: '#E7E5E4',
-    borderColorHover: '#F97316',
-    borderColorFocus: '#F97316',
-    textColor: '#1C1917',
-    placeholderColor: '#A8A29E',
-    borderRadius: '12px'
-  },
-  Layout: {
-    siderColor: '#FFFFFF',
-    headerColor: '#FFFFFF',
-    color: '#FFFBF5'
+    color: 'rgba(255, 255, 255, 0.9)',
+    borderColor: 'rgba(249, 115, 22, 0.12)',
+    titleTextColor: '#451a03',
+    textColor: '#7c2d12'
   },
   DataTable: {
-    thColor: '#FEF7ED',
-    tdColor: '#FFFFFF',
-    thTextColor: '#1C1917',
-    tdTextColor: '#57534E',
-    borderColor: '#E7E5E4'
-  },
-  List: {
-    textColor: '#1C1917',
-    color: '#FFFFFF',
-    borderColor: '#E7E5E4'
-  },
-  Modal: {
-    color: '#FFFFFF',
-    borderRadius: '16px'
-  },
-  Dialog: {
-    color: '#FFFFFF'
+    thColor: 'rgba(255, 247, 237, 0.95)',
+    tdColor: 'rgba(255, 255, 255, 0.92)',
+    borderColor: 'rgba(249, 115, 22, 0.12)'
   }
 }
 
-// 根据当前主题选择配置
-const themeOverrides = computed(() => {
-  return actualTheme.value === 'dark' ? darkThemeOverrides : lightThemeOverrides
-})
+const themeOverrides = computed(() => actualTheme.value === 'dark' ? darkThemeOverrides : lightThemeOverrides)
 
-// 当前路由
 const currentRoute = computed(() => route.name as string)
 const currentTitle = computed(() => route.meta.title as string || '仪表盘')
+const currentDescription = computed(() => route.meta.description as string || '统一管理 AI Agent 的核心能力与配置。')
+const currentSection = computed(() => {
+  const matched = menuOptions.find(item => item.key === currentRoute.value)
+  return matched?.label || 'Control'
+})
 
-// 菜单图标渲染
-const renderIcon = (icon: any) => {
-  return () => h(NIcon, null, { default: () => h(icon) })
-}
+const renderIcon = (icon: any) => () => h(NIcon, null, { default: () => h(icon) })
 
-// 菜单选项
 const menuOptions = [
-  {
-    label: '仪表盘',
-    key: 'Dashboard',
-    icon: renderIcon(DashboardIcon)
-  },
-  {
-    label: '文件管理',
-    key: 'Files',
-    icon: renderIcon(FolderIcon)
-  },
-  {
-    label: 'AI聊天',
-    key: 'Chat',
-    icon: renderIcon(ChatIcon)
-  },
-  {
-    label: '模型配置',
-    key: 'Models',
-    icon: renderIcon(ModelIcon)
-  },
-  {
-    label: '笔记',
-    key: 'Notes',
-    icon: renderIcon(NotebookIcon)
-  },
-  {
-    label: '代码片段',
-    key: 'Snippets',
-    icon: renderIcon(CodeIcon)
-  },
-  {
-    label: '日程管理',
-    key: 'Schedule',
-    icon: renderIcon(CalendarIcon)
-  },
-  {
-    label: '邮件配置',
-    key: 'Email',
-    icon: renderIcon(MailIcon)
-  },
-  {
-    label: '网络搜索',
-    key: 'Search',
-    icon: renderIcon(SearchIcon)
-  },
-  {
-    label: '工具管理',
-    key: 'Tools',
-    icon: renderIcon(ToolIcon)
-  },
-  {
-    label: '技能管理',
-    key: 'Skills',
-    icon: renderIcon(SkillIcon)
-  },
-  {
-    label: '系统设置',
-    key: 'Settings',
-    icon: renderIcon(SettingsIcon)
-  }
+  { label: '仪表盘', key: 'Dashboard', icon: renderIcon(DashboardIcon) },
+  { label: 'AI 聊天', key: 'Chat', icon: renderIcon(ChatIcon) },
+  { label: '模型配置', key: 'Models', icon: renderIcon(ModelIcon) },
+  { label: '知识库', key: 'Knowledge', icon: renderIcon(KnowledgeIcon) },
+  { label: '定时任务', key: 'Tasks', icon: renderIcon(TaskIcon) },
+  { label: '文件管理', key: 'Files', icon: renderIcon(FolderIcon) },
+  { label: '日程管理', key: 'Schedule', icon: renderIcon(CalendarIcon) },
+  { label: '邮件配置', key: 'Email', icon: renderIcon(MailIcon) },
+  { label: '网络搜索', key: 'Search', icon: renderIcon(SearchIcon) },
+  { label: '工具管理', key: 'Tools', icon: renderIcon(ToolIcon) },
+  { label: '技能管理', key: 'Skills', icon: renderIcon(SkillIcon) },
+  { label: '笔记', key: 'Notes', icon: renderIcon(NotebookIcon) },
+  { label: '代码片段', key: 'Snippets', icon: renderIcon(CodeIcon) },
+  { label: '系统设置', key: 'Settings', icon: renderIcon(SettingsIcon) }
 ]
 
-// 菜单点击处理
 const handleMenuClick = (key: string) => {
   router.push({ name: key })
 }
 
-// 切换主题
 const toggleTheme = () => {
   themeStore.toggleTheme()
 }
 </script>
 
 <style scoped>
-.main-layout {
-  height: 100vh;
-  background: var(--bg-base);
-  transition: background-color 0.4s ease;
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(251, 191, 36, 0.22), transparent 28%),
+    radial-gradient(circle at 80% 10%, rgba(249, 115, 22, 0.18), transparent 24%),
+    linear-gradient(145deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 88%, #000 12%) 100%);
+}
+
+.app-shell__glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(70px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.glow-a {
+  top: -120px;
+  left: -80px;
+  width: 320px;
+  height: 320px;
+  background: rgba(251, 191, 36, 0.24);
+}
+
+.glow-b {
+  right: -80px;
+  bottom: -140px;
+  width: 360px;
+  height: 360px;
+  background: rgba(249, 115, 22, 0.18);
+}
+
+.shell-layout,
+.main-panel {
+  background: transparent;
+  min-height: 100vh;
 }
 
 .app-sider {
-  background: var(--bg-sider);
-  border-right: 1px solid var(--border-color);
-  transition: background-color 0.4s ease, border-color 0.4s ease;
+  background: transparent;
+  border-right: none !important;
 }
 
-.logo-area {
-  height: 64px;
+.sider-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  margin: 18px 0 18px 18px;
+  padding: 22px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 247, 237, 0.08), rgba(255, 247, 237, 0.02)),
+    var(--bg-card);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-lg);
+}
+
+.brand-block {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 16px;
-  border-bottom: 1px solid var(--border-color);
-  transition: border-color 0.4s ease;
+  gap: 14px;
+  padding: 10px 8px 14px;
+  cursor: pointer;
 }
 
-.logo-icon {
-  width: 36px;
-  height: 36px;
-  color: var(--primary-color);
+.brand-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 18px;
+  color: #fff7ed;
+  background: linear-gradient(135deg, #fb923c, #f59e0b 58%, #fcd34d);
+  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.32);
 }
 
-.logo-text {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--primary-color);
-  margin-left: 12px;
-  letter-spacing: -0.5px;
+.brand-mark__spark {
+  position: absolute;
+  inset: 5px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-copy strong {
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+}
+
+.brand-copy span,
+.eyebrow,
+.page-subtitle,
+.header-kicker {
+  color: var(--text-secondary);
+}
+
+.eyebrow,
+.header-kicker,
+.header-chip__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .app-menu {
-  padding: 12px;
+  flex: 1;
+}
+
+.sider-footer {
+  display: grid;
+  gap: 10px;
+}
+
+.status-pill,
+.header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+.status-pill__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.12);
+}
+
+.status-pill__dot--soft {
+  background: #fb923c;
 }
 
 .app-header {
-  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  background: var(--bg-header);
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.4s ease, border-color 0.4s ease;
+  gap: 16px;
+  margin: 18px 18px 0 18px;
+  padding: 18px 22px;
+  border: 1px solid var(--border-color);
+  border-radius: 26px;
+  background: var(--bg-card);
+  backdrop-filter: blur(18px);
+}
+
+.header-left,
+.header-right,
+.header-copy {
+  display: flex;
+  align-items: center;
 }
 
 .header-left {
-  display: flex;
-  align-items: center;
+  gap: 14px;
+}
+
+.header-copy {
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .page-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  transition: color 0.4s ease;
+  font-size: clamp(1.25rem, 2vw, 1.8rem);
+  line-height: 1.2;
+}
+
+.page-subtitle {
+  font-size: 0.92rem;
 }
 
 .header-right {
-  display: flex;
-  align-items: center;
   gap: 12px;
 }
 
-.theme-toggle-btn {
-  color: var(--text-secondary);
-  transition: color 0.2s ease;
+.header-chip strong {
+  color: var(--text-primary);
 }
 
-.theme-toggle-btn:hover {
-  color: var(--primary-color);
+.header-chip--ghost {
+  background: transparent;
+}
+
+.icon-btn {
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .app-content {
-  padding: 24px;
-  min-height: calc(100vh - 64px);
-  background: var(--bg-base);
-  transition: background-color 0.4s ease;
+  padding: 18px;
+  background: transparent;
+}
+
+.content-frame {
+  min-height: calc(100vh - 132px);
+  padding: 10px 0 0;
+}
+
+@media (max-width: 1100px) {
+  .header-chip {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .sider-panel {
+    margin-right: 0;
+    border-radius: 0 24px 24px 0;
+  }
+
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .header-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 768px) {
+  .content-frame {
+    min-height: calc(100vh - 168px);
+  }
+
+  .page-subtitle {
+    display: none;
+  }
 }
 </style>
