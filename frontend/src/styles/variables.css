@@ -1,0 +1,393 @@
+/* ========================================
+   温暖橙黄色主题 - 日间/夜间模式
+   设计理念：温暖、现代、舒适
+   禁止蓝紫色！
+======================================== */
+
+/* 夜间模式 - 温暖深色调（不是黑色！） */
+:root,
+[data-theme="dark"] {
+  /* 主色调 - 温暖橙黄 */
+  --primary-color: #FF9F43;
+  --primary-light: #FFBE76;
+  --primary-dark: #E17055;
+  --primary-hover: #FECA57;
+
+  /* 渐变色 */
+  --gradient-start: #FF9F43;
+  --gradient-end: #FECA57;
+  --gradient-warm: linear-gradient(135deg, #FF9F43 0%, #FECA57 50%, #F8B739 100%);
+
+  /* 夜间背景 - 温暖深棕/深灰，不是黑色！ */
+  --bg-base: #1C1917;
+  --bg-dark: #1C1917;
+  --bg-elevated: #292524;
+  --bg-card: #292524;
+  --bg-input: #3D3835;
+  --bg-sider: #1C1917;
+  --bg-header: #292524;
+  --bg-hover: #3D3835;
+  --bg-active: #44403C;
+
+  /* 文字颜色 */
+  --text-primary: #FAFAF9;
+  --text-secondary: #A8A29E;
+  --text-muted: #78716C;
+  --text-inverse: #1C1917;
+
+  /* 边框颜色 */
+  --border-color: #44403C;
+  --border-light: #57534E;
+  --border-active: #FF9F43;
+
+  /* 状态色 - 全部使用暖色调 */
+  --success: #10B981;
+  --success-light: #34D399;
+  --warning: #FBBF24;
+  --warning-light: #FCD34D;
+  --error: #EF4444;
+  --error-light: #F87171;
+  --info: #FF9F43;
+  --info-light: #FFBE76;
+
+  /* 特效 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(255, 159, 67, 0.3);
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  /* 聊天专用 */
+  --chat-user-bg: linear-gradient(135deg, #FF9F43 0%, #FECA57 100%);
+  --chat-ai-bg: #3D3835;
+  --chat-input-bg: #3D3835;
+}
+
+/* 日间模式 - 温暖明亮 */
+[data-theme="light"] {
+  /* 主色调 - 温暖橙黄 */
+  --primary-color: #F97316;
+  --primary-light: #FB923C;
+  --primary-dark: #EA580C;
+  --primary-hover: #FDBA74;
+
+  /* 渐变色 */
+  --gradient-start: #F97316;
+  --gradient-end: #FDBA74;
+  --gradient-warm: linear-gradient(135deg, #F97316 0%, #FDBA74 50%, #FCD34D 100%);
+
+  /* 日间背景 - 温暖白色/奶油色 */
+  --bg-base: #FFFBF5;
+  --bg-dark: #FFFBF5;
+  --bg-elevated: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-input: #FEF7ED;
+  --bg-sider: #FFFFFF;
+  --bg-header: #FFFFFF;
+  --bg-hover: #FEF3E2;
+  --bg-active: #FDECD3;
+
+  /* 文字颜色 */
+  --text-primary: #1C1917;
+  --text-secondary: #57534E;
+  --text-muted: #A8A29E;
+  --text-inverse: #FFFFFF;
+
+  /* 边框颜色 */
+  --border-color: #E7E5E4;
+  --border-light: #D6D3D1;
+  --border-active: #F97316;
+
+  /* 状态色 */
+  --success: #059669;
+  --success-light: #10B981;
+  --warning: #D97706;
+  --warning-light: #F59E0B;
+  --error: #DC2626;
+  --error-light: #EF4444;
+  --info: #F97316;
+  --info-light: #FB923C;
+
+  /* 特效 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 20px rgba(249, 115, 22, 0.2);
+  --shadow-color: rgba(0, 0, 0, 0.08);
+
+  /* 聊天专用 */
+  --chat-user-bg: linear-gradient(135deg, #F97316 0%, #FDBA74 100%);
+  --chat-ai-bg: #FFFFFF;
+  --chat-input-bg: #FEF7ED;
+}
+
+/* ========================================
+   基础样式重置
+======================================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  transition: background-color 0.4s ease, color 0.4s ease;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ========================================
+   滚动条样式
+======================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
+}
+
+/* ========================================
+   主题背景纹理
+======================================== */
+.theme-texture {
+  position: relative;
+}
+
+.theme-texture::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FF9F43' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ========================================
+   卡片组件
+======================================== */
+.warm-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+}
+
+.warm-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+/* ========================================
+   按钮组件
+======================================== */
+.warm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.warm-btn-primary {
+  background: var(--gradient-warm);
+  color: white;
+  box-shadow: var(--shadow-md);
+}
+
+.warm-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glow);
+}
+
+.warm-btn-secondary {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.warm-btn-secondary:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary-color);
+}
+
+/* ========================================
+   输入框组件
+======================================== */
+.warm-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.warm-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(255, 159, 67, 0.15);
+}
+
+.warm-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ========================================
+   动画关键帧
+======================================== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+  }
+  40% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(255, 159, 67, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 159, 67, 0.6);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ========================================
+   响应式断点
+======================================== */
+@media (max-width: 1200px) {
+  :root {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    font-size: 14px;
+  }
+}
+
+/* ========================================
+   工具类
+======================================== */
+.text-gradient {
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.border-gradient {
+  border: 2px solid transparent;
+  background: linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+              var(--gradient-warm) border-box;
+}
+
+.shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease;
+}

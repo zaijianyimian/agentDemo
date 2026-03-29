@@ -1,7 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.memory.MemoryRecord;
-import com.example.demo.service.MemoryApplicationService;
+import com.example.demo.service.memory.MemoryApplicationService;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import org.springframework.validation.annotation.Validated;
@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/memory")
+@RequestMapping("/api/memory")
 @Validated
 public class MemoryController {
     private final MemoryApplicationService memoryApplicationService;

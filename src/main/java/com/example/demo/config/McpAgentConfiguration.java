@@ -1,7 +1,7 @@
 package com.example.demo.config;
 
-import com.example.demo.service.McpAgentService;
-import com.example.demo.service.McpToolAdapter;
+import com.example.demo.service.mcp.McpAgentService;
+import com.example.demo.service.mcp.McpToolAdapter;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;

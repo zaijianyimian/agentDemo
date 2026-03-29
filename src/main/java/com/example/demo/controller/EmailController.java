@@ -3,7 +3,7 @@ package com.example.demo.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.entity.EmailConfig;
 import com.example.demo.mapper.EmailConfigMapper;
-import com.example.demo.service.EmailListenerService;
+import com.example.demo.service.email.EmailListenerService;
 import jakarta.annotation.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -157,6 +157,46 @@ public class EmailController {
     @GetMapping("/listener/status")
     public Map<Long, String> getListenerStatus() {
         return emailListenerService.getListenerStatus();
+    }
+
+    // ==================== 邮箱测试 ====================
+
+    /**
+     * 测试邮箱连接
+     */
+    @PostMapping("/config/{id}/test")
+    public ResponseEntity<Map<String, Object>> testConfig(@PathVariable Long id) {
+        EmailConfig config = emailConfigMapper.selectById(id);
+        if (config == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "邮箱配置不存在"
+            ));
+        }
+
+        EmailListenerService.EmailTestResult result = emailListenerService.testConnection(config);
+        return ResponseEntity.ok(Map.of(
+                "success", result.isSuccess(),
+                "message", result.getMessage(),
+                "durationMs", result.getDurationMs(),
+                "messageCount", result.getMessageCount(),
+                "errorDetail", result.getErrorDetail() != null ? result.getErrorDetail() : ""
+        ));
+    }
+
+    /**
+     * 测试新邮箱配置（未保存的配置）
+     */
+    @PostMapping("/config/test")
+    public ResponseEntity<Map<String, Object>> testNewConfig(@RequestBody EmailConfig config) {
+        EmailListenerService.EmailTestResult result = emailListenerService.testConnection(config);
+        return ResponseEntity.ok(Map.of(
+                "success", result.isSuccess(),
+                "message", result.getMessage(),
+                "durationMs", result.getDurationMs(),
+                "messageCount", result.getMessageCount(),
+                "errorDetail", result.getErrorDetail() != null ? result.getErrorDetail() : ""
+        ));
     }
 
     // ==================== 常用邮箱模板 ====================

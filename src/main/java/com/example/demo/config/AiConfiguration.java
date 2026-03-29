@@ -22,6 +22,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import java.time.Duration;
+
 @Slf4j
 @Configuration
 public class AiConfiguration {
@@ -59,6 +61,10 @@ public class AiConfiguration {
                 .apiKey(properties.getApiKey())
                 .modelName(properties.getModelName())
                 .baseUrl(properties.getBaseUrl())
+                .timeout(Duration.ofSeconds(120))
+                .maxRetries(3)
+                .logRequests(true)
+                .logResponses(true)
                 .build();
     }
 
@@ -72,11 +78,14 @@ public class AiConfiguration {
                 .modelName(properties.getModelName())
                 .baseUrl(properties.getBaseUrl())
                 .responseFormat("json_object")
+                .timeout(Duration.ofSeconds(120))
+                .maxRetries(3)
                 .build();
     }
 
     /**
      * ObjectMapper Bean - 用于 JSON 序列化/反序列化
+     * 包含 JavaTimeModule 支持 LocalDateTime 序列化
      */
     @Bean
     @Primary
@@ -84,6 +93,10 @@ public class AiConfiguration {
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        // 注册 JavaTimeModule 支持 Java 8 日期时间类型
+        mapper.findAndRegisterModules();
+        // 禁用日期时间作为时间戳
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return mapper;
     }
 
@@ -93,6 +106,7 @@ public class AiConfiguration {
                 .apiKey(properties.getApiKey())
                 .modelName(properties.getModelName())
                 .baseUrl(properties.getBaseUrl())
+                .timeout(Duration.ofSeconds(180))
                 .build();
     }
 

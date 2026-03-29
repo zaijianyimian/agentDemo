@@ -2,7 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.ToolExecutionResult;
 import com.example.demo.entity.McpTool;
-import com.example.demo.service.McpToolService;
+import com.example.demo.service.mcp.McpToolService;
 import jakarta.annotation.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

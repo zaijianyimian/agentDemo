@@ -3,9 +3,11 @@ package com.example.demo.controller;
 import com.example.demo.dto.SkillExecutionResult;
 import com.example.demo.entity.McpTool;
 import com.example.demo.entity.Skill;
-import com.example.demo.service.SkillExecutor;
-import com.example.demo.service.SkillService;
+import com.example.demo.service.skill.SkillExecutor;
+import com.example.demo.service.skill.SkillLoaderService;
+import com.example.demo.service.mcp.SkillService;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +17,7 @@ import java.util.Map;
 /**
  * 技能管理控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/skill")
 public class SkillController {
@@ -24,6 +27,9 @@ public class SkillController {
 
     @Resource
     private SkillExecutor skillExecutor;
+
+    @Resource
+    private SkillLoaderService skillLoaderService;
 
     // ==================== 查询接口 ====================
 
@@ -99,10 +105,15 @@ public class SkillController {
     @PostMapping
     public ResponseEntity<String> add(@RequestBody Skill skill) {
         try {
+            log.info("收到添加技能请求: code={}, name={}", skill.getCode(), skill.getName());
             skillService.add(skill);
             return ResponseEntity.ok("添加成功");
         } catch (IllegalArgumentException e) {
+            log.warn("添加技能参数错误: {}", e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            log.error("添加技能异常: ", e);
+            return ResponseEntity.internalServerError().body("服务器错误: " + e.getMessage());
         }
     }
 
@@ -214,5 +225,65 @@ public class SkillController {
 
         SkillExecutionResult result = skillExecutor.execute(skill, params);
         return ResponseEntity.ok(result);
+    }
+
+    // ==================== 导入导出接口 ====================
+
+    /**
+     * 从配置文件重新加载技能
+     */
+    @PostMapping("/reload")
+    public ResponseEntity<Map<String, Object>> reloadSkills() {
+        int loaded = skillLoaderService.loadSkillsFromConfig();
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "成功加载 " + loaded + " 个技能",
+                "count", loaded
+        ));
+    }
+
+    /**
+     * 导入技能(JSON格式)
+     */
+    @PostMapping("/import")
+    public ResponseEntity<Map<String, Object>> importSkill(@RequestBody Map<String, Object> skillData) {
+        try {
+            log.info("收到技能导入请求: {}", skillData);
+            // 将Map转回JSON字符串
+            String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(skillData);
+            boolean success = skillLoaderService.importSkillFromJson(json);
+            if (success) {
+                return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "message", "技能导入成功"
+                ));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "技能导入失败，可能技能已存在或格式错误"
+                ));
+            }
+        } catch (Exception e) {
+            log.error("导入技能异常: ", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "导入失败: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * 导出技能(JSON格式)
+     */
+    @GetMapping("/{id}/export")
+    public ResponseEntity<Map<String, Object>> exportSkill(@PathVariable Long id) {
+        String json = skillLoaderService.exportSkillToJson(id);
+        if (json == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", json
+        ));
     }
 }

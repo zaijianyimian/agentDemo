@@ -1,0 +1,29 @@
+{
+  "name": "ai-agent-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vicons/ionicons5": "^0.13.0",
+    "@vueuse/core": "^12.8.0",
+    "axios": "^1.8.4",
+    "dayjs": "^1.11.13",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.5",
+    "naive-ui": "^2.41.0",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "typescript": "~5.7.3",
+    "vite": "^6.2.3",
+    "vue-tsc": "^2.2.8"
+  }
+}

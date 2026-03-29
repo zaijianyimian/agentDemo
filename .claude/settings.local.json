@@ -12,7 +12,10 @@
       "Bash(./gradlew:*)",
       "Bash(jar:*)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(java:*)",
+      "Bash(mysql:*)",
+      "Bash(grep:*)"
     ]
   }
 }

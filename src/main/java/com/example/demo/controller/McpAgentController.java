@@ -1,6 +1,6 @@
 package com.example.demo.controller;
 
-import com.example.demo.service.McpAgentService;
+import com.example.demo.service.mcp.McpAgentService;
 import jakarta.annotation.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;

@@ -1,7 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.ContentAnalysis;
-import com.example.demo.service.ContentAnalysisService;
+import com.example.demo.service.chat.ContentAnalysisService;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;

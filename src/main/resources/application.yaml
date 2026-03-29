@@ -31,7 +31,11 @@ server:
       force: true
       force-response: true
       force-request: true
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
 app:
+  # 内存存储配置
   memory:
     collection-name: agent_memory
     top-k: 5
@@ -41,13 +45,37 @@ app:
     port: 6334
   # 网络搜索配置
   search:
-    enabled: false
+    enabled: true
     # 搜索引擎类型: serper, tavily, bing
     engine: serper
     # 搜索API密钥 (选择一个配置)
     # Serper: https://serper.dev 免费额度 2500次/月
     # Tavily: https://tavily.com 免费额度 1000次/月
     # Bing: https://azure.microsoft.com/services/cognitive-services/bing-web-search-api/
-    api-key: your-search-api-key-here
+    api-key: your_search_api_key
     # 为节约成本，只保留最相关的3条结果
     max-results: 3
+  # 邮件发送配置 (SMTP)
+  mail:
+    smtp-host: smtp.163.com
+    smtp-port: 465
+    smtp-username: your_mail@example.com
+    smtp-password: ""
+    smtp-ssl-enabled: true
+    from-name: AI Agent
+  # 日程管理配置
+  schedule:
+    # 是否启用日程功能
+    enabled: true
+    # 日程文件存储路径
+    storage-path: ./data/schedules
+    # 用户接收邮件地址（用于发送汇总和提醒）
+    user-email: your_mail@example.com
+    # 每日汇总发送时间 (cron表达式，默认每天20:00)
+    daily-summary-cron: "0 0 20 * * ?"
+    # 早上提醒时间 (cron表达式，默认每天08:00)
+    morning-reminder-cron: "0 0 8 * * ?"
+  # 文件上传配置
+  file:
+    upload-dir: ./data/documents
+    allowed-types: txt,md,pdf,doc,docx
