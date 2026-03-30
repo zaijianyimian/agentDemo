@@ -2,6 +2,8 @@
 -- AI Agent 数据库初始化脚本
 -- 创建时间: 2026-03-29
 -- 说明: 合并所有模块的数据库表结构
+-- 注意: 本脚本为非破坏性初始化，不会自动 DROP 现有表
+-- 如需重置数据库，请在开发环境手动执行 DROP 后再运行本脚本
 -- ============================================
 
 -- 设置字符集
@@ -11,7 +13,6 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- ============================================
 -- 1. AI 模型配置表
 -- ============================================
-DROP TABLE IF EXISTS `ai_model_config`;
 CREATE TABLE IF NOT EXISTS `ai_model_config` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(50) NOT NULL COMMENT '模型名称(显示用)',
@@ -30,7 +31,6 @@ CREATE TABLE IF NOT EXISTS `ai_model_config` (
 -- ============================================
 -- 2. 邮箱配置表
 -- ============================================
-DROP TABLE IF EXISTS `email_config`;
 CREATE TABLE IF NOT EXISTS `email_config` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `email` VARCHAR(100) NOT NULL COMMENT '邮箱地址',
@@ -52,7 +52,64 @@ CREATE TABLE IF NOT EXISTS `email_config` (
 -- ============================================
 -- 3. 文件上传记录表
 -- ============================================
-DROP TABLE IF EXISTS `document`;
+CREATE TABLE IF NOT EXISTS `user_account` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    `username` VARCHAR(50) NOT NULL COMMENT '登录名',
+    `email` VARCHAR(100) NOT NULL COMMENT '邮箱',
+    `password_hash` VARCHAR(255) NOT NULL COMMENT 'BCrypt密码哈希',
+    `display_name` VARCHAR(100) DEFAULT NULL COMMENT '显示名',
+    `role` VARCHAR(30) DEFAULT 'USER' COMMENT '角色',
+    `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    `email_verified` TINYINT(1) DEFAULT 0 COMMENT '邮箱是否已验证',
+    `token_version` INT NOT NULL DEFAULT 0 COMMENT 'JWT版本号，用于令牌失效',
+    `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY `uk_user_account_username` (`username`),
+    UNIQUE KEY `uk_user_account_email` (`email`),
+    INDEX `idx_user_account_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户账号表';
+
+CREATE TABLE IF NOT EXISTS `oauth_account` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    `user_id` BIGINT NOT NULL COMMENT '本地用户ID',
+    `provider` VARCHAR(30) NOT NULL COMMENT '提供商: github',
+    `provider_user_id` VARCHAR(100) NOT NULL COMMENT '第三方用户ID',
+    `login` VARCHAR(100) DEFAULT NULL COMMENT '第三方登录名',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY `uk_oauth_provider_user` (`provider`, `provider_user_id`),
+    INDEX `idx_oauth_user_id` (`user_id`),
+    CONSTRAINT `fk_oauth_account_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='第三方账号绑定表';
+
+CREATE TABLE IF NOT EXISTS `oauth_state` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    `state` VARCHAR(80) NOT NULL COMMENT 'OAuth state',
+    `redirect_path` VARCHAR(255) NOT NULL COMMENT '登录后跳转路径',
+    `expire_time` DATETIME NOT NULL COMMENT '过期时间',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY `uk_oauth_state` (`state`),
+    INDEX `idx_oauth_state_expire` (`expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='OAuth state表';
+
+CREATE TABLE IF NOT EXISTS `auth_email_code` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    `email` VARCHAR(100) NOT NULL COMMENT '邮箱',
+    `code` VARCHAR(12) NOT NULL COMMENT '验证码',
+    `purpose` VARCHAR(30) NOT NULL COMMENT '用途: LOGIN',
+    `used` TINYINT(1) DEFAULT 0 COMMENT '是否已使用',
+    `send_time` DATETIME NOT NULL COMMENT '发送时间',
+    `expire_time` DATETIME NOT NULL COMMENT '过期时间',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    INDEX `idx_auth_email_code_email` (`email`),
+    INDEX `idx_auth_email_code_purpose` (`purpose`),
+    INDEX `idx_auth_email_code_send_time` (`send_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邮箱验证码表';
+
+-- ============================================
+-- 3. 文件上传记录表
+-- ============================================
 CREATE TABLE IF NOT EXISTS `document` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     `file_name` VARCHAR(255) NOT NULL COMMENT '文件名',
@@ -75,7 +132,6 @@ CREATE TABLE IF NOT EXISTS `document` (
 -- ============================================
 -- 4. 日程事件表
 -- ============================================
-DROP TABLE IF EXISTS `schedule_event`;
 CREATE TABLE IF NOT EXISTS `schedule_event` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     `title` VARCHAR(255) NOT NULL COMMENT '事件标题',
@@ -100,7 +156,6 @@ CREATE TABLE IF NOT EXISTS `schedule_event` (
 -- ============================================
 -- 5. 定时任务表
 -- ============================================
-DROP TABLE IF EXISTS `scheduled_task`;
 CREATE TABLE IF NOT EXISTS `scheduled_task` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(100) NOT NULL COMMENT '任务名称',
@@ -125,8 +180,6 @@ CREATE TABLE IF NOT EXISTS `scheduled_task` (
 -- ============================================
 -- 6. 聊天会话表
 -- ============================================
-DROP TABLE IF EXISTS `chat_message`;
-DROP TABLE IF EXISTS `chat_session`;
 CREATE TABLE IF NOT EXISTS `chat_session` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '会话ID',
     `title` VARCHAR(255) DEFAULT '新会话' COMMENT '会话标题',
@@ -147,15 +200,12 @@ CREATE TABLE IF NOT EXISTS `chat_message` (
     `token_count` INT COMMENT 'token数量',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX `idx_session_time` (`session_id`, `create_time`),
-    INDEX `idx_session_last_time` (`last_message_time` DESC),
     FOREIGN KEY (`session_id`) REFERENCES `chat_session`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天消息表';
 
 -- ============================================
 -- 7. 知识库表
 -- ============================================
-DROP TABLE IF EXISTS `knowledge_document`;
-DROP TABLE IF EXISTS `knowledge_base`;
 CREATE TABLE IF NOT EXISTS `knowledge_base` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(100) NOT NULL COMMENT '知识库名称',
@@ -194,8 +244,6 @@ CREATE TABLE IF NOT EXISTS `knowledge_document` (
 -- ============================================
 -- 8. 笔记表 & 代码片段表
 -- ============================================
-DROP TABLE IF EXISTS `code_snippet`;
-DROP TABLE IF EXISTS `note`;
 CREATE TABLE IF NOT EXISTS `note` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '笔记ID',
     `title` VARCHAR(255) NOT NULL COMMENT '标题',
@@ -226,9 +274,6 @@ CREATE INDEX `idx_snippet_language` ON `code_snippet`(`language`);
 -- ============================================
 -- 9. MCP 工具配置表
 -- ============================================
-DROP TABLE IF EXISTS `skill_tool_mapping`;
-DROP TABLE IF EXISTS `skill`;
-DROP TABLE IF EXISTS `mcp_tool`;
 CREATE TABLE IF NOT EXISTS `mcp_tool` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `name` VARCHAR(100) NOT NULL COMMENT '工具名称，唯一标识',

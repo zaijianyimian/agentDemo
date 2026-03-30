@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.SkillExecutionResult;
 import com.example.demo.entity.McpTool;
 import com.example.demo.entity.Skill;
@@ -202,29 +203,27 @@ public class SkillController {
      * 执行技能
      */
     @PostMapping("/{code}/execute")
-    public ResponseEntity<SkillExecutionResult> execute(
+    public ApiResponse<SkillExecutionResult> execute(
             @PathVariable String code,
             @RequestBody(required = false) Map<String, Object> params) {
         SkillExecutionResult result = skillExecutor.execute(code, params);
-        return ResponseEntity.ok(result);
+        return ApiResponse.success(result);
     }
 
     /**
      * 测试技能执行
      */
     @PostMapping("/{id}/test")
-    public ResponseEntity<SkillExecutionResult> test(
+    public ApiResponse<SkillExecutionResult> test(
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, Object> params) {
         Skill skill = skillService.getById(id);
         if (skill == null) {
-            return ResponseEntity.badRequest().body(
-                    SkillExecutionResult.failure(null, "技能不存在: " + id)
-            );
+            return ApiResponse.error("技能不存在: " + id);
         }
 
         SkillExecutionResult result = skillExecutor.execute(skill, params);
-        return ResponseEntity.ok(result);
+        return ApiResponse.success(result);
     }
 
     // ==================== 导入导出接口 ====================

@@ -56,13 +56,7 @@ public class ScheduledTaskService {
         scheduler.setAwaitTerminationSeconds(60);
         scheduler.initialize();
         this.taskScheduler = scheduler;
-
-        // 加载所有启用的任务
-        List<ScheduledTask> tasks = taskMapper.selectEnabled();
-        for (ScheduledTask task : tasks) {
-            scheduleTask(task);
-        }
-        log.info("已加载 {} 个定时任务", tasks.size());
+        reloadScheduledTasks();
     }
 
     @PreDestroy
@@ -108,6 +102,11 @@ public class ScheduledTaskService {
             throw new IllegalArgumentException("任务不存在: " + task.getId());
         }
 
+        // 前端更新时可能不传 enabled，保持原状态避免出现“已启用但未调度”的状态漂移
+        if (task.getEnabled() == null) {
+            task.setEnabled(existing.getEnabled());
+        }
+
         // 验证 Cron 表达式
         if (!CronExpression.isValidExpression(task.getCronExpression())) {
             throw new IllegalArgumentException("无效的 Cron 表达式: " + task.getCronExpression());
@@ -143,7 +142,7 @@ public class ScheduledTaskService {
             throw new IllegalArgumentException("任务不存在: " + id);
         }
 
-        task.setEnabled(!task.getEnabled());
+        task.setEnabled(!Boolean.TRUE.equals(task.getEnabled()));
         taskMapper.updateById(task);
 
         if (task.getEnabled()) {
@@ -174,6 +173,22 @@ public class ScheduledTaskService {
      */
     public List<ScheduledTask> listTasks() {
         return taskMapper.selectList(null);
+    }
+
+    /**
+     * 从数据库重载所有启用任务到调度器
+     */
+    public synchronized void reloadScheduledTasks() {
+        for (ScheduledFuture<?> future : scheduledTasks.values()) {
+            future.cancel(false);
+        }
+        scheduledTasks.clear();
+
+        List<ScheduledTask> tasks = taskMapper.selectEnabled();
+        for (ScheduledTask task : tasks) {
+            scheduleTask(task);
+        }
+        log.info("已重载 {} 个定时任务", tasks.size());
     }
 
     /**
@@ -222,6 +237,7 @@ public class ScheduledTaskService {
         log.info("执行定时任务: {} ({})", task.getName(), task.getTaskType());
         String result;
         boolean success = false;
+        boolean supportedTaskType = true;
 
         try {
             switch (task.getTaskType()) {
@@ -235,23 +251,34 @@ public class ScheduledTaskService {
                     result = executeReminderTask(task);
                     break;
                 default:
+                    supportedTaskType = false;
                     result = "不支持的任务类型: " + task.getTaskType();
+                    break;
             }
-            success = true;
+            if (supportedTaskType) {
+                success = true;
+            }
         } catch (Exception e) {
             result = "执行失败: " + e.getMessage();
             log.error("任务执行失败: {}", task.getName(), e);
+        }
+
+        if (result == null) {
+            result = "";
         }
 
         // 更新执行记录
         task.setLastExecuteTime(LocalDateTime.now());
         task.setLastExecuteResult(result.length() > 500 ? result.substring(0, 500) : result);
         task.setNextExecuteTime(calculateNextExecuteTime(task.getCronExpression()));
-        task.setExecuteCount(task.getExecuteCount() + 1);
+        int executeCount = task.getExecuteCount() == null ? 0 : task.getExecuteCount();
+        int successCount = task.getSuccessCount() == null ? 0 : task.getSuccessCount();
+        int failCount = task.getFailCount() == null ? 0 : task.getFailCount();
+        task.setExecuteCount(executeCount + 1);
         if (success) {
-            task.setSuccessCount(task.getSuccessCount() + 1);
+            task.setSuccessCount(successCount + 1);
         } else {
-            task.setFailCount(task.getFailCount() + 1);
+            task.setFailCount(failCount + 1);
         }
         taskMapper.updateById(task);
 

@@ -179,7 +179,7 @@ public class SkillService {
             throw new IllegalArgumentException("技能不存在: " + id);
         }
 
-        skill.setEnabled(!skill.getEnabled());
+        skill.setEnabled(!Boolean.TRUE.equals(skill.getEnabled()));
         skillMapper.updateById(skill);
         log.info("切换技能状态: {} -> {}", skill.getCode(), skill.getEnabled());
     }
@@ -256,12 +256,18 @@ public class SkillService {
             return new ArrayList<>();
         }
 
-        // 获取工具列表
+        // 获取工具列表，并按映射顺序返回
         List<Long> toolIds = mappings.stream()
                 .map(SkillToolMapping::getToolId)
                 .collect(Collectors.toList());
+        List<McpTool> tools = mcpToolMapper.selectBatchIds(toolIds);
+        java.util.Map<Long, McpTool> toolMap = tools.stream()
+                .collect(Collectors.toMap(McpTool::getId, tool -> tool, (a, b) -> a));
 
-        return mcpToolMapper.selectBatchIds(toolIds);
+        return toolIds.stream()
+                .map(toolMap::get)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     /**

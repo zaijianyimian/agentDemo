@@ -31,7 +31,9 @@ public class EmailController {
      */
     @GetMapping("/config/list")
     public List<EmailConfig> listConfigs() {
-        return emailConfigMapper.selectList(null);
+        List<EmailConfig> list = emailConfigMapper.selectList(null);
+        list.forEach(this::normalizeConfig);
+        return list;
     }
 
     /**
@@ -39,9 +41,11 @@ public class EmailController {
      */
     @GetMapping("/config/enabled")
     public List<EmailConfig> listEnabledConfigs() {
-        return emailConfigMapper.selectList(
+        List<EmailConfig> list = emailConfigMapper.selectList(
                 new LambdaQueryWrapper<EmailConfig>().eq(EmailConfig::getEnabled, true)
         );
+        list.forEach(this::normalizeConfig);
+        return list;
     }
 
     /**
@@ -49,7 +53,9 @@ public class EmailController {
      */
     @GetMapping("/config/{id}")
     public EmailConfig getConfig(@PathVariable Long id) {
-        return emailConfigMapper.selectById(id);
+        EmailConfig config = emailConfigMapper.selectById(id);
+        normalizeConfig(config);
+        return config;
     }
 
     /**
@@ -57,6 +63,7 @@ public class EmailController {
      */
     @PostMapping("/config")
     public ResponseEntity<String> addConfig(@RequestBody EmailConfig config) {
+        normalizeConfig(config);
         // 设置默认值
         if (config.getProtocol() == null) {
             config.setProtocol("imap");
@@ -86,6 +93,7 @@ public class EmailController {
      */
     @PutMapping("/config")
     public ResponseEntity<String> updateConfig(@RequestBody EmailConfig config) {
+        normalizeConfig(config);
         emailConfigMapper.updateById(config);
         return ResponseEntity.ok("更新成功");
     }
@@ -113,6 +121,7 @@ public class EmailController {
         if (config == null) {
             return ResponseEntity.badRequest().body("邮箱配置不存在");
         }
+        normalizeConfig(config);
 
         // 更新启用状态
         config.setEnabled(true);
@@ -132,6 +141,7 @@ public class EmailController {
         if (config == null) {
             return ResponseEntity.badRequest().body("邮箱配置不存在");
         }
+        normalizeConfig(config);
 
         // 更新启用状态
         config.setEnabled(false);
@@ -173,6 +183,7 @@ public class EmailController {
                     "message", "邮箱配置不存在"
             ));
         }
+        normalizeConfig(config);
 
         EmailListenerService.EmailTestResult result = emailListenerService.testConnection(config);
         return ResponseEntity.ok(Map.of(
@@ -185,10 +196,58 @@ public class EmailController {
     }
 
     /**
+     * 检查已保存邮箱配置的网络连通性（服务器 -> 邮件服务器）
+     */
+    @GetMapping("/config/{id}/network-check")
+    public ResponseEntity<Map<String, Object>> checkNetwork(@PathVariable Long id) {
+        EmailConfig config = emailConfigMapper.selectById(id);
+        if (config == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "邮箱配置不存在"
+            ));
+        }
+        normalizeConfig(config);
+        EmailListenerService.NetworkCheckResult result = emailListenerService.checkNetworkConnectivity(
+                config.getHost(),
+                config.getPort() == null ? 993 : config.getPort(),
+                10000
+        );
+        return ResponseEntity.ok(Map.of(
+                "success", result.isSuccess(),
+                "message", result.getMessage(),
+                "durationMs", result.getDurationMs(),
+                "resolvedIp", result.getResolvedIp() != null ? result.getResolvedIp() : "",
+                "errorDetail", result.getErrorDetail() != null ? result.getErrorDetail() : ""
+        ));
+    }
+
+    /**
+     * 检查未保存配置的网络连通性
+     */
+    @PostMapping("/config/network-check")
+    public ResponseEntity<Map<String, Object>> checkNewConfigNetwork(@RequestBody EmailConfig config) {
+        normalizeConfig(config);
+        EmailListenerService.NetworkCheckResult result = emailListenerService.checkNetworkConnectivity(
+                config.getHost(),
+                config.getPort() == null ? 993 : config.getPort(),
+                10000
+        );
+        return ResponseEntity.ok(Map.of(
+                "success", result.isSuccess(),
+                "message", result.getMessage(),
+                "durationMs", result.getDurationMs(),
+                "resolvedIp", result.getResolvedIp() != null ? result.getResolvedIp() : "",
+                "errorDetail", result.getErrorDetail() != null ? result.getErrorDetail() : ""
+        ));
+    }
+
+    /**
      * 测试新邮箱配置（未保存的配置）
      */
     @PostMapping("/config/test")
     public ResponseEntity<Map<String, Object>> testNewConfig(@RequestBody EmailConfig config) {
+        normalizeConfig(config);
         EmailListenerService.EmailTestResult result = emailListenerService.testConnection(config);
         return ResponseEntity.ok(Map.of(
                 "success", result.isSuccess(),
@@ -221,4 +280,28 @@ public class EmailController {
      * 邮箱服务器模板
      */
     public record EmailTemplate(String name, String host, int port, boolean sslEnabled, String protocol) {}
+
+    private void normalizeConfig(EmailConfig config) {
+        if (config == null) {
+            return;
+        }
+        if (config.getEmail() != null) {
+            config.setEmail(config.getEmail().trim());
+        }
+        if (config.getHost() != null) {
+            config.setHost(config.getHost().trim());
+        }
+        if (config.getPassword() != null) {
+            config.setPassword(config.getPassword().trim());
+        }
+        if (config.getProtocol() != null) {
+            config.setProtocol(config.getProtocol().trim().toLowerCase());
+        }
+        if (config.getFolder() != null) {
+            config.setFolder(config.getFolder().trim());
+        }
+        if (config.getRemark() != null) {
+            config.setRemark(config.getRemark().trim());
+        }
+    }
 }

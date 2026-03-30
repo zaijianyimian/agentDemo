@@ -23,7 +23,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
      * 确保 String 类型响应使用 UTF-8 编码
      */
     @Override
-    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
+    public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
         StringHttpMessageConverter stringConverter = new StringHttpMessageConverter(StandardCharsets.UTF_8);
         stringConverter.setSupportedMediaTypes(List.of(
                 MediaType.TEXT_PLAIN,

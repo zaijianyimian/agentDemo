@@ -17,6 +17,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -123,17 +126,23 @@ public class EmailListenerService {
     private void connectAndListen(EmailConfig config) throws MessagingException {
         log.info("正在连接邮箱: {}", config.getEmail());
 
+        String protocol = normalizeProtocol(config.getProtocol());
+        String host = safeTrim(config.getHost());
+        String email = safeTrim(config.getEmail());
+        String password = safeTrim(config.getPassword());
+        String folderName = normalizeFolder(config.getFolder());
+
         // 配置邮件属性
         Properties props = new Properties();
-        props.put("mail.store.protocol", config.getProtocol());
-        props.put("mail." + config.getProtocol() + ".host", config.getHost());
-        props.put("mail." + config.getProtocol() + ".port", config.getPort());
-        props.put("mail." + config.getProtocol() + ".connectiontimeout", 10000);
-        props.put("mail." + config.getProtocol() + ".timeout", 10000);
+        props.put("mail.store.protocol", protocol);
+        props.put("mail." + protocol + ".host", host);
+        props.put("mail." + protocol + ".port", config.getPort());
+        props.put("mail." + protocol + ".connectiontimeout", 10000);
+        props.put("mail." + protocol + ".timeout", 10000);
 
         if (Boolean.TRUE.equals(config.getSslEnabled())) {
-            props.put("mail." + config.getProtocol() + ".ssl.enable", "true");
-            props.put("mail." + config.getProtocol() + ".ssl.trust", config.getHost());
+            props.put("mail." + protocol + ".ssl.enable", "true");
+            props.put("mail." + protocol + ".ssl.trust", host);
         }
 
         // 创建Session
@@ -141,11 +150,10 @@ public class EmailListenerService {
         session.setDebug(false);
 
         // 连接Store
-        Store store = session.getStore(config.getProtocol());
-        store.connect(config.getHost(), config.getEmail(), config.getPassword());
+        Store store = session.getStore(protocol);
+        store.connect(host, email, password);
 
         // 打开文件夹
-        String folderName = config.getFolder() != null ? config.getFolder() : "INBOX";
         Folder folder = store.getFolder(folderName);
         folder.open(Folder.READ_WRITE);
 
@@ -382,18 +390,35 @@ public class EmailListenerService {
         try {
             log.info("测试邮箱连接: {}", config.getEmail());
 
+            String protocol = normalizeProtocol(config.getProtocol());
+            String host = safeTrim(config.getHost());
+            String email = safeTrim(config.getEmail());
+            String password = safeTrim(config.getPassword());
+            String folderName = normalizeFolder(config.getFolder());
+            int port = config.getPort() != null ? config.getPort() : 993;
+
+            NetworkCheckResult networkCheckResult = checkNetworkConnectivity(host, port, 10000);
+            if (!networkCheckResult.isSuccess()) {
+                return new EmailTestResult(
+                        false,
+                        "连接失败：服务器无法访问邮件服务器，请检查主机、端口或服务器防火墙",
+                        System.currentTimeMillis() - startTime,
+                        0,
+                        networkCheckResult.getErrorDetail()
+                );
+            }
+
             // 配置邮件属性
             Properties props = new Properties();
-            props.put("mail.store.protocol", config.getProtocol() != null ? config.getProtocol() : "imap");
-            String protocol = config.getProtocol() != null ? config.getProtocol() : "imap";
-            props.put("mail." + protocol + ".host", config.getHost());
-            props.put("mail." + protocol + ".port", config.getPort() != null ? config.getPort() : 993);
+            props.put("mail.store.protocol", protocol);
+            props.put("mail." + protocol + ".host", host);
+            props.put("mail." + protocol + ".port", port);
             props.put("mail." + protocol + ".connectiontimeout", 10000);
             props.put("mail." + protocol + ".timeout", 10000);
 
             if (Boolean.TRUE.equals(config.getSslEnabled())) {
                 props.put("mail." + protocol + ".ssl.enable", "true");
-                props.put("mail." + protocol + ".ssl.trust", config.getHost());
+                props.put("mail." + protocol + ".ssl.trust", host);
             }
 
             // 创建Session
@@ -402,10 +427,9 @@ public class EmailListenerService {
 
             // 连接Store
             Store store = session.getStore(protocol);
-            store.connect(config.getHost(), config.getEmail(), config.getPassword());
+            store.connect(host, email, password);
 
             // 测试打开文件夹
-            String folderName = config.getFolder() != null ? config.getFolder() : "INBOX";
             Folder folder = store.getFolder(folderName);
             folder.open(Folder.READ_ONLY);
 
@@ -475,5 +499,74 @@ public class EmailListenerService {
      */
     public interface EmailHandler {
         void handle(EmailMessage emailMessage);
+    }
+
+    public NetworkCheckResult checkNetworkConnectivity(String host, Integer port, int timeoutMs) {
+        long start = System.currentTimeMillis();
+        try {
+            String normalizedHost = safeTrim(host);
+            int normalizedPort = (port == null || port <= 0) ? 993 : port;
+            if (normalizedHost == null || normalizedHost.isEmpty()) {
+                return new NetworkCheckResult(false, "主机地址不能为空", 0, null, "host is blank");
+            }
+
+            InetAddress address = InetAddress.getByName(normalizedHost);
+            try (Socket socket = new Socket()) {
+                socket.connect(new InetSocketAddress(address, normalizedPort), timeoutMs);
+            }
+            long duration = System.currentTimeMillis() - start;
+            return new NetworkCheckResult(
+                    true,
+                    "网络连通",
+                    duration,
+                    address.getHostAddress(),
+                    null
+            );
+        } catch (Exception e) {
+            long duration = System.currentTimeMillis() - start;
+            return new NetworkCheckResult(
+                    false,
+                    "网络不通",
+                    duration,
+                    null,
+                    e.getMessage()
+            );
+        }
+    }
+
+    public static class NetworkCheckResult {
+        private final boolean success;
+        private final String message;
+        private final long durationMs;
+        private final String resolvedIp;
+        private final String errorDetail;
+
+        public NetworkCheckResult(boolean success, String message, long durationMs, String resolvedIp, String errorDetail) {
+            this.success = success;
+            this.message = message;
+            this.durationMs = durationMs;
+            this.resolvedIp = resolvedIp;
+            this.errorDetail = errorDetail;
+        }
+
+        public boolean isSuccess() { return success; }
+        public String getMessage() { return message; }
+        public long getDurationMs() { return durationMs; }
+        public String getResolvedIp() { return resolvedIp; }
+        public String getErrorDetail() { return errorDetail; }
+    }
+
+    private String safeTrim(String text) {
+        return text == null ? null : text.trim();
+    }
+
+    private String normalizeProtocol(String protocol) {
+        String value = safeTrim(protocol);
+        return (value == null || value.isEmpty()) ? "imap" : value.toLowerCase();
+    }
+
+    private String normalizeFolder(String folder) {
+        String value = safeTrim(folder);
+        return (value == null || value.isEmpty()) ? "INBOX" : value;
     }
 }

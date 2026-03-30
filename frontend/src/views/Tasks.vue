@@ -33,6 +33,20 @@
           <div class="task-type-list">
             <span v-for="item in taskTypeOptions" :key="item.value" class="task-type-pill">{{ item.label }}</span>
           </div>
+          <n-divider style="margin: 8px 0;" />
+          <div class="template-block">
+            <strong>模板中心</strong>
+            <n-button
+              v-for="item in templates"
+              :key="item.id"
+              size="small"
+              tertiary
+              @click="createByTemplate(item.id, item.name)"
+            >
+              {{ item.name }}
+            </n-button>
+            <n-button size="small" type="warning" secondary @click="undoDelete">撤销删除</n-button>
+          </div>
         </div>
       </div>
 
@@ -144,9 +158,10 @@ import {
   CreateOutline as EditIcon,
   TrashOutline as TrashIcon
 } from '@vicons/ionicons5'
-import { taskService } from '@/services/api'
+import { personalService, taskService } from '@/services/api'
 import dayjs from 'dayjs'
 import { computed } from 'vue'
+import { pushRecentAction } from '@/services/user-preferences'
 
 interface ScheduledTask {
   id: number
@@ -176,6 +191,8 @@ const editingTask = ref<ScheduledTask | null>(null)
 const currentTask = ref<ScheduledTask | null>(null)
 const submitLoading = ref(false)
 const formRef = ref()
+const templates = ref<Array<{ id: string; name: string }>>([])
+const lastDeletedTask = ref<ScheduledTask | null>(null)
 
 const form = ref({
   name: '',
@@ -282,6 +299,17 @@ const submitForm = async () => {
   }
 }
 
+const loadTemplates = async () => {
+  try {
+    const res = await personalService.listTaskTemplates()
+    if (res.success && res.data) {
+      templates.value = res.data.map(item => ({ id: item.id, name: item.name }))
+    }
+  } catch (error) {
+    console.error('加载任务模板失败:', error)
+  }
+}
+
 const openCreateModal = () => {
   editingTask.value = null
   form.value = {
@@ -337,9 +365,11 @@ const confirmDelete = (task: ScheduledTask) => {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
+        lastDeletedTask.value = { ...task }
         const res = await taskService.delete(task.id)
         if (res.success) {
-          message.success('删除成功')
+          message.success('删除成功，可点击“撤销删除”恢复')
+          pushRecentAction({ time: new Date().toLocaleString(), title: '删除任务', detail: task.name })
           loadTasks()
         } else {
           message.error(res.message || '删除失败')
@@ -350,6 +380,36 @@ const confirmDelete = (task: ScheduledTask) => {
       }
     }
   })
+}
+
+const undoDelete = async () => {
+  if (!lastDeletedTask.value) {
+    message.warning('当前没有可撤销的删除项')
+    return
+  }
+
+  const payload = { ...lastDeletedTask.value }
+  delete (payload as any).id
+  const res = await taskService.create(payload)
+  if (res.success) {
+    message.success('任务已恢复')
+    pushRecentAction({ time: new Date().toLocaleString(), title: '撤销删除任务', detail: lastDeletedTask.value.name })
+    lastDeletedTask.value = null
+    await loadTasks()
+  } else {
+    message.error(res.message || '恢复失败')
+  }
+}
+
+const createByTemplate = async (templateId: string, templateName: string) => {
+  const res = await personalService.createTaskFromTemplate(templateId)
+  if (res.success) {
+    message.success(`模板任务已创建: ${templateName}`)
+    pushRecentAction({ time: new Date().toLocaleString(), title: '应用任务模板', detail: templateName })
+    await loadTasks()
+  } else {
+    message.error(res.message || '模板创建失败')
+  }
 }
 
 function getTaskTypeColor(type: string) {
@@ -370,6 +430,7 @@ function formatTime(time: string | number[] | null | undefined) {
 
 onMounted(() => {
   loadTasks()
+  loadTemplates()
 })
 </script>
 
@@ -381,6 +442,7 @@ onMounted(() => {
 .hero-stat span { color:var(--text-secondary); font-size:.86rem; }
 .hero-stat strong { display:block; margin-top:6px; font-size:1.3rem; }
 .task-type-list { display:flex; flex-wrap:wrap; gap:10px; }
+.template-block { display:grid; gap:8px; }
 .task-type-pill { padding:8px 12px; border-radius:999px; color:var(--text-secondary); font-size:.86rem; }
 .result-content { background: var(--bg-input); padding:16px; border-radius:14px; font-size:12px; white-space:pre-wrap; word-break:break-all; color:var(--text-primary); }
 @media (max-width: 900px) { .hero-grid { grid-template-columns:1fr; } }

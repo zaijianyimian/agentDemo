@@ -82,4 +82,32 @@ public class EmailConfig {
      * 更新时间
      */
     private LocalDateTime updateTime;
+
+    public void setEmail(String email) {
+        this.email = trim(email);
+    }
+
+    public void setPassword(String password) {
+        this.password = trim(password);
+    }
+
+    public void setHost(String host) {
+        this.host = trim(host);
+    }
+
+    public void setProtocol(String protocol) {
+        this.protocol = trim(protocol);
+    }
+
+    public void setFolder(String folder) {
+        this.folder = trim(folder);
+    }
+
+    public void setRemark(String remark) {
+        this.remark = trim(remark);
+    }
+
+    private String trim(String value) {
+        return value == null ? null : value.trim();
+    }
 }

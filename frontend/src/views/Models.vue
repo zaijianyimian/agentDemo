@@ -4,7 +4,7 @@
       <div>
         <div class="page-eyebrow">Model Registry</div>
         <h2>管理默认模型、连接状态和提供商切换。</h2>
-        <p>这里统一承接后端的模型 CRUD、默认模型切换和连接测试，让模型能力入口更清晰。</p>
+        <p>这里统一承接后端的模型 CRUD、连接测试和单模型启用切换，让模型能力入口更清晰。</p>
       </div>
       <div class="hero-actions">
         <div class="hero-stat">
@@ -194,7 +194,7 @@ const columns: DataTableColumns<AiModelConfig> = [
     render: row => h(NSpace, null, {
       default: () => [
         h(NButton, { size: 'small', quaternary: true, onClick: () => editModel(row) }, { default: () => '编辑' }),
-        h(NButton, { size: 'small', quaternary: true, onClick: () => toggleEnabled(row) }, { default: () => row.enabled ? '禁用' : '启用' }),
+        h(NButton, { size: 'small', quaternary: true, onClick: () => toggleEnabled(row) }, { default: () => row.enabled ? '禁用' : '启用此模型' }),
         h(NButton, { size: 'small', quaternary: true, type: 'error', onClick: () => confirmDelete(row) }, { icon: () => h(NIcon, null, { default: () => h(TrashIcon) }) })
       ]
     })
@@ -282,7 +282,7 @@ const submitForm = async () => {
 const toggleEnabled = async (model: AiModelConfig) => {
   const res = await modelService.toggle(model.id)
   if (res.success) {
-    message.success(model.enabled ? '已禁用' : '已启用')
+    message.success(model.enabled ? '已禁用当前模型' : '已切换为当前启用模型（其他模型已自动禁用）')
     loadModels()
   } else message.error(res.message || '操作失败')
 }

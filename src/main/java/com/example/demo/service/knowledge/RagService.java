@@ -5,6 +5,7 @@ import com.example.demo.entity.KnowledgeDocument;
 import com.example.demo.mapper.KnowledgeBaseMapper;
 import com.example.demo.mapper.KnowledgeDocumentMapper;
 import com.example.demo.properties.QdrantProperties;
+import com.example.demo.service.SystemSettingsService;
 import com.example.demo.service.memory.EmbeddingCacheService;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
@@ -29,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -47,6 +49,7 @@ public class RagService {
     private final KnowledgeDocumentMapper knowledgeDocumentMapper;
     private final EmbeddingCacheService embeddingCacheService;
     private final QdrantProperties qdrantProperties;
+    private final SystemSettingsService systemSettingsService;
 
     // 每个知识库的 EmbeddingStore 缓存
     private final Map<String, EmbeddingStore<TextSegment>> embeddingStoreCache = new HashMap<>();
@@ -54,11 +57,13 @@ public class RagService {
     public RagService(KnowledgeBaseMapper knowledgeBaseMapper,
                       KnowledgeDocumentMapper knowledgeDocumentMapper,
                       EmbeddingCacheService embeddingCacheService,
-                      QdrantProperties qdrantProperties) {
+                      QdrantProperties qdrantProperties,
+                      SystemSettingsService systemSettingsService) {
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.knowledgeDocumentMapper = knowledgeDocumentMapper;
         this.embeddingCacheService = embeddingCacheService;
         this.qdrantProperties = qdrantProperties;
+        this.systemSettingsService = systemSettingsService;
     }
 
     @PostConstruct
@@ -195,6 +200,18 @@ public class RagService {
 
         // 提取内容
         String content = extractContent(filePath, fileType);
+        String contentHash = digest(content);
+
+        // 单用户增强：支持去重与增量上传策略
+        KnowledgeDocument existing = findDuplicateOrUnchanged(baseId, originalFilename, contentHash);
+        if (existing != null) {
+            // 去重命中时，删除本次临时落盘文件，避免产生孤儿文件
+            if (Files.exists(filePath)) {
+                Files.delete(filePath);
+            }
+            log.info("跳过重复或未变化文档: baseId={}, file={}", baseId, originalFilename);
+            return existing;
+        }
 
         // 创建文档记录
         KnowledgeDocument doc = KnowledgeDocument.builder()
@@ -292,8 +309,12 @@ public class RagService {
                 chunks.add(chunk);
             }
 
-            start = end - chunkOverlap;
-            if (start <= end) start = end;
+            int nextStart = end - Math.max(0, chunkOverlap);
+            // 防止 overlap 配置异常（例如 overlap >= chunkSize）导致死循环
+            if (nextStart <= start) {
+                nextStart = end;
+            }
+            start = nextStart;
         }
 
         return chunks;
@@ -471,5 +492,47 @@ public class RagService {
             return host;
         }
         return "http://" + host;
+    }
+
+    private KnowledgeDocument findDuplicateOrUnchanged(Long baseId, String fileName, String contentHash) {
+        boolean dedupeEnabled = "true".equalsIgnoreCase(
+                systemSettingsService.getSetting("system", "knowledge_dedupe_enabled", "true"));
+        boolean incrementalEnabled = "true".equalsIgnoreCase(
+                systemSettingsService.getSetting("system", "knowledge_incremental_enabled", "true"));
+
+        if (!dedupeEnabled && !incrementalEnabled) {
+            return null;
+        }
+
+        List<KnowledgeDocument> docs = knowledgeDocumentMapper.selectByBaseId(baseId);
+        for (KnowledgeDocument doc : docs) {
+            String hash = digest(doc.getContent());
+            if (dedupeEnabled && Objects.equals(hash, contentHash)) {
+                return doc;
+            }
+            if (incrementalEnabled
+                    && Objects.equals(doc.getFileName(), fileName)
+                    && Objects.equals(hash, contentHash)) {
+                return doc;
+            }
+        }
+        return null;
+    }
+
+    private String digest(String text) {
+        if (text == null) {
+            return "";
+        }
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = md.digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return String.valueOf(text.hashCode());
+        }
     }
 }

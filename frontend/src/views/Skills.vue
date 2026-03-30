@@ -443,9 +443,13 @@ const doExecute = async () => {
   try {
     const params = JSON.parse(executeParams.value || '{}')
     const res = await skillService.execute(currentSkill.value.code, params)
-    executeResult.value = res.data
-    showExecuteModal.value = false
-    showResultModal.value = true
+    if (res.success) {
+      executeResult.value = res.data
+      showExecuteModal.value = false
+      showResultModal.value = true
+    } else {
+      message.error(res.message || '执行失败')
+    }
   } catch (error: any) {
     message.error('执行失败: ' + (error.message || '未知错误'))
   } finally {

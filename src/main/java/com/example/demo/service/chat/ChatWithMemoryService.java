@@ -2,12 +2,9 @@ package com.example.demo.service.chat;
 
 import com.example.demo.service.ai.ModelManager;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
-import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.V;
-import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -18,20 +15,17 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 带记忆功能的聊天服务
  * 每个会话(sessionId)拥有独立的对话记忆
- * 支持动态切换不同模型
+ * 聊天统一使用当前启用模型
  */
 @Slf4j
 @Service
 public class ChatWithMemoryService {
 
-    @Resource
-    private ModelManager modelManager;
+    private final ModelManager modelManager;
 
-    @Resource(name = "chatModel")
-    private ChatModel defaultChatModel;
-
-    @Resource(name = "streamingChatModel")
-    private StreamingChatModel defaultStreamingChatModel;
+    public ChatWithMemoryService(ModelManager modelManager) {
+        this.modelManager = modelManager;
+    }
 
     /**
      * 带记忆的聊天接口
@@ -60,32 +54,23 @@ public class ChatWithMemoryService {
     /**
      * 获取带记忆的聊天服务实例
      * 根据模型ID动态创建或获取缓存实例
-     * @param modelId 模型ID，null时使用默认模型
+     * @param modelId 模型ID
      */
     public ChatWithMemory getChatWithMemory(Long modelId) {
-        if (modelId == null) {
-            return chatWithMemoryCache.computeIfAbsent(0L, id -> {
-                log.info("Creating ChatWithMemory for application default model");
-                return AiServices.builder(ChatWithMemory.class)
-                        .chatModel(defaultChatModel)
-                        .streamingChatModel(defaultStreamingChatModel)
-                        .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(20))
-                        .build();
-            });
-        }
-
         // 从缓存获取或创建新实例
         return chatWithMemoryCache.computeIfAbsent(modelId, id -> {
-            ChatModel chatModel = modelManager.getChatModel(id);
-            StreamingChatModel streamingModel = modelManager.getStreamingChatModel(id);
             log.info("Creating ChatWithMemory for modelId: {}", id);
 
             return AiServices.builder(ChatWithMemory.class)
-                    .chatModel(chatModel)
-                    .streamingChatModel(streamingModel)
+                    .chatModel(modelManager.getChatModel(id))
+                    .streamingChatModel(modelManager.getStreamingChatModel(id))
                     .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(20))
                     .build();
         });
+    }
+
+    public Long resolveActiveModelId() {
+        return modelManager.getDefaultModelId();
     }
 
     /**
@@ -95,19 +80,23 @@ public class ChatWithMemoryService {
      * @return AI回答
      */
     public String chat(Long sessionId, String question) {
-        return chat(sessionId, question, null);
+        Long activeModelId = resolveActiveModelId();
+        log.info("Chat with sessionId={}, activeModelId={}", sessionId, activeModelId);
+        return getChatWithMemory(activeModelId).chat(sessionId, question);
     }
 
     /**
      * 带记忆的普通聊天（指定模型）
      * @param sessionId 会话ID
      * @param question 用户问题
-     * @param modelId 模型ID，null时使用默认模型
+     * @param modelId 模型ID（兼容参数，当前会忽略并使用启用模型）
      * @return AI回答
      */
     public String chat(Long sessionId, String question, Long modelId) {
-        log.info("Chat with sessionId={}, modelId={}", sessionId, modelId);
-        return getChatWithMemory(modelId).chat(sessionId, question);
+        if (modelId != null) {
+            log.info("Ignore requested modelId={}, use active model instead", modelId);
+        }
+        return chat(sessionId, question);
     }
 
     /**
@@ -117,19 +106,23 @@ public class ChatWithMemoryService {
      * @return AI流式回答
      */
     public Flux<String> streamChat(Long sessionId, String question) {
-        return streamChat(sessionId, question, null);
+        Long activeModelId = resolveActiveModelId();
+        log.info("Stream chat with sessionId={}, activeModelId={}", sessionId, activeModelId);
+        return getChatWithMemory(activeModelId).streamChat(sessionId, question);
     }
 
     /**
      * 带记忆的流式聊天（指定模型）
      * @param sessionId 会话ID
      * @param question 用户问题
-     * @param modelId 模型ID，null时使用默认模型
+     * @param modelId 模型ID（兼容参数，当前会忽略并使用启用模型）
      * @return AI流式回答
      */
     public Flux<String> streamChat(Long sessionId, String question, Long modelId) {
-        log.info("Stream chat with sessionId={}, modelId={}", sessionId, modelId);
-        return getChatWithMemory(modelId).streamChat(sessionId, question);
+        if (modelId != null) {
+            log.info("Ignore requested modelId={}, use active model instead", modelId);
+        }
+        return streamChat(sessionId, question);
     }
 
     /**

@@ -264,6 +264,59 @@ export interface CommandPaletteItem {
   route?: string
 }
 
+export interface AuthUserProfile {
+  id: number
+  username: string
+  email: string
+  displayName: string
+  role: string
+  emailVerified: boolean
+}
+
+export interface AuthTokenResponse {
+  tokenType: string
+  accessToken: string
+  refreshToken: string
+  expiresIn: number
+  user: AuthUserProfile
+}
+
+export interface EmailCodeSendResponse {
+  cooldownSeconds: number
+  message: string
+}
+
+export interface GithubAuthorizeResponse {
+  authorizationUrl: string
+  stateExpiresIn: number
+}
+
+export interface GithubExchangeResponse {
+  token: AuthTokenResponse
+  redirectPath: string
+}
+
+export interface PersonalInsight {
+  generatedAt: string
+  enabledTasks: number
+  todaySchedules: number
+  pendingSchedules: number
+  pinnedNotes: number
+  snippetCount: number
+  messageCount: number
+  totalTokenUsage: number
+  avgTokensPerMessage: number
+}
+
+export interface TaskTemplate {
+  id: string
+  name: string
+  description: string
+  taskType: string
+  cronExpression: string
+  params: string
+}
+
 // API响应类型
 export interface ApiResponse<T> {
   success: boolean

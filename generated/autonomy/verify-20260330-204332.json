@@ -1,0 +1,17 @@
+{
+  "verifyTime" : "2026-03-30T20:43:32.4814673",
+  "success" : false,
+  "steps" : [ {
+    "name" : "backend-test",
+    "success" : true,
+    "exitCode" : 0,
+    "workingDirectory" : "D:\\javaproject\\agentDemo",
+    "output" : "\r\n> Task :compileJava\r\nע: D:\\javaproject\\agentDemo\\src\\main\\java\\com\\example\\demo\\service\\mcp\\SkillService.javaʹ�û\uDAA3\uDCB8����ѹ�ʱ�� API��\r\nע: �й���ϸ��Ϣ, ��ʹ�� -Xlint:deprecation ���±��롣\r\nע: ĳЩ�����ļ�ʹ����δ�����\uDA8B\uDEF0�ȫ�Ĳ�����\r\nע: �й���ϸ��Ϣ, ��ʹ�� -Xlint:unchecked ���±��롣\r\n\r\n> Task :processResources\r\n> Task :classes\r\n> Task :compileTestJava\r\n> Task :processTestResources NO-SOURCE\r\n> Task :testClasses\r\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n2026-03-30T20:40:31.424+08:00 \u001B[39mDEBUG\u001B[0;39m [SpringApplicationShutdownHook] \u001B[36mo.s.w.c.s.GenericWebApplicationContext\u001B[0;39m : Closing org.springframework.web.context.support.GenericWebApplicationContext@7d2998d8, started on Mon Mar 30 20:40:11 CST 2026\r\n2026-03-30T20:40:31.479+08:00 \u001B[34mINFO \u001B[0;39m [SpringApplicationShutdownHook] \u001B[36mc.e.d.s.task.ScheduledTaskService\u001B[0;39m : 已取消所有定时任�?\r\n2026-03-30T20:40:31.480+08:00 \u001B[34mINFO \u001B[0;39m [SpringApplicationShutdownHook] \u001B[36mc.e.d.s.email.EmailListenerService\u001B[0;39m : 关闭邮件监听服务...\r\n2026-03-30T20:40:31.497+08:00 \u001B[34mINFO \u001B[0;39m [SpringApplicationShutdownHook] \u001B[36mc.e.d.service.tool.McpClientManager\u001B[0;39m : Closing all MCP Server connections...\r\n2026-03-30T20:40:31.502+08:00 \u001B[34mINFO \u001B[0;39m [SpringApplicationShutdownHook] \u001B[36mcom.zaxxer.hikari.HikariDataSource\u001B[0;39m : HikariPool-1 - Shutdown initiated...\r\n2026-03-30T20:40:31.519+08:00 \u001B[34mINFO \u001B[0;39m [SpringApplicationShutdownHook] \u001B[36mcom.zaxxer.hikari.HikariDataSource\u001B[0;39m : HikariPool-1 - Shutdown completed.\r\n> Task :test\r\n\r\n[Incubating] Problems report is available at: file:///D:/javaproject/agentDemo/build/reports/problems/problems-report.html\r\n\r\nBUILD SUCCESSFUL in 54s\r\n4 actionable tasks: 4 executed\r\n"
+  }, {
+    "name" : "frontend-build",
+    "success" : false,
+    "exitCode" : -1,
+    "workingDirectory" : "D:\\javaproject\\agentDemo\\frontend",
+    "output" : "命令执行超时，已终止: cmd.exe /c npm run build"
+  } ]
+}

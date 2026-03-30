@@ -137,70 +137,97 @@ public class EmailSenderService {
      * 构建汇总邮件HTML内容
      */
     private String buildSummaryEmail(String date, String summaryContent) {
-        return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: 'Microsoft YaHei', Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0; }
-                    .content { background: #f9f9f9; padding: 20px; border: 1px solid #eee; border-radius: 0 0 10px 10px; }
-                    .footer { text-align: center; color: #888; font-size: 12px; margin-top: 20px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h2>📅 日程汇总</h2>
-                        <p>%s</p>
-                    </div>
-                    <div class="content">
-                        %s
-                    </div>
-                    <div class="footer">
-                        <p>此邮件由 AI Agent 自动发送</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """.formatted(date, summaryContent);
+        String body = """
+                <h2>📅 日程汇总</h2>
+                <p style="margin:0 0 16px 0;color:#9A3412;">%s</p>
+                <div class="content-card">%s</div>
+                """.formatted(date, summaryContent);
+        return wrapEmailTemplate("日程汇总", body);
     }
 
     /**
      * 构建提醒邮件HTML内容
      */
     private String buildReminderEmail(String date, String events) {
+        String body = """
+                <h2>⏰ 日程提醒</h2>
+                <p style="margin:0 0 16px 0;color:#9A3412;">%s</p>
+                <div class="content-card">%s</div>
+                """.formatted(date, events);
+        return wrapEmailTemplate("日程提醒", body);
+    }
+
+    private String wrapEmailTemplate(String title, String body) {
         return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: 'Microsoft YaHei', Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0; }
-                    .content { background: #f9f9f9; padding: 20px; border: 1px solid #eee; border-radius: 0 0 10px 10px; }
-                    .event { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #f5576c; }
-                    .footer { text-align: center; color: #888; font-size: 12px; margin-top: 20px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h2>⏰ 日程提醒</h2>
-                        <p>%s</p>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            background: #FFF7ED;
+                            color: #7C2D12;
+                            font-family: 'Microsoft YaHei', Arial, sans-serif;
+                            line-height: 1.65;
+                        }
+                        .container {
+                            max-width: 640px;
+                            margin: 0 auto;
+                            padding: 24px;
+                        }
+                        .panel {
+                            background: #FFFFFF;
+                            border: 1px solid #FED7AA;
+                            border-radius: 12px;
+                            overflow: hidden;
+                        }
+                        .header {
+                            padding: 18px 20px;
+                            background: linear-gradient(135deg, #FDBA74 0%%, #F59E0B 100%%);
+                            color: #7C2D12;
+                            font-weight: 700;
+                            font-size: 16px;
+                        }
+                        .main {
+                            padding: 20px;
+                        }
+                        h2 {
+                            margin: 0 0 6px 0;
+                            font-size: 20px;
+                            color: #7C2D12;
+                        }
+                        .content-card {
+                            background: #FFFBEB;
+                            border: 1px solid #FDE68A;
+                            border-radius: 10px;
+                            padding: 14px 16px;
+                            color: #7C2D12;
+                        }
+                        .disclaimer {
+                            margin-top: 18px;
+                            padding-top: 12px;
+                            border-top: 1px solid #D1D5DB;
+                            color: #6B7280;
+                            font-size: 12px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="panel">
+                            <div class="header">AI Agent · %s</div>
+                            <div class="main">
+                                %s
+                                <div class="disclaimer">
+                                    免责声明：本邮件由系统自动发送，仅供通知与参考，不构成任何承诺或保证。如非本人操作，请忽略或联系管理员。
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="content">
-                        %s
-                    </div>
-                    <div class="footer">
-                        <p>此邮件由 AI Agent 自动发送</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """.formatted(date, events);
+                </body>
+                </html>
+                """.formatted(title, body);
     }
 }

@@ -149,12 +149,14 @@ import {
   knowledgeService,
   mcpToolService,
   modelService,
+  personalService,
   scheduleService,
   skillService,
   taskService
 } from '@/services/api'
 import type { Document, ScheduleEvent } from '@/types'
 import dayjs from 'dayjs'
+import { readCachedPayload, writeCachedPayload } from '@/services/user-preferences'
 
 const stats = ref({
   files: 0,
@@ -168,12 +170,15 @@ const stats = ref({
 
 const recentFiles = ref<Document[]>([])
 const todaySchedules = ref<ScheduleEvent[]>([])
+const personalInsight = ref<{ totalTokenUsage?: number; avgTokensPerMessage?: number } | null>(null)
+const DASHBOARD_CACHE_KEY = 'cache.dashboard.v1'
 
 const metricCards = computed(() => [
   { label: '文件', value: stats.value.files, hint: '内容分析与检索', path: '/files', icon: FolderIcon, color: '#f59e0b' },
   { label: '模型', value: stats.value.models, hint: '默认模型与连接测试', path: '/models', icon: ModelIcon, color: '#fb923c' },
   { label: '知识库', value: stats.value.knowledge, hint: 'RAG 与文档向量化', path: '/knowledge', icon: KnowledgeIcon, color: '#fbbf24' },
-  { label: '任务', value: stats.value.tasks, hint: '自动化执行与计划流程', path: '/tasks', icon: TaskIcon, color: '#f97316' }
+  { label: '任务', value: stats.value.tasks, hint: '自动化执行与计划流程', path: '/tasks', icon: TaskIcon, color: '#f97316' },
+  { label: 'Token 用量', value: personalInsight.value?.totalTokenUsage || 0, hint: `均值 ${personalInsight.value?.avgTokensPerMessage || 0}`, path: '/personal', icon: InboxIcon, color: '#fdba74' }
 ])
 
 const modules = [
@@ -187,19 +192,21 @@ const modules = [
   { name: '工具管理', path: '/tools', description: 'MCP 工具配置、验证与执行', icon: ToolIcon, color: '#f97316' },
   { name: '技能管理', path: '/skills', description: '分类、绑定工具、执行与导出', icon: SkillIcon, color: '#f59e0b' },
   { name: '邮件配置', path: '/email', description: '邮箱、监听、测试与模板', icon: MailIcon, color: '#fb923c' },
-  { name: '系统设置', path: '/settings', description: '模型、Qdrant、搜索与文件参数', icon: SettingsIcon, color: '#fbbf24' }
+  { name: '系统设置', path: '/settings', description: '模型、Qdrant、搜索与文件参数', icon: SettingsIcon, color: '#fbbf24' },
+  { name: '单用户中心', path: '/personal', description: '专注模式、备份恢复、模板与离线增强', icon: ReportIcon, color: '#f97316' }
 ]
 
 const loadDashboard = async () => {
   try {
-    const [filesRes, schedulesRes, toolsRes, skillsRes, modelsRes, tasksRes, knowledgeRes] = await Promise.all([
+    const [filesRes, schedulesRes, toolsRes, skillsRes, modelsRes, tasksRes, knowledgeRes, insightRes] = await Promise.all([
       fileService.list(),
       scheduleService.list(),
       mcpToolService.list(),
       skillService.list(),
       modelService.list(),
       taskService.list(),
-      knowledgeService.list()
+      knowledgeService.list(),
+      personalService.insights()
     ])
 
     const allSchedules = schedulesRes || []
@@ -217,8 +224,28 @@ const loadDashboard = async () => {
 
     recentFiles.value = (filesRes.data || []).slice(0, 4)
     todaySchedules.value = allSchedules.filter(item => item.eventDate === today).slice(0, 4)
+    personalInsight.value = insightRes.data || null
+
+    writeCachedPayload(DASHBOARD_CACHE_KEY, {
+      stats: stats.value,
+      recentFiles: recentFiles.value,
+      todaySchedules: todaySchedules.value,
+      personalInsight: personalInsight.value
+    })
   } catch (error) {
     console.error('加载仪表盘失败:', error)
+    const cached = readCachedPayload<{
+      stats: typeof stats.value
+      recentFiles: Document[]
+      todaySchedules: ScheduleEvent[]
+      personalInsight: { totalTokenUsage?: number; avgTokensPerMessage?: number } | null
+    }>(DASHBOARD_CACHE_KEY)
+    if (cached) {
+      stats.value = cached.stats
+      recentFiles.value = cached.recentFiles
+      todaySchedules.value = cached.todaySchedules
+      personalInsight.value = cached.personalInsight
+    }
   }
 }
 
@@ -250,12 +277,20 @@ onMounted(loadDashboard)
 .activity-row,
 .coverage-item {
   border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--gradient-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.mini-stat,
+.metric-card,
+.module-card {
+  transition: all var(--transition-base);
 }
 
 .mini-stat {
-  padding: 16px;
-  border-radius: 20px;
+  padding: 18px;
+  border-radius: var(--radius-xl);
 }
 
 .mini-stat span {
@@ -265,32 +300,55 @@ onMounted(loadDashboard)
 }
 
 .mini-stat strong {
-  font-size: 1.4rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: var(--text-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: 18px;
 }
 
 .metric-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px;
-  border-radius: 24px;
+  gap: 18px;
+  padding: 20px;
+  border-radius: var(--radius-xl);
   text-align: left;
   cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  box-shadow: var(--shadow-xs);
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--icon-color, var(--primary-color)), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.metric-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-glow);
   box-shadow: var(--shadow-sm);
 }
 
-.metric-card:hover,
-.module-card:hover {
-  transform: translateY(-3px);
-  border-color: color-mix(in srgb, var(--primary-color) 55%, white 12%);
-  box-shadow: var(--shadow-glow);
+.metric-card:hover::before {
+  opacity: 1;
+}
+
+.metric-card:active {
+  transform: translateY(-2px) scale(1);
 }
 
 .metric-card__icon,
@@ -300,18 +358,26 @@ onMounted(loadDashboard)
   flex-shrink: 0;
   color: #fff7ed;
   background: linear-gradient(135deg, var(--icon-color, #f59e0b), color-mix(in srgb, var(--icon-color, #f59e0b) 72%, #fde68a 28%));
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.metric-card:hover .metric-card__icon,
+.module-card:hover .module-card__icon {
+  transform: scale(1.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .metric-card__icon {
-  width: 54px;
-  height: 54px;
-  border-radius: 18px;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
 }
 
 .metric-card__copy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .metric-card__copy span,
@@ -320,11 +386,22 @@ onMounted(loadDashboard)
 .timeline-copy p,
 .coverage-item span {
   color: var(--text-secondary);
+  font-size: 0.88rem;
 }
 
 .metric-card__copy strong {
-  font-size: 1.8rem;
+  font-size: 2rem;
+  font-weight: 700;
   line-height: 1;
+  background: var(--text-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.metric-card__copy small {
+  color: var(--text-muted);
+  font-size: 0.82rem;
 }
 
 .section-head {
@@ -332,11 +409,13 @@ onMounted(loadDashboard)
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .section-head h3 {
   font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .module-grid {
@@ -348,18 +427,28 @@ onMounted(loadDashboard)
 .module-card {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 18px;
-  border-radius: 22px;
+  gap: 16px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
   text-align: left;
   cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  box-shadow: var(--shadow-xs);
+}
+
+.module-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-sm);
+}
+
+.module-card:active {
+  transform: translateY(-1px);
 }
 
 .module-card__icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
   --icon-color: var(--module-color);
 }
 
@@ -368,6 +457,8 @@ onMounted(loadDashboard)
 .activity-row strong {
   display: block;
   margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .timeline-list,
@@ -384,8 +475,17 @@ onMounted(loadDashboard)
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px;
-  border-radius: 20px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
+}
+
+.timeline-item:hover,
+.activity-row:hover,
+.coverage-item:hover {
+  border-color: var(--border-glow);
+  background: var(--bg-hover);
+  transform: translateX(1px);
 }
 
 .timeline-item {
@@ -398,7 +498,9 @@ onMounted(loadDashboard)
   margin-top: 8px;
   border-radius: 50%;
   background: var(--primary-color);
-  box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.12);
+  box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.15);
+  flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .timeline-copy {
@@ -407,6 +509,7 @@ onMounted(loadDashboard)
 
 .coverage-item strong {
   color: var(--text-primary);
+  font-weight: 600;
 }
 
 @media (max-width: 1100px) {
@@ -420,5 +523,10 @@ onMounted(loadDashboard)
   .module-grid {
     grid-template-columns: 1fr;
   }
+
+  .metric-card__copy strong {
+    font-size: 1.6rem;
+  }
 }
 </style>
+

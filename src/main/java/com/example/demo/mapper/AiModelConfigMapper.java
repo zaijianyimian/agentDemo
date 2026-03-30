@@ -19,4 +19,10 @@ public interface AiModelConfigMapper extends BaseMapper<AiModelConfig> {
 
     @Update("UPDATE ai_model_config SET is_default = 0")
     int clearDefault();
+
+    @Update("UPDATE ai_model_config SET enabled = 0")
+    int clearEnabled();
+
+    @Select("SELECT COUNT(*) FROM ai_model_config WHERE enabled = 1")
+    int countEnabled();
 }

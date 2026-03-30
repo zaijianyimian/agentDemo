@@ -195,15 +195,6 @@
             <n-radio-button value="normal">普通聊天</n-radio-button>
             <n-radio-button value="mcp">MCP Agent</n-radio-button>
           </n-radio-group>
-          <n-select
-            v-model:value="selectedModelId"
-            :options="modelOptions"
-            :loading="loadingModels"
-            placeholder="选择模型"
-            size="small"
-            style="width: 200px"
-            @update:value="saveSelectedModel"
-          />
           <div class="mode-indicator">
             <span class="mode-dot"></span>
             <span class="mode-text">
@@ -235,7 +226,6 @@ import {
   NRadioButton,
   NDropdown,
   NModal,
-  NSelect,
   useMessage
 } from 'naive-ui'
 import {
@@ -252,7 +242,6 @@ import {
 } from '@vicons/ionicons5'
 import type { ChatMessage, ChatSession } from '@/types'
 import { chatActionService, chatHistoryService } from '@/services/api'
-import axios from 'axios'
 import dayjs from 'dayjs'
 import { marked } from 'marked'
 
@@ -288,54 +277,6 @@ let abortController: AbortController | null = null
 // 编辑标题
 const showEditModal = ref(false)
 const editTitle = ref('')
-
-// 模型选择
-interface ModelOption {
-  label: string
-  value: number
-}
-const selectedModelId = ref<number | null>(null)
-const modelOptions = ref<ModelOption[]>([])
-const loadingModels = ref(false)
-
-// 加载可用模型列表
-const loadModels = async () => {
-  loadingModels.value = true
-  try {
-    const res = await axios.get('/api/model/list')
-    if (res.data.success && res.data.data) {
-      // 只显示启用的模型
-      const enabledModels = res.data.data.filter((m: any) => m.enabled)
-      modelOptions.value = enabledModels.map((m: any) => ({
-        label: `${m.name} (${m.provider})`,
-        value: m.id
-      }))
-      // 设置默认模型
-      const defaultModel = enabledModels.find((m: any) => m.isDefault)
-      if (defaultModel) {
-        selectedModelId.value = defaultModel.id
-      } else if (enabledModels.length > 0) {
-        selectedModelId.value = enabledModels[0].id
-      }
-      // 从 localStorage 恢复上次选择的模型
-      const savedModelId = localStorage.getItem('selectedModelId')
-      if (savedModelId && modelOptions.value.some(m => m.value === Number(savedModelId))) {
-        selectedModelId.value = Number(savedModelId)
-      }
-    }
-  } catch (error) {
-    console.error('加载模型失败', error)
-  } finally {
-    loadingModels.value = false
-  }
-}
-
-// 保存选择的模型到 localStorage
-const saveSelectedModel = () => {
-  if (selectedModelId.value) {
-    localStorage.setItem('selectedModelId', selectedModelId.value.toString())
-  }
-}
 
 // 加载会话列表
 const loadSessions = async () => {
@@ -543,15 +484,12 @@ const sendMessage = async () => {
 const streamChat = async (query: string, messageObj: ChatMessage) => {
   abortController = new AbortController()
 
-  // 使用带 sessionId 和 model 的流式接口，后端会自动保存消息和记忆
+  // 使用带 sessionId 的流式接口，后端会自动选择当前启用模型并保存消息和记忆
   let apiPath = ''
   if (chatMode.value === 'mcp') {
     apiPath = `/api/mcp/agent/chat/stream?message=${encodeURIComponent(query)}`
   } else {
     apiPath = `/api/chat/stream/session?message=${encodeURIComponent(query)}&sessionId=${currentSession.value!.id}`
-    if (selectedModelId.value) {
-      apiPath += `&model=${selectedModelId.value}`
-    }
   }
 
   try {
@@ -640,15 +578,12 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
 
 // 普通聊天
 const normalChat = async (query: string, messageObj: ChatMessage) => {
-  // 使用带 sessionId 和 model 的接口，后端会自动保存消息和记忆
+  // 使用带 sessionId 的接口，后端会自动选择当前启用模型并保存消息和记忆
   let apiPath = ''
   if (chatMode.value === 'mcp') {
     apiPath = `/api/mcp/agent/chat?message=${encodeURIComponent(query)}`
   } else {
     apiPath = `/api/chat/complete/session?message=${encodeURIComponent(query)}&sessionId=${currentSession.value!.id}`
-    if (selectedModelId.value) {
-      apiPath += `&model=${selectedModelId.value}`
-    }
   }
 
   const response = await fetch(apiPath)
@@ -752,7 +687,6 @@ onUnmounted(() => {
 
 onMounted(async () => {
   await loadSessions()
-  await loadModels()
 
   if (sessions.value.length > 0) {
     await switchSession(sessions.value[0])
@@ -770,9 +704,9 @@ onMounted(async () => {
 <style scoped>
 .chat-page {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 0;
-  height: calc(100vh - 112px);
+  height: calc(100vh - 120px);
   position: relative;
   overflow: hidden;
   background: var(--bg-base);
@@ -793,48 +727,36 @@ onMounted(async () => {
 .gradient-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.15;
-  animation: float 20s ease-in-out infinite;
+  filter: blur(100px);
+  opacity: 0.12;
+  animation: float 15s ease-in-out infinite;
 }
 
 .orb-1 {
-  width: 400px;
-  height: 400px;
-  background: var(--primary-color);
-  top: -100px;
-  right: -100px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, var(--primary-color), transparent 60%);
+  top: -150px;
+  right: -150px;
   animation-delay: 0s;
 }
 
 .orb-2 {
-  width: 300px;
-  height: 300px;
-  background: var(--primary-light);
-  bottom: -50px;
-  left: 20%;
-  animation-delay: -5s;
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, var(--primary-light), transparent 60%);
+  bottom: -80px;
+  left: 15%;
+  animation-delay: -4s;
 }
 
 .orb-3 {
-  width: 250px;
-  height: 250px;
-  background: var(--warning);
-  top: 40%;
-  left: -50px;
-  animation-delay: -10s;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(30px, -30px) scale(1.1);
-  }
-  66% {
-    transform: translate(-20px, 20px) scale(0.9);
-  }
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, var(--warning), transparent 60%);
+  top: 35%;
+  left: -80px;
+  animation-delay: -8s;
 }
 
 /* 会话侧边栏 */
@@ -847,32 +769,49 @@ onMounted(async () => {
   position: relative;
 }
 
+.session-sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--border-light), transparent);
+}
+
 .sidebar-header {
-  padding: 20px;
+  padding: 22px;
   border-bottom: 1px solid var(--border-color);
+  background: var(--gradient-card);
 }
 
 .logo-area {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
 .logo-icon {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   background: var(--gradient-warm);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.logo-icon:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .logo-text {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.5px;
@@ -882,34 +821,54 @@ onMounted(async () => {
   width: 100%;
   background: var(--gradient-warm) !important;
   border: none !important;
-  box-shadow: var(--shadow-md);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-base);
   font-weight: 600;
+  height: 44px;
+  border-radius: var(--radius-md) !important;
 }
 
 .new-session-btn:hover {
-  box-shadow: var(--shadow-glow);
-  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.new-session-btn:active {
+  transform: translateY(0);
 }
 
 .session-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 12px;
+  padding: 14px;
 }
 
 .session-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 14px;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 6px;
+  transition: all var(--transition-base);
+  margin-bottom: 8px;
   background: transparent;
   border: 1px solid transparent;
+  position: relative;
+}
+
+.session-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: var(--primary-color);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  transition: height var(--transition-base);
 }
 
 .session-item:hover {
@@ -917,22 +876,38 @@ onMounted(async () => {
   border-color: var(--border-color);
 }
 
+.session-item:hover::before {
+  height: 40%;
+}
+
 .session-item.active {
   background: var(--bg-active);
   border-color: var(--primary-color);
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-xs);
+}
+
+.session-item.active::before {
+  height: 60%;
 }
 
 .session-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
   background: var(--bg-input);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--primary-color);
   flex-shrink: 0;
+  transition: all var(--transition-base);
+}
+
+.session-item:hover .session-icon,
+.session-item.active .session-icon {
+  background: var(--gradient-warm);
+  color: white;
+  box-shadow: var(--shadow-xs);
 }
 
 .session-info {
@@ -959,7 +934,7 @@ onMounted(async () => {
 
 .session-menu-btn {
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-fast);
   color: var(--text-muted);
 }
 
@@ -972,14 +947,15 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 48px 24px;
   color: var(--text-muted);
   text-align: center;
 }
 
 .empty-icon {
   color: var(--border-light);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  opacity: 0.6;
 }
 
 .empty-hint {
@@ -1001,12 +977,24 @@ onMounted(async () => {
 }
 
 .chat-header {
-  padding: 16px 24px;
+  padding: 18px 26px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: var(--bg-card);
+  backdrop-filter: blur(var(--blur-md));
+  position: relative;
+}
+
+.chat-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 26px;
+  right: 26px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-light), transparent);
 }
 
 .header-title {
@@ -1027,29 +1015,33 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.header-actions .n-button:hover {
+  color: var(--primary-color);
+}
+
 /* 消息列表 */
 .message-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 24px;
+  padding: 28px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
 }
 
 .message {
-  animation: messageSlideIn 0.3s ease;
+  animation: messageSlideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes messageSlideIn {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(20px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -1060,7 +1052,7 @@ onMounted(async () => {
 /* 用户消息 */
 .user-message {
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
 .message-avatar {
@@ -1068,18 +1060,20 @@ onMounted(async () => {
 }
 
 .avatar-inner {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
 }
 
 .user-avatar .avatar-inner {
   background: var(--gradient-warm);
+  box-shadow: var(--shadow-sm);
 }
 
 .ai-avatar .avatar-inner {
@@ -1092,8 +1086,8 @@ onMounted(async () => {
 }
 
 .message-text {
-  padding: 14px 18px;
-  border-radius: 16px;
+  padding: 16px 20px;
+  border-radius: var(--radius-lg);
   line-height: 1.7;
   position: relative;
   max-width: 80%;
@@ -1103,19 +1097,20 @@ onMounted(async () => {
 .user-text {
   background: var(--gradient-warm);
   color: white;
-  border-bottom-left-radius: 4px;
+  border-bottom-left-radius: var(--radius-xs);
+  box-shadow: var(--shadow-sm);
 }
 
 .ai-text {
   background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: var(--radius-xs);
 }
 
 .message-bubble.streaming .ai-text {
   border-color: var(--primary-color);
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-xs);
 }
 
 .message-pre {
@@ -1127,50 +1122,51 @@ onMounted(async () => {
 
 /* Markdown 内容样式 */
 .markdown-content {
-  line-height: 1.7;
+  line-height: 1.75;
 }
 
 .markdown-content :deep(h1),
 .markdown-content :deep(h2),
 .markdown-content :deep(h3),
 .markdown-content :deep(h4) {
-  margin: 16px 0 8px 0;
+  margin: 18px 0 10px 0;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .markdown-content :deep(h1) { font-size: 1.4em; }
-.markdown-content :deep(h2) { font-size: 1.2em; }
+.markdown-content :deep(h2) { font-size: 1.25em; }
 .markdown-content :deep(h3) { font-size: 1.1em; }
 
 .markdown-content :deep(p) {
-  margin: 8px 0;
+  margin: 10px 0;
 }
 
 .markdown-content :deep(ul),
 .markdown-content :deep(ol) {
-  margin: 8px 0;
-  padding-left: 20px;
+  margin: 10px 0;
+  padding-left: 22px;
 }
 
 .markdown-content :deep(li) {
-  margin: 4px 0;
+  margin: 6px 0;
 }
 
 .markdown-content :deep(code) {
   background: var(--bg-input);
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 3px 7px;
+  border-radius: var(--radius-xs);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.9em;
+  font-size: 0.88em;
   color: var(--primary-color);
+  border: 1px solid var(--border-color);
 }
 
 .markdown-content :deep(pre) {
   background: var(--bg-input);
-  padding: 12px 16px;
-  border-radius: 12px;
-  margin: 12px 0;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  margin: 14px 0;
   overflow-x: auto;
   border: 1px solid var(--border-color);
 }
@@ -1180,12 +1176,14 @@ onMounted(async () => {
   padding: 0;
   color: var(--text-primary);
   font-size: 0.85em;
-  line-height: 1.5;
+  line-height: 1.6;
+  border: none;
 }
 
 .markdown-content :deep(a) {
   color: var(--primary-color);
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .markdown-content :deep(strong) {
@@ -1198,22 +1196,22 @@ onMounted(async () => {
 }
 
 .markdown-content :deep(blockquote) {
-  margin: 12px 0;
-  padding: 8px 16px;
+  margin: 14px 0;
+  padding: 10px 18px;
   border-left: 3px solid var(--primary-color);
   background: var(--bg-input);
-  border-radius: 8px;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
 
 .markdown-content :deep(table) {
-  margin: 12px 0;
+  margin: 14px 0;
   border-collapse: collapse;
   width: 100%;
 }
 
 .markdown-content :deep(th),
 .markdown-content :deep(td) {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border: 1px solid var(--border-color);
   text-align: left;
 }
@@ -1224,24 +1222,36 @@ onMounted(async () => {
 }
 
 .markdown-content :deep(hr) {
-  margin: 16px 0;
+  margin: 18px 0;
   border: none;
   height: 1px;
-  background: var(--border-color);
+  background: linear-gradient(90deg, transparent, var(--border-color), transparent);
 }
 
 .message-footer {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .message-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.message-actions .n-button {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.message-actions .n-button:hover {
+  background: var(--bg-active);
+  color: var(--primary-color);
 }
 
 .message-time {
@@ -1252,7 +1262,7 @@ onMounted(async () => {
 /* AI消息 */
 .ai-message {
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
 .message.assistant .ai-message {
@@ -1263,12 +1273,12 @@ onMounted(async () => {
 .thinking-indicator {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .thinking-dots {
   display: flex;
-  gap: 4px;
+  gap: 5px;
 }
 
 .dot {
@@ -1303,11 +1313,12 @@ onMounted(async () => {
 .cursor-blink {
   display: inline-block;
   width: 2px;
-  height: 16px;
+  height: 18px;
   background: var(--primary-color);
   animation: blink 1s infinite;
   margin-left: 2px;
   vertical-align: text-bottom;
+  box-shadow: none;
 }
 
 @keyframes blink {
@@ -1321,64 +1332,73 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
+  padding: 80px 24px;
 }
 
 .empty-illustration {
   position: relative;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .empty-circle {
-  width: 100px;
-  height: 100px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(253, 186, 116, 0.15));
+  background: var(--gradient-card);
+  border: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--primary-color);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  animation: float 4s ease-in-out infinite;
+  box-shadow: var(--shadow-sm);
 }
 
 .empty-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .empty-subtitle {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-secondary);
 }
 
 /* 输入区域 */
 .input-area {
-  padding: 20px 24px;
+  padding: 22px 28px;
   border-top: 1px solid var(--border-color);
   background: var(--bg-card);
+  backdrop-filter: blur(var(--blur-md));
+  position: relative;
+}
+
+.input-area::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 28px;
+  right: 28px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-light), transparent);
 }
 
 .input-container {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: flex-end;
-  padding: 14px;
-  border-radius: 16px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
   background: var(--bg-input);
   border: 1px solid var(--border-color);
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .input-container:focus-within {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+  box-shadow: var(--shadow-focus);
 }
 
 .chat-input {
@@ -1390,6 +1410,7 @@ onMounted(async () => {
   font-size: 15px;
   color: var(--text-primary);
   background: transparent;
+  line-height: 1.6;
 }
 
 .chat-input :deep(.n-input__placeholder) {
@@ -1398,15 +1419,21 @@ onMounted(async () => {
 
 .send-btn {
   flex-shrink: 0;
+  width: 48px;
+  height: 48px;
   background: var(--gradient-warm) !important;
   border: none !important;
-  box-shadow: var(--shadow-md);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-base);
 }
 
 .send-btn:hover:not(:disabled) {
-  transform: scale(1.05);
-  box-shadow: var(--shadow-glow);
+  transform: scale(1.02);
+  box-shadow: var(--shadow-sm);
+}
+
+.send-btn:active:not(:disabled) {
+  transform: scale(0.95);
 }
 
 .send-btn:disabled {
@@ -1417,22 +1444,23 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 12px;
-  gap: 12px;
+  margin-top: 14px;
+  gap: 14px;
 }
 
 .mode-indicator {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .mode-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--primary-color);
   animation: modeDotPulse 1.5s ease-in-out infinite;
+  box-shadow: none;
 }
 
 @keyframes modeDotPulse {
@@ -1460,3 +1488,4 @@ onMounted(async () => {
   }
 }
 </style>
+

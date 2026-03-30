@@ -1,6 +1,20 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { buildLoginRedirectUrl, hasAccessToken } from '@/services/auth-token'
 
 const routes = [
+  {
+    path: '/oauth/github/callback',
+    name: 'GithubCallback',
+    component: () => import('@/views/GithubCallback.vue'),
+    meta: { title: 'GitHub 登录回调', icon: 'oauth', public: true, description: 'GitHub OAuth 回调处理。' }
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/Login.vue'),
+    meta: { title: '登录', icon: 'lock', public: true, description: '账号密码与邮箱验证码登录。' }
+  },
   {
     path: '/',
     name: 'Dashboard',
@@ -102,6 +116,12 @@ const routes = [
     name: 'Settings',
     component: () => import('@/views/Settings.vue'),
     meta: { title: '系统设置', icon: 'settings', description: '集中调整系统、模型、Qdrant、搜索与文件参数。' }
+  },
+  {
+    path: '/personal',
+    name: 'Personal',
+    component: () => import('@/views/PersonalCenter.vue'),
+    meta: { title: '单用户中心', icon: 'person', description: '单用户效率增强、模板中心与备份恢复。' }
   }
 ]
 
@@ -111,6 +131,24 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
+  const authStore = useAuthStore()
+  const isPublic = Boolean(to.meta.public)
+  const hasToken = hasAccessToken()
+
+  if (to.path === '/login' && hasToken) {
+    next('/')
+    return
+  }
+
+  if (!isPublic && !hasToken) {
+    next(buildLoginRedirectUrl(to.fullPath))
+    return
+  }
+
+  if (hasToken && !authStore.user && !authStore.initialized) {
+    authStore.hydrate()
+  }
+
   document.title = `${to.meta.title || 'AI Agent'} - Dashboard`
   next()
 })

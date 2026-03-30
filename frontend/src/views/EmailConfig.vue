@@ -55,6 +55,13 @@
             </n-button>
             <n-button
               size="small"
+              :loading="checkingNetworkIds.includes(config.id)"
+              @click="checkNetwork(config)"
+            >
+              网络检测
+            </n-button>
+            <n-button
+              size="small"
               :type="listenerStatus[config.id] ? 'warning' : 'default'"
               @click="toggleListener(config)"
             >
@@ -95,6 +102,9 @@
       </n-form>
       <template #footer>
         <n-space justify="end">
+          <n-button @click="checkNewConfigNetwork" :loading="checkingNewNetwork">
+            网络检测
+          </n-button>
           <n-button @click="testNewConfig" :loading="testingNew">
             <template #icon><n-icon><TestIcon /></n-icon></template>
             测试连接
@@ -165,6 +175,7 @@ const configs = ref<EmailConfig[]>([])
 const listenerStatus = ref<Record<number, boolean>>({})
 const connectionStatus = ref<Record<number, { success: boolean; message: string }>>({})
 const testingIds = ref<number[]>([])
+const checkingNetworkIds = ref<number[]>([])
 const showAddModal = ref(false)
 const editingConfig = ref<EmailConfig | null>(null)
 const formData = ref({
@@ -176,6 +187,7 @@ const formData = ref({
   protocol: 'imap'
 })
 const testingNew = ref(false)
+const checkingNewNetwork = ref(false)
 const showTestResult = ref(false)
 const testResult = ref<{
   success: boolean
@@ -200,18 +212,51 @@ const templateColumns = [
   { title: 'SSL', key: 'ssl', render: (row: any) => row.ssl ? '是' : '否' }
 ]
 
+const parseConfigList = (payload: any): EmailConfig[] => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  return []
+}
+
+const trimText = (value: unknown): string => String(value ?? '').trim()
+
+const normalizeConfigPayload = (payload: Partial<EmailConfig>): Partial<EmailConfig> => ({
+  ...payload,
+  email: payload.email == null ? payload.email : trimText(payload.email),
+  password: payload.password == null ? payload.password : trimText(payload.password),
+  host: payload.host == null ? payload.host : trimText(payload.host),
+  protocol: payload.protocol == null ? payload.protocol : trimText(payload.protocol).toLowerCase(),
+  folder: payload.folder == null ? payload.folder : trimText(payload.folder),
+  remark: payload.remark == null ? payload.remark : trimText(payload.remark)
+})
+
+const parseObjectPayload = (payload: any): Record<string, any> => {
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) return payload
+  if (payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) return payload.data
+  return {}
+}
+
+const parseResultPayload = <T extends Record<string, any>>(payload: any): T | null => {
+  if (payload && typeof payload === 'object' && !Array.isArray(payload) && ('success' in payload || 'message' in payload || 'durationMs' in payload)) {
+    return payload as T
+  }
+  if (payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) {
+    return payload.data as T
+  }
+  return null
+}
+
 // 加载配置
 const loadConfigs = async () => {
   try {
     const res = await emailService.listConfigs()
-    configs.value = res.data || []
+    configs.value = parseConfigList(res).map(item => normalizeConfigPayload(item) as EmailConfig)
     // 加载监听状态
     const statusRes = await emailService.getListenerStatus()
-    if (statusRes.data) {
-      listenerStatus.value = {}
-      for (const [key, value] of Object.entries(statusRes.data)) {
-        listenerStatus.value[Number(key)] = value === '已连接'
-      }
+    const statusPayload = parseObjectPayload(statusRes)
+    listenerStatus.value = {}
+    for (const [key, value] of Object.entries(statusPayload)) {
+      listenerStatus.value[Number(key)] = value === '已连接'
     }
   } catch (error) {
     message.error('加载失败')
@@ -223,7 +268,13 @@ const testConnection = async (config: EmailConfig) => {
   testingIds.value.push(config.id)
   try {
     const res = await emailService.testConfig(config.id)
-    const data = res.data
+    const data = parseResultPayload<{
+      success: boolean
+      message: string
+      durationMs: number
+      messageCount: number
+      errorDetail: string
+    }>(res)
     if (!data) {
       message.error('测试请求失败')
       return
@@ -252,21 +303,28 @@ const testConnection = async (config: EmailConfig) => {
 
 // 测试新配置（未保存的）
 const testNewConfig = async () => {
+  formData.value = normalizeConfigPayload(formData.value) as typeof formData.value
   if (!formData.value.email || !formData.value.password || !formData.value.host) {
     message.warning('请填写完整的邮箱配置')
     return
   }
   testingNew.value = true
   try {
-    const res = await emailService.testNewConfig({
+    const res = await emailService.testNewConfig(normalizeConfigPayload({
       email: formData.value.email,
       password: formData.value.password,
       host: formData.value.host,
       port: formData.value.port,
       sslEnabled: formData.value.sslEnabled,
       protocol: formData.value.protocol
-    })
-    const data = res.data
+    }))
+    const data = parseResultPayload<{
+      success: boolean
+      message: string
+      durationMs: number
+      messageCount: number
+      errorDetail: string
+    }>(res)
     if (!data) {
       message.error('测试请求失败')
       return
@@ -285,10 +343,73 @@ const testNewConfig = async () => {
   }
 }
 
+const checkNetwork = async (config: EmailConfig) => {
+  checkingNetworkIds.value.push(config.id)
+  try {
+    const res = await emailService.checkNetwork(config.id)
+    const data = parseResultPayload<{
+      success: boolean
+      message: string
+      durationMs: number
+      resolvedIp: string
+      errorDetail: string
+    }>(res)
+    if (!data) {
+      message.error('网络检测失败')
+      return
+    }
+    if (data.success) {
+      message.success(`网络连通，耗时 ${data.durationMs}ms，IP: ${data.resolvedIp || '-'}`)
+    } else {
+      message.error(data.message || '网络不通')
+    }
+  } catch (error: any) {
+    message.error(error?.response?.data?.message || '网络检测失败')
+  } finally {
+    checkingNetworkIds.value = checkingNetworkIds.value.filter(id => id !== config.id)
+  }
+}
+
+const checkNewConfigNetwork = async () => {
+  formData.value = normalizeConfigPayload(formData.value) as typeof formData.value
+  if (!formData.value.host || !formData.value.port) {
+    message.warning('请先填写主机和端口')
+    return
+  }
+  checkingNewNetwork.value = true
+  try {
+    const res = await emailService.checkNewConfigNetwork(normalizeConfigPayload({
+      host: formData.value.host,
+      port: formData.value.port,
+      protocol: formData.value.protocol
+    }))
+    const data = parseResultPayload<{
+      success: boolean
+      message: string
+      durationMs: number
+      resolvedIp: string
+      errorDetail: string
+    }>(res)
+    if (!data) {
+      message.error('网络检测失败')
+      return
+    }
+    if (data.success) {
+      message.success(`网络连通，耗时 ${data.durationMs}ms，IP: ${data.resolvedIp || '-'}`)
+    } else {
+      message.error(data.message || '网络不通')
+    }
+  } catch (error: any) {
+    message.error(error?.response?.data?.message || '网络检测失败')
+  } finally {
+    checkingNewNetwork.value = false
+  }
+}
+
 // 切换启用状态
 const toggleEnabled = async (config: EmailConfig, enabled: boolean) => {
   try {
-    await emailService.updateConfig({ ...config, enabled })
+    await emailService.updateConfig(normalizeConfigPayload({ ...config, enabled }))
     message.success('更新成功')
     loadConfigs()
   } catch (error) {
@@ -317,26 +438,27 @@ const toggleListener = async (config: EmailConfig) => {
 const editConfig = (config: EmailConfig) => {
   editingConfig.value = config
   formData.value = {
-    email: config.email,
+    email: trimText(config.email),
     password: '',
-    host: config.host,
+    host: trimText(config.host),
     port: config.port,
     sslEnabled: config.sslEnabled,
-    protocol: config.protocol
+    protocol: trimText(config.protocol)
   }
   showAddModal.value = true
 }
 
 // 保存配置
 const saveConfig = async () => {
+  formData.value = normalizeConfigPayload(formData.value) as typeof formData.value
   try {
     if (editingConfig.value) {
-      await emailService.updateConfig({
+      await emailService.updateConfig(normalizeConfigPayload({
         id: editingConfig.value.id,
         ...formData.value
-      })
+      }))
     } else {
-      await emailService.createConfig(formData.value)
+      await emailService.createConfig(normalizeConfigPayload(formData.value))
     }
     message.success('保存成功')
     showAddModal.value = false

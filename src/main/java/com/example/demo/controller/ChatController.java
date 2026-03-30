@@ -144,22 +144,21 @@ public class ChatController {
      * 带记忆的普通聊天接口 - 返回完整响应
      * @param message 用户消息
      * @param sessionId 会话ID（用于记忆和历史存储）
-     * @param modelId 模型ID（可选，不传则使用默认模型）
      */
     @GetMapping("/complete/session")
     public String completeWithSession(
             @RequestParam("message") String message,
-            @RequestParam("sessionId") Long sessionId,
-            @RequestParam(value = "model", required = false) Long modelId) {
+            @RequestParam("sessionId") Long sessionId) {
+        Long activeModelId = chatWithMemoryService.resolveActiveModelId();
         // 1. 保存用户消息
         chatHistoryService.addMessage(sessionId, "user", message, null);
-        log.info("保存用户消息: sessionId={}, message={}, modelId={}", sessionId, message, modelId);
+        log.info("保存用户消息: sessionId={}, message={}, activeModelId={}", sessionId, message, activeModelId);
 
         // 2. 获取带记忆的AI响应
-        String response = chatWithMemoryService.chat(sessionId, message, modelId);
+        String response = chatWithMemoryService.chat(sessionId, message);
 
         // 3. 保存AI响应
-        chatHistoryService.addMessage(sessionId, "assistant", response, "model-" + modelId);
+        chatHistoryService.addMessage(sessionId, "assistant", response, "model-" + activeModelId);
         log.info("保存AI响应: sessionId={}, responseLength={}", sessionId, response.length());
 
         // 4. 提取并存储记忆
@@ -180,28 +179,27 @@ public class ChatController {
      * 同时保存用户消息和AI响应到数据库
      * @param message 用户消息
      * @param sessionId 会话ID（用于记忆和历史存储）
-     * @param modelId 模型ID（可选，不传则使用默认模型）
      */
     @GetMapping(value = "/stream/session", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStreamWithSession(
             @RequestParam("message") String message,
-            @RequestParam("sessionId") Long sessionId,
-            @RequestParam(value = "model", required = false) Long modelId) {
+            @RequestParam("sessionId") Long sessionId) {
+        Long activeModelId = chatWithMemoryService.resolveActiveModelId();
 
         // 1. 保存用户消息
         chatHistoryService.addMessage(sessionId, "user", message, null);
-        log.info("保存用户消息: sessionId={}, message={}, modelId={}", sessionId, message, modelId);
+        log.info("保存用户消息: sessionId={}, message={}, activeModelId={}", sessionId, message, activeModelId);
 
         // 2. 收集完整响应的容器
         AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
 
         // 3. 流式调用带记忆的AI服务
-        return chatWithMemoryService.streamChat(sessionId, message, modelId)
+        return chatWithMemoryService.streamChat(sessionId, message)
                 .doOnNext(chunk -> fullResponse.get().append(chunk))
                 .doOnComplete(() -> {
                     // 4. 流完成后保存AI响应
                     String response = fullResponse.get().toString();
-                    chatHistoryService.addMessage(sessionId, "assistant", response, "model-" + modelId);
+                    chatHistoryService.addMessage(sessionId, "assistant", response, "model-" + activeModelId);
                     log.info("保存AI响应: sessionId={}, responseLength={}", sessionId, response.length());
 
                     // 5. 提取并存储记忆
@@ -225,23 +223,22 @@ public class ChatController {
      * 每个数据块包装为 JSON 格式，同时保存消息和记忆
      * @param message 用户消息
      * @param sessionId 会话ID（用于记忆和历史存储）
-     * @param modelId 模型ID（可选，不传则使用默认模型）
      */
     @GetMapping(value = "/stream/session/json", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStreamWithSessionJson(
             @RequestParam("message") String message,
-            @RequestParam("sessionId") Long sessionId,
-            @RequestParam(value = "model", required = false) Long modelId) {
+            @RequestParam("sessionId") Long sessionId) {
+        Long activeModelId = chatWithMemoryService.resolveActiveModelId();
 
         // 1. 保存用户消息
         chatHistoryService.addMessage(sessionId, "user", message, null);
-        log.info("保存用户消息: sessionId={}, message={}, modelId={}", sessionId, message, modelId);
+        log.info("保存用户消息: sessionId={}, message={}, activeModelId={}", sessionId, message, activeModelId);
 
         // 2. 收集完整响应的容器
         AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
 
         // 3. 流式调用带记忆的AI服务
-        return chatWithMemoryService.streamChat(sessionId, message, modelId)
+        return chatWithMemoryService.streamChat(sessionId, message)
                 .map(chunk -> {
                     fullResponse.get().append(chunk);
                     try {
@@ -258,7 +255,7 @@ public class ChatController {
                 .concatWith(Mono.fromRunnable(() -> {
                     // 4. 流完成后保存AI响应和记忆
                     String response = fullResponse.get().toString();
-                    chatHistoryService.addMessage(sessionId, "assistant", response, "model-" + modelId);
+                    chatHistoryService.addMessage(sessionId, "assistant", response, "model-" + activeModelId);
                     log.info("保存AI响应: sessionId={}, responseLength={}", sessionId, response.length());
 
                     // 5. 提取并存储记忆

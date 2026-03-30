@@ -2,12 +2,12 @@
   <n-config-provider :theme="naiveTheme" :theme-overrides="themeOverrides">
     <n-message-provider>
       <n-dialog-provider>
-        <div class="app-shell">
-          <div class="app-shell__glow glow-a"></div>
-          <div class="app-shell__glow glow-b"></div>
+        <router-view v-if="isAuthPage" />
 
+        <div v-else :class="['app-shell', { 'app-shell--focus': focusMode }]">
           <n-layout has-sider class="shell-layout">
             <n-layout-sider
+              v-if="!focusMode"
               bordered
               collapse-mode="width"
               :collapsed-width="72"
@@ -55,10 +55,11 @@
             <n-layout class="main-panel">
               <n-layout-header class="app-header">
                 <div class="header-left">
-                  <n-button quaternary circle class="icon-btn" @click="collapsed = !collapsed">
+                  <n-button quaternary circle class="icon-btn" @click="toggleSidebarOrGoDashboard">
                     <template #icon>
                       <n-icon size="18">
-                        <MenuIcon v-if="collapsed" />
+                        <HomeIcon v-if="focusMode" />
+                        <MenuIcon v-else-if="collapsed" />
                         <MenuOpenIcon v-else />
                       </n-icon>
                     </template>
@@ -75,6 +76,9 @@
                     <span>Ctrl</span>
                     <span>K</span>
                   </n-button>
+                  <n-button v-if="focusMode" quaternary class="command-btn" @click="exitFocusMode">
+                    退出专注
+                  </n-button>
                   <div class="header-chip">
                     <span class="header-chip__label">接口入口</span>
                     <strong>{{ menuOptions.length }}</strong>
@@ -83,6 +87,12 @@
                     <span class="header-chip__label">主题</span>
                     <strong>{{ actualTheme === 'dark' ? 'Dark' : 'Light' }}</strong>
                   </div>
+                  <n-dropdown :options="userOptions" @select="handleUserAction">
+                    <button class="user-chip" type="button">
+                      <span class="user-chip__avatar">{{ userDisplayInitial }}</span>
+                      <span class="user-chip__name">{{ userDisplayName }}</span>
+                    </button>
+                  </n-dropdown>
                   <n-tooltip trigger="hover">
                     <template #trigger>
                       <n-button quaternary circle class="icon-btn" @click="toggleTheme">
@@ -128,6 +138,26 @@
               </div>
             </div>
           </n-modal>
+
+          <n-modal v-model:show="showChangePasswordModal" preset="card" title="修改密码" style="width: min(520px, 92vw)">
+            <n-form label-placement="top">
+              <n-form-item label="当前密码">
+                <n-input v-model:value="passwordForm.currentPassword" type="password" show-password-on="mousedown" />
+              </n-form-item>
+              <n-form-item label="新密码">
+                <n-input v-model:value="passwordForm.newPassword" type="password" show-password-on="mousedown" />
+              </n-form-item>
+              <n-form-item label="确认新密码">
+                <n-input v-model:value="passwordForm.confirmPassword" type="password" show-password-on="mousedown" />
+              </n-form-item>
+            </n-form>
+            <template #footer>
+              <n-space justify="end">
+                <n-button @click="showChangePasswordModal = false">取消</n-button>
+                <n-button type="primary" :loading="changingPassword" @click="submitChangePassword">保存</n-button>
+              </n-space>
+            </template>
+          </n-modal>
         </div>
       </n-dialog-provider>
     </n-message-provider>
@@ -141,6 +171,7 @@ import {
   NButton,
   NConfigProvider,
   NDialogProvider,
+  NDropdown,
   NIcon,
   NInput,
   NLayout,
@@ -149,7 +180,10 @@ import {
   NLayoutSider,
   NMenu,
   NModal,
+  NForm,
+  NFormItem,
   NMessageProvider,
+  NSpace,
   NTooltip,
   createDiscreteApi,
   darkTheme
@@ -157,6 +191,7 @@ import {
 import {
   BookOutline as KnowledgeIcon,
   FileTrayFullOutline as InboxIcon,
+  HomeOutline as HomeIcon,
   CalendarOutline as CalendarIcon,
   ChatbubblesOutline as ChatIcon,
   CodeSlashOutline as CodeIcon,
@@ -170,6 +205,7 @@ import {
   MoonOutline as MoonIcon,
   RocketOutline as SkillIcon,
   SearchOutline as SearchIcon,
+  PersonCircleOutline as PersonalIcon,
   SettingsOutline as SettingsIcon,
   SparklesOutline as SparklesIcon,
   FlashOutline as AutonomyIcon,
@@ -179,16 +215,27 @@ import {
   ConstructOutline as ToolIcon
 } from '@vicons/ionicons5'
 import { useThemeStore } from '@/stores/theme'
-import { autonomyService, chatHistoryService, reportService } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
+import { authService, autonomyService, chatHistoryService, reportService } from '@/services/api'
 import type { CommandPaletteItem } from '@/types'
+import { isFocusMode, setFocusMode } from '@/services/user-preferences'
 
 const router = useRouter()
 const route = useRoute()
 const themeStore = useThemeStore()
+const authStore = useAuthStore()
 const collapsed = ref(false)
+const focusMode = ref(isFocusMode())
 const showCommandPalette = ref(false)
 const commandQuery = ref('')
 const { message } = createDiscreteApi(['message'])
+const showChangePasswordModal = ref(false)
+const changingPassword = ref(false)
+const passwordForm = ref({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
 
 const actualTheme = computed(() => {
   if (themeStore.mode === 'auto') {
@@ -209,24 +256,24 @@ const commonTheme = {
     successColor: '#10b981',
     warningColor: '#f59e0b',
     errorColor: '#ef4444',
-    borderRadius: '18px',
-    borderRadiusSmall: '12px',
+    borderRadius: '14px',
+    borderRadiusSmall: '10px',
     fontFamily: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif"
   },
   Card: {
-    borderRadius: '24px'
+    borderRadius: '18px'
   },
   Button: {
-    borderRadiusMedium: '16px',
-    borderRadiusSmall: '14px'
+    borderRadiusMedium: '12px',
+    borderRadiusSmall: '10px'
   },
   Input: {
-    borderRadius: '16px'
+    borderRadius: '12px'
   },
   Select: {
     peers: {
       InternalSelection: {
-        borderRadius: '16px'
+        borderRadius: '12px'
       }
     }
   }
@@ -295,6 +342,16 @@ const lightThemeOverrides = {
 const themeOverrides = computed(() => actualTheme.value === 'dark' ? darkThemeOverrides : lightThemeOverrides)
 
 const currentRoute = computed(() => route.name as string)
+const isAuthPage = computed(() => route.path === '/login')
+const userDisplayName = computed(() => authStore.user?.displayName || authStore.user?.username || '未登录')
+const userDisplayInitial = computed(() => userDisplayName.value.slice(0, 1).toUpperCase())
+const userOptions = computed(() => [
+  { key: 'email', label: authStore.user?.email || '-' },
+  { key: 'role', label: `角色: ${authStore.user?.role || 'USER'}` },
+  { type: 'divider', key: 'd1' },
+  { key: 'password', label: '修改密码' },
+  { key: 'logout', label: '退出登录' }
+])
 const currentTitle = computed(() => route.meta.title as string || '仪表盘')
 const currentDescription = computed(() => route.meta.description as string || '统一管理 AI Agent 的核心能力与配置。')
 const currentSection = computed(() => {
@@ -321,11 +378,28 @@ const menuOptions = [
   { label: '技能管理', key: 'Skills', icon: renderIcon(SkillIcon) },
   { label: '笔记', key: 'Notes', icon: renderIcon(NotebookIcon) },
   { label: '代码片段', key: 'Snippets', icon: renderIcon(CodeIcon) },
-  { label: '系统设置', key: 'Settings', icon: renderIcon(SettingsIcon) }
+  { label: '系统设置', key: 'Settings', icon: renderIcon(SettingsIcon) },
+  { label: '单用户中心', key: 'Personal', icon: renderIcon(PersonalIcon) }
 ]
 
 const handleMenuClick = (key: string) => {
   router.push({ name: key })
+}
+
+const toggleSidebarOrGoDashboard = async () => {
+  if (focusMode.value) {
+    if (route.path !== '/') {
+      await router.push('/')
+    }
+    return
+  }
+  collapsed.value = !collapsed.value
+}
+
+const exitFocusMode = () => {
+  focusMode.value = false
+  setFocusMode(false)
+  window.dispatchEvent(new CustomEvent('focus-mode-changed', { detail: { enabled: false } }))
 }
 
 const toggleTheme = () => {
@@ -372,13 +446,59 @@ const routePathByKey = (key: string) => {
     Skills: '/skills',
     Notes: '/notes',
     Snippets: '/snippets',
-    Settings: '/settings'
+    Settings: '/settings',
+    Personal: '/personal'
   }
   return map[key] || '/'
 }
 
 const openCommandPalette = () => {
   showCommandPalette.value = true
+}
+
+const handleUserAction = async (key: string) => {
+  if (key === 'password') {
+    passwordForm.value = {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    }
+    showChangePasswordModal.value = true
+    return
+  }
+  if (key === 'logout') {
+    await authStore.logout()
+    await router.replace('/login')
+    message.success('已退出登录')
+  }
+}
+
+const submitChangePassword = async () => {
+  if (!passwordForm.value.currentPassword || !passwordForm.value.newPassword) {
+    message.warning('请填写完整密码信息')
+    return
+  }
+  if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+    message.warning('两次输入的新密码不一致')
+    return
+  }
+  changingPassword.value = true
+  try {
+    const res = await authService.changePassword({
+      currentPassword: passwordForm.value.currentPassword,
+      newPassword: passwordForm.value.newPassword
+    })
+    if (res.success) {
+      message.success(res.message || '密码修改成功')
+      showChangePasswordModal.value = false
+    } else {
+      message.error(res.message || '密码修改失败')
+    }
+  } catch (error) {
+    message.error('密码修改失败')
+  } finally {
+    changingPassword.value = false
+  }
 }
 
 const executeCommand = async (item: CommandPaletteItem) => {
@@ -419,12 +539,25 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
   }
 }
 
+const handleFocusModeChanged = (event: Event) => {
+  const detail = (event as CustomEvent<{ enabled: boolean }>).detail
+  focusMode.value = !!detail?.enabled
+  if (focusMode.value) {
+    collapsed.value = true
+  }
+}
+
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener('focus-mode-changed', handleFocusModeChanged)
+  if (focusMode.value) {
+    collapsed.value = true
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('focus-mode-changed', handleFocusModeChanged)
 })
 </script>
 
@@ -432,35 +565,15 @@ onUnmounted(() => {
 .app-shell {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(251, 191, 36, 0.22), transparent 28%),
-    radial-gradient(circle at 80% 10%, rgba(249, 115, 22, 0.18), transparent 24%),
-    linear-gradient(145deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 88%, #000 12%) 100%);
+  background: linear-gradient(180deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 94%, #000 6%) 100%);
 }
 
-.app-shell__glow {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(70px);
-  opacity: 0.45;
-  pointer-events: none;
+.app-shell--focus .app-header {
+  margin-left: 12px;
 }
 
-.glow-a {
-  top: -120px;
-  left: -80px;
-  width: 320px;
-  height: 320px;
-  background: rgba(251, 191, 36, 0.24);
-}
-
-.glow-b {
-  right: -80px;
-  bottom: -140px;
-  width: 360px;
-  height: 360px;
-  background: rgba(249, 115, 22, 0.18);
+.app-shell--focus .app-content {
+  padding-top: 8px;
 }
 
 .shell-layout,
@@ -477,70 +590,75 @@ onUnmounted(() => {
 .sider-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   height: 100%;
-  margin: 18px 0 18px 18px;
-  padding: 22px 16px;
+  margin: 20px 0 20px 20px;
+  padding: 24px 18px;
   border: 1px solid var(--border-color);
-  border-radius: 28px;
+  border-radius: var(--radius-2xl);
   background:
-    linear-gradient(180deg, rgba(255, 247, 237, 0.08), rgba(255, 247, 237, 0.02)),
+    linear-gradient(180deg, rgba(255, 247, 237, 0.06), rgba(255, 247, 237, 0.02)),
     var(--bg-card);
-  backdrop-filter: blur(18px);
-  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(var(--blur-lg));
+  box-shadow: var(--shadow-md);
+  position: relative;
 }
 
 .brand-block {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 8px 14px;
+  padding: 12px 8px 16px;
   cursor: pointer;
+  transition: transform var(--transition-base);
+  border-radius: var(--radius-lg);
+}
+
+.brand-block:hover {
+  transform: translateX(4px);
 }
 
 .brand-mark {
   position: relative;
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 18px;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-lg);
   color: #fff7ed;
-  background: linear-gradient(135deg, #fb923c, #f59e0b 58%, #fcd34d);
-  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.32);
+  background: var(--gradient-warm);
+  box-shadow: var(--shadow-md), var(--shadow-glow-sm);
+  transition: all var(--transition-base);
+}
+
+.brand-mark:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
 }
 
 .brand-mark__spark {
   position: absolute;
-  inset: 5px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  inset: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
 .brand-copy {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 .brand-copy strong {
-  font-size: 1.05rem;
+  font-size: 1.08rem;
+  font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--text-primary);
 }
 
-.brand-copy span,
-.eyebrow,
-.page-subtitle,
-.header-kicker {
-  color: var(--text-secondary);
-}
-
-.eyebrow,
-.header-kicker,
-.header-chip__label {
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+.brand-copy span {
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 
 .app-menu {
@@ -550,6 +668,8 @@ onUnmounted(() => {
 .sider-footer {
   display: grid;
   gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
 }
 
 .status-pill,
@@ -559,21 +679,30 @@ onUnmounted(() => {
   gap: 10px;
   padding: 10px 14px;
   border: 1px solid var(--border-color);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
+  font-size: 0.88rem;
+  transition: all var(--transition-base);
+}
+
+.status-pill:hover,
+.header-chip:hover {
+  border-color: var(--border-glow);
+  background: var(--bg-hover);
 }
 
 .status-pill__dot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #f59e0b;
-  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.12);
+  background: var(--primary-color);
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15);
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .status-pill__dot--soft {
-  background: #fb923c;
+  background: var(--primary-light);
 }
 
 .app-header {
@@ -581,12 +710,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 18px 18px 0 18px;
-  padding: 18px 22px;
+  margin: 20px 20px 0 20px;
+  padding: 18px 24px;
   border: 1px solid var(--border-color);
-  border-radius: 26px;
+  border-radius: var(--radius-2xl);
   background: var(--bg-card);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(var(--blur-lg));
+  box-shadow: var(--shadow-sm);
+  position: relative;
 }
 
 .header-left,
@@ -603,15 +734,22 @@ onUnmounted(() => {
 .header-copy {
   flex-direction: column;
   align-items: flex-start;
+  gap: 2px;
 }
 
 .page-title {
   font-size: clamp(1.25rem, 2vw, 1.8rem);
+  font-weight: 700;
   line-height: 1.2;
+  background: var(--text-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .page-subtitle {
-  font-size: 0.92rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
 }
 
 .header-right {
@@ -619,9 +757,28 @@ onUnmounted(() => {
 }
 
 .command-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
   border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
+  font-size: 0.82rem;
+  transition: all var(--transition-base);
+}
+
+.command-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.command-btn span {
+  padding: 2px 6px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-xs);
+  font-weight: 600;
 }
 
 .command-palette {
@@ -640,53 +797,110 @@ onUnmounted(() => {
 
 .command-item {
   border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 18px;
-  padding: 14px 16px;
+  background: var(--gradient-card);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .command-item:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--primary-color) 46%, white 18%);
-  box-shadow: var(--shadow-glow);
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-glow-sm);
 }
 
 .command-item strong {
   display: block;
   color: var(--text-primary);
+  font-weight: 600;
 }
 
 .command-item span {
   display: block;
   margin-top: 4px;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 .header-chip strong {
   color: var(--text-primary);
+  font-weight: 600;
 }
 
 .header-chip--ghost {
   background: transparent;
 }
 
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.user-chip:hover {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-glow-sm);
+}
+
+.user-chip__avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: #fff;
+  background: var(--gradient-warm);
+}
+
+.user-chip__name {
+  max-width: 112px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .icon-btn {
   border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-input);
+  transition: all var(--transition-base);
+}
+
+.icon-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  transform: scale(1.05);
 }
 
 .app-content {
-  padding: 18px;
+  padding: 20px;
   background: transparent;
 }
 
 .content-frame {
-  min-height: calc(100vh - 132px);
-  padding: 10px 0 0;
+  min-height: calc(100vh - 140px);
+  padding: 8px 0 0;
+  animation: fadeInUp 0.4s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 1100px) {
@@ -698,7 +912,7 @@ onUnmounted(() => {
 @media (max-width: 900px) {
   .sider-panel {
     margin-right: 0;
-    border-radius: 0 24px 24px 0;
+    border-radius: 0 var(--radius-2xl) var(--radius-2xl) 0;
   }
 
   .app-header {
@@ -714,7 +928,7 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .content-frame {
-    min-height: calc(100vh - 168px);
+    min-height: calc(100vh - 180px);
   }
 
   .page-subtitle {

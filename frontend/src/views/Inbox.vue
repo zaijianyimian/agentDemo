@@ -155,6 +155,7 @@ import {
 import type { InboxSummary } from '@/types'
 import { autonomyService, inboxService, noteService, scheduleService, taskService } from '@/services/api'
 import dayjs from 'dayjs'
+import { readCachedPayload, writeCachedPayload } from '@/services/user-preferences'
 
 const router = useRouter()
 const message = useMessage()
@@ -166,6 +167,7 @@ const inbox = ref<InboxSummary>({
   items: [],
   warnings: []
 })
+const INBOX_CACHE_KEY = 'cache.inbox.v1'
 
 const categoryMap: Record<string, { label: string; icon: any; color: string }> = {
   schedule: { label: '日程', icon: CalendarIcon, color: '#f59e0b' },
@@ -201,6 +203,13 @@ const loadInbox = async () => {
     const res = await inboxService.summary(18)
     if (res.success && res.data) {
       inbox.value = res.data
+      writeCachedPayload(INBOX_CACHE_KEY, res.data)
+    }
+  } catch (_error) {
+    const cached = readCachedPayload<InboxSummary>(INBOX_CACHE_KEY)
+    if (cached) {
+      inbox.value = cached
+      message.info('当前使用离线缓存收件箱数据')
     }
   } finally {
     loading.value = false
@@ -329,7 +338,7 @@ onMounted(loadInbox)
   display: flex;
   gap: 16px;
   align-items: center;
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
   padding: 18px;
   box-shadow: var(--shadow-sm);
 }
@@ -380,16 +389,16 @@ onMounted(loadInbox)
 .feed-item,
 .lane-item {
   text-align: left;
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
 .feed-item:hover,
 .lane-item:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--primary-color) 45%, white 18%);
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-sm);
 }
 
 .feed-item {
@@ -456,7 +465,7 @@ onMounted(loadInbox)
   align-items: center;
   margin-bottom: 14px;
   padding: 14px 16px;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   background: rgba(255, 255, 255, 0.05);
 }
@@ -472,7 +481,7 @@ onMounted(loadInbox)
   gap: 10px;
   align-items: flex-start;
   padding: 14px 16px;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
 }
 
 .lane-grid {
@@ -482,7 +491,7 @@ onMounted(loadInbox)
 }
 
 .lane-card {
-  border-radius: 22px;
+  border-radius: var(--radius-xl);
   padding: 18px;
 }
 
@@ -544,3 +553,4 @@ onMounted(loadInbox)
   }
 }
 </style>
+

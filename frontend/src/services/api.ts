@@ -27,8 +27,22 @@ import type {
   NoteSemanticHit,
   GeneratedReport,
   ReportArtifact,
-  ChatActionResult
+  ChatActionResult,
+  AuthTokenResponse,
+  AuthUserProfile,
+  EmailCodeSendResponse,
+  GithubAuthorizeResponse,
+  GithubExchangeResponse,
+  PersonalInsight,
+  TaskTemplate
 } from '@/types'
+import {
+  buildLoginRedirectUrl,
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  setTokens
+} from '@/services/auth-token'
 
 const api = axios.create({
   baseURL: '/api',
@@ -37,6 +51,85 @@ const api = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+api.interceptors.request.use(config => {
+  const requestUrl = String(config.url || '')
+  const shouldSkipAuthHeader =
+    requestUrl.startsWith('/auth/register') ||
+    requestUrl.startsWith('/auth/login/') ||
+    requestUrl.startsWith('/auth/token/refresh') ||
+    requestUrl.startsWith('/auth/oauth/github/')
+
+  if (shouldSkipAuthHeader) {
+    if (config.headers && 'Authorization' in config.headers) {
+      delete (config.headers as Record<string, string>).Authorization
+    }
+    return config
+  }
+
+  const token = getAccessToken()
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+let refreshingPromise: Promise<string> | null = null
+
+api.interceptors.response.use(
+  response => response,
+  async (error) => {
+    const originalRequest = error.config as any
+    const status = error?.response?.status
+    const requestUrl = String(originalRequest?.url || '')
+
+    const shouldSkipRefresh =
+      requestUrl.startsWith('/auth/token/refresh') ||
+      requestUrl.startsWith('/auth/register') ||
+      requestUrl.startsWith('/auth/login/')
+
+    if (
+      status === 401 &&
+      !originalRequest?._retry &&
+      !shouldSkipRefresh
+    ) {
+      const refreshToken = getRefreshToken()
+      if (refreshToken) {
+        originalRequest._retry = true
+        try {
+          if (!refreshingPromise) {
+            refreshingPromise = axios
+              .post('/api/auth/token/refresh', { refreshToken })
+              .then(resp => {
+                const payload = resp.data as ApiResponse<AuthTokenResponse>
+                if (!payload?.success || !payload.data) {
+                  throw new Error(payload?.message || '刷新令牌失败')
+                }
+                setTokens(payload.data.accessToken, payload.data.refreshToken)
+                return payload.data.accessToken
+              })
+              .finally(() => {
+                refreshingPromise = null
+              })
+          }
+          const latestAccessToken = await refreshingPromise
+          originalRequest.headers = originalRequest.headers || {}
+          originalRequest.headers.Authorization = `Bearer ${latestAccessToken}`
+          return api(originalRequest)
+        } catch (_e) {
+          clearTokens()
+          if (window.location.pathname !== '/login') {
+            window.location.href = buildLoginRedirectUrl(window.location.pathname + window.location.search)
+          }
+        }
+      } else if (window.location.pathname !== '/login') {
+        window.location.href = buildLoginRedirectUrl(window.location.pathname + window.location.search)
+      }
+    }
+
+    return Promise.reject(error)
+  }
+)
 
 // 文件上传服务
 export const fileService = {
@@ -249,6 +342,30 @@ export const emailService = {
     errorDetail: string
   }>> => {
     const response = await api.post('/email/config/test', data)
+    return response.data
+  },
+
+  // 检查已保存配置的网络连通性（服务器 -> 邮件服务器）
+  checkNetwork: async (id: number): Promise<ApiResponse<{
+    success: boolean
+    message: string
+    durationMs: number
+    resolvedIp: string
+    errorDetail: string
+  }>> => {
+    const response = await api.get(`/email/config/${id}/network-check`)
+    return response.data
+  },
+
+  // 检查新配置的网络连通性（未保存）
+  checkNewConfigNetwork: async (data: Partial<EmailConfig>): Promise<ApiResponse<{
+    success: boolean
+    message: string
+    durationMs: number
+    resolvedIp: string
+    errorDetail: string
+  }>> => {
+    const response = await api.post('/email/config/network-check', data)
     return response.data
   }
 }
@@ -911,6 +1028,11 @@ export const settingsService = {
     return response.data
   },
 
+  getSystem: async (): Promise<ApiResponse<Record<string, any>>> => {
+    const response = await api.get('/settings/system')
+    return response.data
+  },
+
   updateSystem: async (payload: SystemSettings): Promise<ApiResponse<any>> => {
     const response = await api.put('/settings/system', payload)
     return response.data
@@ -1032,6 +1154,87 @@ export const chatActionService = {
     const response = await api.post('/chat/action/memory', payload)
     return response.data
   }
+}
+
+export const authService = {
+  register: async (payload: { username: string; email: string; password: string; displayName?: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
+    const response = await api.post('/auth/register', payload)
+    return response.data
+  },
+
+  loginByPassword: async (payload: { username: string; password: string }): Promise<ApiResponse<AuthTokenResponse>> => {
+    const response = await api.post('/auth/login/password', payload)
+    return response.data
+  },
+
+  sendEmailCode: async (payload: { email: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
+    const response = await api.post('/auth/login/email/send-code', payload)
+    return response.data
+  },
+
+  loginByEmailCode: async (payload: { email: string; code: string }): Promise<ApiResponse<AuthTokenResponse>> => {
+    const response = await api.post('/auth/login/email', payload)
+    return response.data
+  },
+
+  me: async (): Promise<ApiResponse<AuthUserProfile>> => {
+    const response = await api.get('/auth/me')
+    return response.data
+  },
+
+  changePassword: async (payload: { currentPassword: string; newPassword: string }): Promise<ApiResponse<void>> => {
+    const response = await api.put('/auth/password', payload)
+    return response.data
+  },
+
+  logout: async (): Promise<ApiResponse<void>> => {
+    const response = await api.post('/auth/logout')
+    return response.data
+  },
+
+  githubAuthorize: async (redirect?: string): Promise<ApiResponse<GithubAuthorizeResponse>> => {
+    const response = await api.get('/auth/oauth/github/authorize', { params: { redirect } })
+    return response.data
+  },
+
+  githubExchange: async (payload: { code: string; state: string }): Promise<ApiResponse<GithubExchangeResponse>> => {
+    const response = await api.post('/auth/oauth/github/exchange', payload)
+    return response.data
+  }
+}
+
+export const personalService = {
+  insights: async (): Promise<ApiResponse<PersonalInsight>> => {
+    const response = await api.get('/personal/insights')
+    return response.data
+  },
+
+  listTaskTemplates: async (): Promise<ApiResponse<TaskTemplate[]>> => {
+    const response = await api.get('/personal/task-templates')
+    return response.data
+  },
+
+  createTaskFromTemplate: async (templateId: string): Promise<ApiResponse<ScheduledTask>> => {
+    const response = await api.post(`/personal/task-templates/${templateId}/create`)
+    return response.data
+  },
+
+  exportBackup: async (): Promise<ApiResponse<Record<string, any>>> => {
+    const response = await api.get('/personal/backup/export')
+    return response.data
+  },
+
+  importBackup: async (payload: Record<string, any>, replaceExisting = false): Promise<ApiResponse<Record<string, any>>> => {
+    const response = await api.post('/personal/backup/import', payload, { params: { replaceExisting } })
+    return response.data
+  }
+}
+
+export const authTokenStorage = {
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+  clearTokens
 }
 
 export default api

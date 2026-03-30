@@ -65,12 +65,17 @@ public class ModelController {
             // 编码 API Key
             config.setApiKey(encodingService.encode(config.getApiKey()));
 
-            // 如果设置为默认，先清除其他默认
-            if (Boolean.TRUE.equals(config.getIsDefault())) {
+            // 首个模型自动启用且设为默认，其余模型默认禁用
+            boolean hasEnabledModel = configMapper.countEnabled() > 0;
+            if (hasEnabledModel) {
+                config.setEnabled(false);
+                config.setIsDefault(false);
+            } else {
+                config.setEnabled(true);
+                config.setIsDefault(true);
                 configMapper.clearDefault();
             }
 
-            config.setEnabled(true);
             configMapper.insert(config);
 
             // 创建 ChatModel 缓存
@@ -132,6 +137,15 @@ public class ModelController {
      */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
+        AiModelConfig existing = configMapper.selectById(id);
+        if (existing == null) {
+            return ApiResponse.error("模型不存在");
+        }
+
+        if (Boolean.TRUE.equals(existing.getEnabled()) && configMapper.countEnabled() <= 1) {
+            return ApiResponse.error("至少需要保留一个启用模型，请先启用其他模型");
+        }
+
         try {
             // 移除缓存
             modelManager.removeModel(id);
@@ -154,17 +168,34 @@ public class ModelController {
             return ApiResponse.error("模型不存在");
         }
 
-        config.setEnabled(!config.getEnabled());
-        configMapper.updateById(config);
+        // 单启用策略：启用某模型时，自动禁用其他模型并设为默认
+        if (Boolean.TRUE.equals(config.getEnabled())) {
+            if (configMapper.countEnabled() <= 1) {
+                return ApiResponse.error("至少需要保留一个启用模型");
+            }
 
-        // 刷新或移除缓存
-        if (config.getEnabled()) {
-            modelManager.refreshModel(id);
-        } else {
+            config.setEnabled(false);
+            config.setIsDefault(false);
+            configMapper.updateById(config);
             modelManager.removeModel(id);
+        } else {
+            // 记录旧的启用模型并清理缓存
+            List<AiModelConfig> previouslyEnabled = configMapper.selectEnabled();
+            for (AiModelConfig enabledConfig : previouslyEnabled) {
+                modelManager.removeModel(enabledConfig.getId());
+            }
+
+            configMapper.clearEnabled();
+            configMapper.clearDefault();
+
+            config.setEnabled(true);
+            config.setIsDefault(true);
+            configMapper.updateById(config);
+            modelManager.refreshModel(id);
         }
 
-        return ApiResponse.success(toSafeMap(config));
+        AiModelConfig latest = configMapper.selectById(id);
+        return ApiResponse.success(toSafeMap(latest));
     }
 
     /**
@@ -175,6 +206,9 @@ public class ModelController {
         AiModelConfig config = configMapper.selectById(id);
         if (config == null) {
             return ApiResponse.error("模型不存在");
+        }
+        if (!Boolean.TRUE.equals(config.getEnabled())) {
+            return ApiResponse.error("请先启用该模型");
         }
 
         // 清除其他默认
