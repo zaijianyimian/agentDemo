@@ -99,3 +99,261 @@
 2026-03-30T08:01:47.286+08:00 INFO  [main] o.a.coyote.http11.Http11NioProtocol : Starting ProtocolHandler ["http-nio-8000"]
 2026-03-30T08:01:47.308+08:00 INFO  [main] o.s.b.w.e.tomcat.TomcatWebServer : Tomcat started on port 8000 (http) with context path '/'
 2026-03-30T08:01:47.322+08:00 INFO  [main] com.example.demo.DemoApplication : Started DemoApplication in 10.598 seconds (process running for 12.149)
+2026-03-30T08:02:19.241+08:00 INFO  [http-nio-8000-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/] : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-03-30T08:02:19.241+08:00 INFO  [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Initializing Servlet 'dispatcherServlet'
+2026-03-30T08:02:19.241+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Detected StandardServletMultipartResolver
+2026-03-30T08:02:19.241+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Detected AcceptHeaderLocaleResolver
+2026-03-30T08:02:19.242+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Detected FixedThemeResolver
+2026-03-30T08:02:19.243+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Detected org.springframework.web.servlet.view.DefaultRequestToViewNameTranslator@2cd2c764
+2026-03-30T08:02:19.243+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Detected org.springframework.web.servlet.support.SessionFlashMapManager@47fc9ce
+2026-03-30T08:02:19.244+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : enableLoggingRequestDetails='false': request parameters and headers will be masked to prevent unsafe logging of potentially sensitive data
+2026-03-30T08:02:19.244+08:00 INFO  [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Completed initialization in 3 ms
+2026-03-30T08:02:19.266+08:00 DEBUG [http-nio-8000-exec-4] o.s.web.servlet.DispatcherServlet : GET "/api/skill/list", parameters={}
+2026-03-30T08:02:19.266+08:00 DEBUG [http-nio-8000-exec-3] o.s.web.servlet.DispatcherServlet : GET "/api/schedule/list", parameters={}
+2026-03-30T08:02:19.266+08:00 DEBUG [http-nio-8000-exec-2] o.s.web.servlet.DispatcherServlet : GET "/api/mcp/tools", parameters={}
+2026-03-30T08:02:19.266+08:00 DEBUG [http-nio-8000-exec-5] o.s.web.servlet.DispatcherServlet : GET "/api/model/list", parameters={}
+2026-03-30T08:02:19.266+08:00 DEBUG [http-nio-8000-exec-6] o.s.web.servlet.DispatcherServlet : GET "/api/task/list", parameters={}
+2026-03-30T08:02:19.266+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : GET "/api/file/list", parameters={}
+2026-03-30T08:02:19.287+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.FileController#listDocuments()
+2026-03-30T08:02:19.287+08:00 DEBUG [http-nio-8000-exec-5] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ModelController#list()
+2026-03-30T08:02:19.287+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ScheduleController#listAll()
+2026-03-30T08:02:19.287+08:00 DEBUG [http-nio-8000-exec-2] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.McpToolController#listAll()
+2026-03-30T08:02:19.287+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.TaskController#list()
+2026-03-30T08:02:19.287+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.SkillController#listAll()
+2026-03-30T08:02:19.328+08:00 DEBUG [http-nio-8000-exec-3] c.e.d.m.S.selectList : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event
+2026-03-30T08:02:19.329+08:00 DEBUG [http-nio-8000-exec-2] c.e.d.m.McpToolMapper.selectList : ==>  Preparing: SELECT id,name,display_name,description,tool_type,config,input_schema,enabled,remark,create_time,update_time FROM mcp_tool
+2026-03-30T08:02:19.328+08:00 DEBUG [http-nio-8000-exec-6] c.e.d.m.S.selectList : ==>  Preparing: SELECT id,name,description,task_type,cron_expression,params,skill_code,last_execute_time,last_execute_result,next_execute_time,execute_count,success_count,fail_count,enabled,create_time,update_time FROM scheduled_task
+2026-03-30T08:02:19.329+08:00 DEBUG [http-nio-8000-exec-5] c.e.d.m.A.selectList : ==>  Preparing: SELECT id,name,provider,base_url,model_name,api_key,is_default,enabled,create_time,update_time FROM ai_model_config
+2026-03-30T08:02:19.329+08:00 DEBUG [http-nio-8000-exec-3] c.e.d.m.S.selectList : ==> Parameters: 
+2026-03-30T08:02:19.330+08:00 DEBUG [http-nio-8000-exec-2] c.e.d.m.McpToolMapper.selectList : ==> Parameters: 
+2026-03-30T08:02:19.329+08:00 DEBUG [http-nio-8000-exec-4] c.e.d.mapper.SkillMapper.selectList : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill
+2026-03-30T08:02:19.330+08:00 DEBUG [http-nio-8000-exec-4] c.e.d.mapper.SkillMapper.selectList : ==> Parameters: 
+2026-03-30T08:02:19.330+08:00 DEBUG [http-nio-8000-exec-6] c.e.d.m.S.selectList : ==> Parameters: 
+2026-03-30T08:02:19.330+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.DocumentMapper.selectList : ==>  Preparing: SELECT id,file_name,file_path,file_type,file_size,content,importance,tags,sentiment,summary,status,create_time,update_time FROM document
+2026-03-30T08:02:19.331+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.DocumentMapper.selectList : ==> Parameters: 
+2026-03-30T08:02:19.332+08:00 DEBUG [http-nio-8000-exec-5] c.e.d.m.A.selectList : ==> Parameters: 
+2026-03-30T08:02:19.361+08:00 DEBUG [http-nio-8000-exec-5] c.e.d.m.A.selectList : <==      Total: 2
+2026-03-30T08:02:19.361+08:00 DEBUG [http-nio-8000-exec-6] c.e.d.m.S.selectList : <==      Total: 3
+2026-03-30T08:02:19.374+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.DocumentMapper.selectList : <==      Total: 1
+2026-03-30T08:02:19.374+08:00 DEBUG [http-nio-8000-exec-3] c.e.d.m.S.selectList : <==      Total: 11
+2026-03-30T08:02:19.374+08:00 DEBUG [http-nio-8000-exec-4] c.e.d.mapper.SkillMapper.selectList : <==      Total: 12
+2026-03-30T08:02:19.377+08:00 DEBUG [http-nio-8000-exec-2] c.e.d.m.McpToolMapper.selectList : <==      Total: 12
+2026-03-30T08:02:19.401+08:00 DEBUG [http-nio-8000-exec-2] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:19.401+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:19.401+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:19.409+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.HttpEntityMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:19.423+08:00 DEBUG [http-nio-8000-exec-5] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:19.423+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:19.423+08:00 DEBUG [http-nio-8000-exec-2] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [[McpTool(id=1, name=updated_tool, displayName=天气查询, description=updated description, toolType=HTTP_A (truncated)...]
+2026-03-30T08:02:19.423+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [[Skill(id=1, code=web_search, name=网络搜索, description=在互联网上搜索相关信息，返回搜索结果, category=search, icon=searc (truncated)...]
+2026-03-30T08:02:19.425+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.HttpEntityMethodProcessor : Writing [{total=1, data=[Document(id=5, fileName=test_upload.txt, filePath=.\data\documents\9fc594ce-3ad9-4e9 (truncated)...]
+2026-03-30T08:02:19.426+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [[ScheduleEvent(id=1, title=updated_schedule, description=test, eventTime=null, eventDate=null, locat (truncated)...]
+2026-03-30T08:02:19.429+08:00 DEBUG [http-nio-8000-exec-5] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[{modelName=gpt-4-turbo, baseUrl=https://dashscope.a (truncated)...]
+2026-03-30T08:02:19.443+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[ScheduledTask(id=1, name=UpdatedTask, description=这 (truncated)...]
+2026-03-30T08:02:19.463+08:00 DEBUG [http-nio-8000-exec-4] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:19.464+08:00 DEBUG [http-nio-8000-exec-6] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:19.465+08:00 DEBUG [http-nio-8000-exec-3] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:19.468+08:00 DEBUG [http-nio-8000-exec-2] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:19.479+08:00 DEBUG [http-nio-8000-exec-5] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:19.480+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:19.490+08:00 DEBUG [http-nio-8000-exec-7] o.s.web.servlet.DispatcherServlet : GET "/api/knowledge/list", parameters={}
+2026-03-30T08:02:19.490+08:00 DEBUG [http-nio-8000-exec-7] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.KnowledgeController#list()
+2026-03-30T08:02:19.492+08:00 DEBUG [http-nio-8000-exec-7] c.e.d.m.K.selectList : ==>  Preparing: SELECT id,name,description,collection_name,embedding_model,chunk_size,chunk_overlap,document_count,enabled,create_time,update_time FROM knowledge_base
+2026-03-30T08:02:19.493+08:00 DEBUG [http-nio-8000-exec-7] c.e.d.m.K.selectList : ==> Parameters: 
+2026-03-30T08:02:19.503+08:00 DEBUG [http-nio-8000-exec-7] c.e.d.m.K.selectList : <==      Total: 3
+2026-03-30T08:02:19.505+08:00 DEBUG [http-nio-8000-exec-7] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:19.506+08:00 DEBUG [http-nio-8000-exec-7] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[KnowledgeBase(id=2, name=TestKB, description=Test k (truncated)...]
+2026-03-30T08:02:19.509+08:00 DEBUG [http-nio-8000-exec-7] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:27.752+08:00 DEBUG [http-nio-8000-exec-8] o.s.web.servlet.DispatcherServlet : GET "/api/report/history?limit=12", parameters={masked}
+2026-03-30T08:02:27.754+08:00 DEBUG [http-nio-8000-exec-8] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ReportController#history(int)
+2026-03-30T08:02:27.787+08:00 DEBUG [http-nio-8000-exec-8] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:27.788+08:00 DEBUG [http-nio-8000-exec-8] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[], total=null)]
+2026-03-30T08:02:27.790+08:00 DEBUG [http-nio-8000-exec-8] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:29.355+08:00 DEBUG [http-nio-8000-exec-9] o.s.web.servlet.DispatcherServlet : POST "/api/report/generate?period=daily", parameters={masked}
+2026-03-30T08:02:29.356+08:00 DEBUG [http-nio-8000-exec-9] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ReportController#generate(String)
+2026-03-30T08:02:29.367+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.S.selectList : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event WHERE (event_date >= ? AND event_date <= ?) ORDER BY event_time ASC
+2026-03-30T08:02:29.370+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.S.selectList : ==> Parameters: 2026-03-30(LocalDate), 2026-03-30(LocalDate)
+2026-03-30T08:02:29.391+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.S.selectList : <==      Total: 2
+2026-03-30T08:02:29.393+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.S.selectList : ==>  Preparing: SELECT id,name,description,task_type,cron_expression,params,skill_code,last_execute_time,last_execute_result,next_execute_time,execute_count,success_count,fail_count,enabled,create_time,update_time FROM scheduled_task WHERE (update_time >= ?) ORDER BY update_time DESC
+2026-03-30T08:02:29.394+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.S.selectList : ==> Parameters: 2026-03-30T00:00(LocalDateTime)
+2026-03-30T08:02:29.397+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.S.selectList : <==      Total: 0
+2026-03-30T08:02:29.398+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.N.findAllOrderByPinnedAndTime : ==>  Preparing: SELECT * FROM note ORDER BY is_pinned DESC, update_time DESC
+2026-03-30T08:02:29.399+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.N.findAllOrderByPinnedAndTime : ==> Parameters: 
+2026-03-30T08:02:29.407+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.N.findAllOrderByPinnedAndTime : <==      Total: 2
+2026-03-30T08:02:29.408+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.S.selectRecent : ==>  Preparing: SELECT * FROM search_history ORDER BY create_time DESC LIMIT ?
+2026-03-30T08:02:29.409+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.S.selectRecent : ==> Parameters: 6(Integer)
+2026-03-30T08:02:29.415+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.S.selectRecent : <==      Total: 6
+2026-03-30T08:02:29.416+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.C.findAllOrderByLastMessageTime : ==>  Preparing: SELECT * FROM chat_session ORDER BY last_message_time DESC, create_time DESC
+2026-03-30T08:02:29.416+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.C.findAllOrderByLastMessageTime : ==> Parameters: 
+2026-03-30T08:02:29.424+08:00 DEBUG [http-nio-8000-exec-9] c.e.d.m.C.findAllOrderByLastMessageTime : <==      Total: 8
+2026-03-30T08:02:29.443+08:00 DEBUG [http-nio-8000-exec-9] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:29.443+08:00 DEBUG [http-nio-8000-exec-9] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=GeneratedReport(period=daily, generatedAt=2026-03-30 (truncated)...]
+2026-03-30T08:02:29.447+08:00 DEBUG [http-nio-8000-exec-9] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:29.460+08:00 DEBUG [http-nio-8000-exec-10] o.s.web.servlet.DispatcherServlet : GET "/api/report/history?limit=12", parameters={masked}
+2026-03-30T08:02:29.461+08:00 DEBUG [http-nio-8000-exec-10] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ReportController#history(int)
+2026-03-30T08:02:29.467+08:00 DEBUG [http-nio-8000-exec-10] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:29.468+08:00 DEBUG [http-nio-8000-exec-10] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[ReportArtifact(period=daily, name=daily-report-2026 (truncated)...]
+2026-03-30T08:02:29.474+08:00 DEBUG [http-nio-8000-exec-10] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:34.595+08:00 DEBUG [http-nio-8000-exec-4] o.s.web.servlet.DispatcherServlet : GET "/api/report/artifact?path=D:%5Cjavaproject%5CagentDemo%5Cgenerated%5Creports%5Cdaily-report-20260330-080229.md", parameters={masked}
+2026-03-30T08:02:34.596+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ReportController#artifact(String)
+2026-03-30T08:02:34.598+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:34.599+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=# 日报<EOL><EOL>- 时间范围: 2026-03-30 ~ 2026-03-30<EOL>- 生成时间: 2026-0 (truncated)...]
+2026-03-30T08:02:34.600+08:00 DEBUG [http-nio-8000-exec-4] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:35.898+08:00 DEBUG [http-nio-8000-exec-6] o.s.web.servlet.DispatcherServlet : GET "/api/report/artifact?path=D:%5Cjavaproject%5CagentDemo%5Cgenerated%5Creports%5Cdaily-report-20260330-080229.md", parameters={masked}
+2026-03-30T08:02:35.899+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ReportController#artifact(String)
+2026-03-30T08:02:35.900+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:35.901+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=# 日报<EOL><EOL>- 时间范围: 2026-03-30 ~ 2026-03-30<EOL>- 生成时间: 2026-0 (truncated)...]
+2026-03-30T08:02:35.902+08:00 DEBUG [http-nio-8000-exec-6] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:42.210+08:00 DEBUG [http-nio-8000-exec-3] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/capabilities", parameters={}
+2026-03-30T08:02:42.211+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#getCapabilities()
+2026-03-30T08:02:42.213+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:02:42.213+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data={enabled=true, workspaceRoot=D:\javaproject\agentDem (truncated)...]
+2026-03-30T08:02:42.215+08:00 DEBUG [http-nio-8000-exec-3] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:02:42.235+08:00 DEBUG [http-nio-8000-exec-2] o.s.web.servlet.DispatcherServlet : POST "/api/autonomy/scan", parameters={}
+2026-03-30T08:02:42.236+08:00 DEBUG [http-nio-8000-exec-2] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#scanProject()
+2026-03-30T08:03:00.434+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : GET "/api/inbox/summary?limit=18", parameters={masked}
+2026-03-30T08:03:00.435+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.InboxController#summary(int)
+2026-03-30T08:03:00.438+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectList : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event ORDER BY event_time DESC
+2026-03-30T08:03:00.439+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectList : ==> Parameters: 
+2026-03-30T08:03:00.448+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectList : <==      Total: 11
+2026-03-30T08:03:00.451+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectList : ==>  Preparing: SELECT id,name,description,task_type,cron_expression,params,skill_code,last_execute_time,last_execute_result,next_execute_time,execute_count,success_count,fail_count,enabled,create_time,update_time FROM scheduled_task ORDER BY update_time DESC
+2026-03-30T08:03:00.452+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectList : ==> Parameters: 
+2026-03-30T08:03:00.455+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectList : <==      Total: 3
+2026-03-30T08:03:00.456+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.N.findAllOrderByPinnedAndTime : ==>  Preparing: SELECT * FROM note ORDER BY is_pinned DESC, update_time DESC
+2026-03-30T08:03:00.456+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.N.findAllOrderByPinnedAndTime : ==> Parameters: 
+2026-03-30T08:03:00.460+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.N.findAllOrderByPinnedAndTime : <==      Total: 2
+2026-03-30T08:03:00.461+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectRecent : ==>  Preparing: SELECT * FROM search_history ORDER BY create_time DESC LIMIT ?
+2026-03-30T08:03:00.462+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectRecent : ==> Parameters: 18(Integer)
+2026-03-30T08:03:00.465+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectRecent : <==      Total: 7
+2026-03-30T08:03:00.467+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.EmailConfigMapper.selectList : ==>  Preparing: SELECT id,email,password,host,protocol,port,ssl_enabled,enabled,folder,poll_interval,remark,create_time,update_time FROM email_config
+2026-03-30T08:03:00.467+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.EmailConfigMapper.selectList : ==> Parameters: 
+2026-03-30T08:03:00.469+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.EmailConfigMapper.selectList : <==      Total: 0
+2026-03-30T08:03:00.486+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:00.496+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=InboxSummary(generatedAt=2026-03-30T08:03:00.4865681 (truncated)...]
+2026-03-30T08:03:00.507+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:02.298+08:00 DEBUG [http-nio-8000-exec-2] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:02.299+08:00 DEBUG [http-nio-8000-exec-2] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=AutonomyScanReport(scanTime=2026-03-30T08:02:42.2371 (truncated)...]
+2026-03-30T08:03:02.300+08:00 DEBUG [http-nio-8000-exec-2] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:02.325+08:00 DEBUG [http-nio-8000-exec-5] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/history?limit=12", parameters={masked}
+2026-03-30T08:03:02.326+08:00 DEBUG [http-nio-8000-exec-5] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#history(int)
+2026-03-30T08:03:02.332+08:00 DEBUG [http-nio-8000-exec-5] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:02.333+08:00 DEBUG [http-nio-8000-exec-5] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[AutonomyArtifact(type=scan, name=scan-20260330-0802 (truncated)...]
+2026-03-30T08:03:02.335+08:00 DEBUG [http-nio-8000-exec-5] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:02.360+08:00 DEBUG [http-nio-8000-exec-7] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/diff", parameters={}
+2026-03-30T08:03:02.360+08:00 DEBUG [http-nio-8000-exec-7] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#diff()
+2026-03-30T08:03:02.363+08:00 DEBUG [http-nio-8000-exec-7] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:02.370+08:00 DEBUG [http-nio-8000-exec-7] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=AutonomyDiff(latestScanTime=null, previousScanTime=n (truncated)...]
+2026-03-30T08:03:02.374+08:00 DEBUG [http-nio-8000-exec-7] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:02.405+08:00 DEBUG [http-nio-8000-exec-8] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/history?limit=12", parameters={masked}
+2026-03-30T08:03:02.405+08:00 DEBUG [http-nio-8000-exec-8] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#history(int)
+2026-03-30T08:03:02.408+08:00 DEBUG [http-nio-8000-exec-8] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:02.408+08:00 DEBUG [http-nio-8000-exec-8] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[AutonomyArtifact(type=scan, name=scan-20260330-0802 (truncated)...]
+2026-03-30T08:03:02.409+08:00 DEBUG [http-nio-8000-exec-8] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:02.425+08:00 DEBUG [http-nio-8000-exec-9] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/diff", parameters={}
+2026-03-30T08:03:02.426+08:00 DEBUG [http-nio-8000-exec-9] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#diff()
+2026-03-30T08:03:02.427+08:00 DEBUG [http-nio-8000-exec-9] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:02.427+08:00 DEBUG [http-nio-8000-exec-9] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=AutonomyDiff(latestScanTime=null, previousScanTime=n (truncated)...]
+2026-03-30T08:03:02.428+08:00 DEBUG [http-nio-8000-exec-9] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:04.724+08:00 DEBUG [http-nio-8000-exec-4] o.s.web.servlet.DispatcherServlet : GET "/api/schedule/list", parameters={}
+2026-03-30T08:03:04.724+08:00 DEBUG [http-nio-8000-exec-10] o.s.web.servlet.DispatcherServlet : GET "/api/file/list", parameters={}
+2026-03-30T08:03:04.724+08:00 DEBUG [http-nio-8000-exec-10] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.FileController#listDocuments()
+2026-03-30T08:03:04.724+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ScheduleController#listAll()
+2026-03-30T08:03:04.726+08:00 DEBUG [http-nio-8000-exec-4] c.e.d.m.S.selectList : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event
+2026-03-30T08:03:04.727+08:00 DEBUG [http-nio-8000-exec-10] c.e.d.m.DocumentMapper.selectList : ==>  Preparing: SELECT id,file_name,file_path,file_type,file_size,content,importance,tags,sentiment,summary,status,create_time,update_time FROM document
+2026-03-30T08:03:04.727+08:00 DEBUG [http-nio-8000-exec-4] c.e.d.m.S.selectList : ==> Parameters: 
+2026-03-30T08:03:04.728+08:00 DEBUG [http-nio-8000-exec-10] c.e.d.m.DocumentMapper.selectList : ==> Parameters: 
+2026-03-30T08:03:04.729+08:00 DEBUG [http-nio-8000-exec-3] o.s.web.servlet.DispatcherServlet : GET "/api/model/list", parameters={}
+2026-03-30T08:03:04.730+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ModelController#list()
+2026-03-30T08:03:04.730+08:00 DEBUG [http-nio-8000-exec-6] o.s.web.servlet.DispatcherServlet : GET "/api/mcp/tools", parameters={}
+2026-03-30T08:03:04.730+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.McpToolController#listAll()
+2026-03-30T08:03:04.731+08:00 DEBUG [http-nio-8000-exec-4] c.e.d.m.S.selectList : <==      Total: 11
+2026-03-30T08:03:04.731+08:00 DEBUG [http-nio-8000-exec-3] c.e.d.m.A.selectList : ==>  Preparing: SELECT id,name,provider,base_url,model_name,api_key,is_default,enabled,create_time,update_time FROM ai_model_config
+2026-03-30T08:03:04.731+08:00 DEBUG [http-nio-8000-exec-10] c.e.d.m.DocumentMapper.selectList : <==      Total: 1
+2026-03-30T08:03:04.731+08:00 DEBUG [http-nio-8000-exec-6] c.e.d.m.McpToolMapper.selectList : ==>  Preparing: SELECT id,name,display_name,description,tool_type,config,input_schema,enabled,remark,create_time,update_time FROM mcp_tool
+2026-03-30T08:03:04.731+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:04.732+08:00 DEBUG [http-nio-8000-exec-3] c.e.d.m.A.selectList : ==> Parameters: 
+2026-03-30T08:03:04.732+08:00 DEBUG [http-nio-8000-exec-6] c.e.d.m.McpToolMapper.selectList : ==> Parameters: 
+2026-03-30T08:03:04.733+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [[ScheduleEvent(id=1, title=updated_schedule, description=test, eventTime=null, eventDate=null, locat (truncated)...]
+2026-03-30T08:03:04.734+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : GET "/api/task/list", parameters={}
+2026-03-30T08:03:04.734+08:00 DEBUG [http-nio-8000-exec-3] c.e.d.m.A.selectList : <==      Total: 2
+2026-03-30T08:03:04.734+08:00 DEBUG [http-nio-8000-exec-2] o.s.web.servlet.DispatcherServlet : GET "/api/skill/list", parameters={}
+2026-03-30T08:03:04.734+08:00 DEBUG [http-nio-8000-exec-10] o.s.w.s.m.m.a.HttpEntityMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:04.734+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.TaskController#list()
+2026-03-30T08:03:04.734+08:00 DEBUG [http-nio-8000-exec-2] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.SkillController#listAll()
+2026-03-30T08:03:04.735+08:00 DEBUG [http-nio-8000-exec-10] o.s.w.s.m.m.a.HttpEntityMethodProcessor : Writing [{total=1, data=[Document(id=5, fileName=test_upload.txt, filePath=.\data\documents\9fc594ce-3ad9-4e9 (truncated)...]
+2026-03-30T08:03:04.735+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:04.735+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[{modelName=gpt-4-turbo, baseUrl=https://dashscope.a (truncated)...]
+2026-03-30T08:03:04.736+08:00 DEBUG [http-nio-8000-exec-10] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:04.736+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectList : ==>  Preparing: SELECT id,name,description,task_type,cron_expression,params,skill_code,last_execute_time,last_execute_result,next_execute_time,execute_count,success_count,fail_count,enabled,create_time,update_time FROM scheduled_task
+2026-03-30T08:03:04.737+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectList : ==> Parameters: 
+2026-03-30T08:03:04.737+08:00 DEBUG [http-nio-8000-exec-2] c.e.d.mapper.SkillMapper.selectList : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill
+2026-03-30T08:03:04.738+08:00 DEBUG [http-nio-8000-exec-2] c.e.d.mapper.SkillMapper.selectList : ==> Parameters: 
+2026-03-30T08:03:04.738+08:00 DEBUG [http-nio-8000-exec-3] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:04.741+08:00 DEBUG [http-nio-8000-exec-4] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:04.742+08:00 DEBUG [http-nio-8000-exec-1] c.e.d.m.S.selectList : <==      Total: 3
+2026-03-30T08:03:04.742+08:00 DEBUG [http-nio-8000-exec-6] c.e.d.m.McpToolMapper.selectList : <==      Total: 12
+2026-03-30T08:03:04.742+08:00 DEBUG [http-nio-8000-exec-2] c.e.d.mapper.SkillMapper.selectList : <==      Total: 12
+2026-03-30T08:03:04.743+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:04.743+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:04.745+08:00 DEBUG [http-nio-8000-exec-2] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:04.745+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [[McpTool(id=1, name=updated_tool, displayName=天气查询, description=updated description, toolType=HTTP_A (truncated)...]
+2026-03-30T08:03:04.745+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[ScheduledTask(id=1, name=UpdatedTask, description=这 (truncated)...]
+2026-03-30T08:03:04.747+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:04.747+08:00 DEBUG [http-nio-8000-exec-2] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [[Skill(id=1, code=web_search, name=网络搜索, description=在互联网上搜索相关信息，返回搜索结果, category=search, icon=searc (truncated)...]
+2026-03-30T08:03:04.753+08:00 DEBUG [http-nio-8000-exec-6] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:04.755+08:00 DEBUG [http-nio-8000-exec-2] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:04.757+08:00 DEBUG [http-nio-8000-exec-5] o.s.web.servlet.DispatcherServlet : GET "/api/knowledge/list", parameters={}
+2026-03-30T08:03:04.757+08:00 DEBUG [http-nio-8000-exec-5] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.KnowledgeController#list()
+2026-03-30T08:03:04.759+08:00 DEBUG [http-nio-8000-exec-5] c.e.d.m.K.selectList : ==>  Preparing: SELECT id,name,description,collection_name,embedding_model,chunk_size,chunk_overlap,document_count,enabled,create_time,update_time FROM knowledge_base
+2026-03-30T08:03:04.759+08:00 DEBUG [http-nio-8000-exec-5] c.e.d.m.K.selectList : ==> Parameters: 
+2026-03-30T08:03:04.761+08:00 DEBUG [http-nio-8000-exec-5] c.e.d.m.K.selectList : <==      Total: 3
+2026-03-30T08:03:04.762+08:00 DEBUG [http-nio-8000-exec-5] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:04.762+08:00 DEBUG [http-nio-8000-exec-5] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[KnowledgeBase(id=2, name=TestKB, description=Test k (truncated)...]
+2026-03-30T08:03:04.764+08:00 DEBUG [http-nio-8000-exec-5] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:06.595+08:00 DEBUG [http-nio-8000-exec-7] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/capabilities", parameters={}
+2026-03-30T08:03:06.595+08:00 DEBUG [http-nio-8000-exec-7] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#getCapabilities()
+2026-03-30T08:03:06.597+08:00 DEBUG [http-nio-8000-exec-7] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:06.597+08:00 DEBUG [http-nio-8000-exec-7] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data={enabled=true, workspaceRoot=D:\javaproject\agentDem (truncated)...]
+2026-03-30T08:03:06.598+08:00 DEBUG [http-nio-8000-exec-7] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:06.618+08:00 DEBUG [http-nio-8000-exec-8] o.s.web.servlet.DispatcherServlet : POST "/api/autonomy/scan", parameters={}
+2026-03-30T08:03:06.619+08:00 DEBUG [http-nio-8000-exec-8] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#scanProject()
+2026-03-30T08:03:14.769+08:00 DEBUG [http-nio-8000-exec-9] o.s.web.servlet.DispatcherServlet : GET "/api/report/history?limit=12", parameters={masked}
+2026-03-30T08:03:14.769+08:00 DEBUG [http-nio-8000-exec-9] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ReportController#history(int)
+2026-03-30T08:03:14.772+08:00 DEBUG [http-nio-8000-exec-9] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:14.772+08:00 DEBUG [http-nio-8000-exec-9] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[ReportArtifact(period=daily, name=daily-report-2026 (truncated)...]
+2026-03-30T08:03:14.774+08:00 DEBUG [http-nio-8000-exec-9] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:17.404+08:00 DEBUG [http-nio-8000-exec-10] o.s.web.servlet.DispatcherServlet : GET "/api/report/artifact?path=D:%5Cjavaproject%5CagentDemo%5Cgenerated%5Creports%5Cdaily-report-20260330-080229.md", parameters={masked}
+2026-03-30T08:03:17.404+08:00 DEBUG [http-nio-8000-exec-10] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.ReportController#artifact(String)
+2026-03-30T08:03:17.406+08:00 DEBUG [http-nio-8000-exec-10] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:17.406+08:00 DEBUG [http-nio-8000-exec-10] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=# 日报<EOL><EOL>- 时间范围: 2026-03-30 ~ 2026-03-30<EOL>- 生成时间: 2026-0 (truncated)...]
+2026-03-30T08:03:17.407+08:00 DEBUG [http-nio-8000-exec-10] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:26.660+08:00 DEBUG [http-nio-8000-exec-8] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:26.661+08:00 DEBUG [http-nio-8000-exec-8] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=AutonomyScanReport(scanTime=2026-03-30T08:03:06.6192 (truncated)...]
+2026-03-30T08:03:26.662+08:00 DEBUG [http-nio-8000-exec-8] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:26.673+08:00 DEBUG [http-nio-8000-exec-3] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/history?limit=12", parameters={masked}
+2026-03-30T08:03:26.674+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#history(int)
+2026-03-30T08:03:26.678+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:26.678+08:00 DEBUG [http-nio-8000-exec-3] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[AutonomyArtifact(type=scan, name=scan-20260330-0803 (truncated)...]
+2026-03-30T08:03:26.679+08:00 DEBUG [http-nio-8000-exec-3] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:26.695+08:00 DEBUG [http-nio-8000-exec-4] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/diff", parameters={}
+2026-03-30T08:03:26.695+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#diff()
+2026-03-30T08:03:26.715+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:26.715+08:00 DEBUG [http-nio-8000-exec-4] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=AutonomyDiff(latestScanTime=null, previousScanTime=n (truncated)...]
+2026-03-30T08:03:26.716+08:00 DEBUG [http-nio-8000-exec-4] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:26.742+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/history?limit=12", parameters={masked}
+2026-03-30T08:03:26.743+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#history(int)
+2026-03-30T08:03:26.746+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:26.747+08:00 DEBUG [http-nio-8000-exec-1] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=[AutonomyArtifact(type=scan, name=scan-20260330-0803 (truncated)...]
+2026-03-30T08:03:26.748+08:00 DEBUG [http-nio-8000-exec-1] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:03:26.763+08:00 DEBUG [http-nio-8000-exec-6] o.s.web.servlet.DispatcherServlet : GET "/api/autonomy/diff", parameters={}
+2026-03-30T08:03:26.763+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped to com.example.demo.controller.AutonomyController#diff()
+2026-03-30T08:03:26.765+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-03-30T08:03:26.765+08:00 DEBUG [http-nio-8000-exec-6] o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor : Writing [ApiResponse(success=true, message=success, data=AutonomyDiff(latestScanTime=null, previousScanTime=n (truncated)...]
+2026-03-30T08:03:26.766+08:00 DEBUG [http-nio-8000-exec-6] o.s.web.servlet.DispatcherServlet : Completed 200 OK
+2026-03-30T08:08:17.765+08:00 INFO  [SpringApplicationShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown : Commencing graceful shutdown. Waiting for active requests to complete
+2026-03-30T08:08:19.582+08:00 INFO  [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown : Graceful shutdown complete
+2026-03-30T08:08:19.705+08:00 INFO  [SpringApplicationShutdownHook] c.e.d.s.task.ScheduledTaskService : 已取消所有定时任务
+2026-03-30T08:08:19.705+08:00 INFO  [SpringApplicationShutdownHook] c.e.d.s.email.EmailListenerService : 关闭邮件监听服务...
+2026-03-30T08:08:19.742+08:00 INFO  [SpringApplicationShutdownHook] c.e.d.service.tool.McpClientManager : Closing all MCP Server connections...
+2026-03-30T08:08:19.745+08:00 INFO  [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Shutdown initiated...
+2026-03-30T08:08:19.754+08:00 INFO  [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Shutdown completed.
