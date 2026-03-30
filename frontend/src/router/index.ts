@@ -8,6 +8,24 @@ const routes = [
     meta: { title: '仪表盘', icon: 'dashboard', description: '查看全局状态、模块入口和今日重点事项。' }
   },
   {
+    path: '/inbox',
+    name: 'Inbox',
+    component: () => import('@/views/Inbox.vue'),
+    meta: { title: '统一收件箱', icon: 'inbox', description: '聚合日程、任务、笔记、搜索、邮件与自治发现项。' }
+  },
+  {
+    path: '/autonomy',
+    name: 'Autonomy',
+    component: () => import('@/views/AutonomyCenter.vue'),
+    meta: { title: '自治中心', icon: 'spark', description: '执行项目扫描、验证和补全草稿生成。' }
+  },
+  {
+    path: '/reports',
+    name: 'Reports',
+    component: () => import('@/views/Reports.vue'),
+    meta: { title: '日报周报', icon: 'report', description: '生成日报、周报并查看个人历史报告。' }
+  },
+  {
     path: '/models',
     name: 'Models',
     component: () => import('@/views/Models.vue'),

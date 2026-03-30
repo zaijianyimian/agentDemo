@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.ApiResponse;
+import com.example.demo.dto.NoteSemanticHit;
 import com.example.demo.entity.Note;
 import com.example.demo.service.note.NoteService;
 import jakarta.annotation.Resource;
@@ -55,6 +56,9 @@ public class NoteController {
     public ApiResponse<Note> updateNote(@PathVariable Long id, @RequestBody Note note) {
         note.setId(id);
         Note updated = noteService.updateNote(note);
+        if (updated == null) {
+            return ApiResponse.error("笔记不存在");
+        }
         return ApiResponse.success(updated);
     }
 
@@ -86,12 +90,12 @@ public class NoteController {
      * AI 总结笔记
      */
     @PostMapping("/{id}/summarize")
-    public ApiResponse<String> summarizeNote(@PathVariable Long id) {
-        String summary = noteService.summarizeNote(id);
-        if (summary == null) {
+    public ApiResponse<Note> summarizeNote(@PathVariable Long id) {
+        Note note = noteService.summarizeNote(id);
+        if (note == null) {
             return ApiResponse.error("笔记不存在或内容为空");
         }
-        return ApiResponse.success(summary);
+        return ApiResponse.success(note);
     }
 
     /**
@@ -101,5 +105,16 @@ public class NoteController {
     public ApiResponse<List<Note>> searchNotes(@RequestParam(required = false) String keyword) {
         List<Note> notes = noteService.searchNotes(keyword);
         return ApiResponse.success(notes);
+    }
+
+    @PostMapping("/reindex")
+    public ApiResponse<Integer> reindexNotes() {
+        return ApiResponse.success(noteService.reindexAllNotes());
+    }
+
+    @GetMapping("/semantic-search")
+    public ApiResponse<List<NoteSemanticHit>> semanticSearch(@RequestParam String query,
+                                                             @RequestParam(defaultValue = "5") int topK) {
+        return ApiResponse.success(noteService.semanticSearch(query, topK));
     }
 }

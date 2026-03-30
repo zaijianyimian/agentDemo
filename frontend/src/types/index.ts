@@ -147,6 +147,123 @@ export interface SystemSettings {
   [key: string]: any
 }
 
+export interface AutonomyFinding {
+  severity: string
+  title: string
+  detail: string
+  suggestion: string
+}
+
+export interface AutonomyScanReport {
+  scanTime: string
+  workspaceRoot: string
+  metrics: Record<string, any>
+  findings: AutonomyFinding[]
+  reportPath: string
+  summaryPath: string
+}
+
+export interface AutonomyVerificationStep {
+  name: string
+  success: boolean
+  exitCode: number
+  workingDirectory: string
+  output: string
+}
+
+export interface AutonomyVerificationResult {
+  verifyTime: string
+  success: boolean
+  steps: AutonomyVerificationStep[]
+}
+
+export interface AutonomyDraftResponse {
+  generateTime: string
+  target: string
+  draftPath: string
+  content: string
+  policyNote: string
+}
+
+export interface AutonomyArtifact {
+  type: string
+  name: string
+  path: string
+  time: string
+  preview: string
+}
+
+export interface AutonomyDiff {
+  latestScanTime?: string
+  previousScanTime?: string
+  newCount: number
+  resolvedCount: number
+  persistentCount: number
+  newFindings: AutonomyFinding[]
+  resolvedFindings: AutonomyFinding[]
+  persistentFindings: AutonomyFinding[]
+}
+
+export interface InboxItem {
+  category: string
+  title: string
+  summary: string
+  status: string
+  route: string
+  accent: string
+  time: string
+  meta?: Record<string, any>
+}
+
+export interface InboxSummary {
+  generatedAt: string
+  counts: Record<string, any>
+  items: InboxItem[]
+  warnings: string[]
+}
+
+export interface NoteSemanticHit {
+  noteId: number
+  title: string
+  contentSnippet: string
+  tags?: string
+  aiSummary?: string
+  score: number
+  updateTime?: string
+}
+
+export interface GeneratedReport {
+  period: string
+  generatedAt: string
+  path: string
+  content: string
+  metrics: Record<string, any>
+}
+
+export interface ReportArtifact {
+  period: string
+  name: string
+  path: string
+  time?: string
+  preview: string
+}
+
+export interface ChatActionResult {
+  target: string
+  message: string
+  entityId?: number
+  route?: string
+  payload?: Record<string, any>
+}
+
+export interface CommandPaletteItem {
+  id: string
+  label: string
+  description: string
+  type: 'route' | 'action'
+  route?: string
+}
+
 // API响应类型
 export interface ApiResponse<T> {
   success: boolean

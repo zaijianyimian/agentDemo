@@ -2,6 +2,7 @@ package com.example.demo.service.note;
 
 import com.example.demo.entity.Note;
 import com.example.demo.mapper.NoteMapper;
+import com.example.demo.dto.NoteSemanticHit;
 import dev.langchain4j.model.chat.ChatModel;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
@@ -31,6 +32,9 @@ public class NoteService {
 
     @Resource
     private ChatModel chatModel;
+
+    @Resource
+    private NoteVectorService noteVectorService;
 
     @PostConstruct
     public void init() {
@@ -92,6 +96,7 @@ public class NoteService {
 
         // 更新数据库中的文件路径
         noteMapper.updateById(note);
+        noteVectorService.syncNote(note);
         log.info("创建笔记: id={}, filePath={}", note.getId(), filePath);
         return note;
     }
@@ -101,11 +106,28 @@ public class NoteService {
      */
     @Transactional
     public Note updateNote(Note note) {
+        Note existing = noteMapper.selectById(note.getId());
+        if (existing == null) {
+            return null;
+        }
+
+        note.setFilePath(existing.getFilePath());
+        note.setCreateTime(existing.getCreateTime());
         note.setUpdateTime(LocalDateTime.now());
+        if (note.getTags() == null) {
+            note.setTags(existing.getTags());
+        }
+        if (note.getAiSummary() == null) {
+            note.setAiSummary(existing.getAiSummary());
+        }
+        if (note.getIsPinned() == null) {
+            note.setIsPinned(existing.getIsPinned());
+        }
         // 更新文件内容
         saveContentToFile(note);
         // 更新数据库（只更新元数据，不更新 content）
         noteMapper.updateById(note);
+        noteVectorService.syncNote(note);
         log.info("更新笔记: id={}", note.getId());
         return note;
     }
@@ -130,6 +152,9 @@ public class NoteService {
         }
         // 删除数据库记录
         int result = noteMapper.deleteById(id);
+        if (result > 0) {
+            noteVectorService.deleteNote(id);
+        }
         log.info("删除笔记: id={}, result={}", id, result > 0);
         return result > 0;
     }
@@ -153,7 +178,7 @@ public class NoteService {
     /**
      * AI 总结笔记
      */
-    public String summarizeNote(Long id) {
+    public Note summarizeNote(Long id) {
         Note note = noteMapper.selectById(id);
         if (note == null) {
             return null;
@@ -171,8 +196,9 @@ public class NoteService {
         note.setAiSummary(summary);
         note.setUpdateTime(LocalDateTime.now());
         noteMapper.updateById(note);
+        noteVectorService.syncNote(note);
 
-        return summary;
+        return note;
     }
 
     /**
@@ -189,6 +215,17 @@ public class NoteService {
                         || (n.getContent() != null && n.getContent().toLowerCase().contains(lowerKeyword))
                         || (n.getTags() != null && n.getTags().toLowerCase().contains(lowerKeyword)))
                 .toList();
+    }
+
+    public int reindexAllNotes() {
+        List<Note> notes = noteMapper.findAllOrderByPinnedAndTime();
+        notes.forEach(this::loadContentFromFile);
+        notes.forEach(noteVectorService::syncNote);
+        return notes.size();
+    }
+
+    public List<NoteSemanticHit> semanticSearch(String query, int topK) {
+        return noteVectorService.search(query, topK);
     }
 
     /**

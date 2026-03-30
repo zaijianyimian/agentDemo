@@ -71,6 +71,10 @@
                 </div>
 
                 <div class="header-right">
+                  <n-button quaternary class="command-btn" @click="openCommandPalette">
+                    <span>Ctrl</span>
+                    <span>K</span>
+                  </n-button>
                   <div class="header-chip">
                     <span class="header-chip__label">接口入口</span>
                     <strong>{{ menuOptions.length }}</strong>
@@ -102,6 +106,28 @@
               </n-layout-content>
             </n-layout>
           </n-layout>
+
+          <n-modal v-model:show="showCommandPalette" preset="card" title="全局命令面板" style="width: min(720px, 92vw)">
+            <div class="command-palette">
+              <n-input
+                v-model:value="commandQuery"
+                placeholder="输入页面名称或操作，例如：收件箱、日报、扫描"
+                clearable
+              />
+              <div class="command-list">
+                <button
+                  v-for="item in filteredCommands"
+                  :key="item.id"
+                  type="button"
+                  class="command-item"
+                  @click="executeCommand(item)"
+                >
+                  <strong>{{ item.label }}</strong>
+                  <span>{{ item.description }}</span>
+                </button>
+              </div>
+            </div>
+          </n-modal>
         </div>
       </n-dialog-provider>
     </n-message-provider>
@@ -109,24 +135,28 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref } from 'vue'
+import { computed, h, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NButton,
   NConfigProvider,
   NDialogProvider,
   NIcon,
+  NInput,
   NLayout,
   NLayoutContent,
   NLayoutHeader,
   NLayoutSider,
   NMenu,
+  NModal,
   NMessageProvider,
   NTooltip,
+  createDiscreteApi,
   darkTheme
 } from 'naive-ui'
 import {
   BookOutline as KnowledgeIcon,
+  FileTrayFullOutline as InboxIcon,
   CalendarOutline as CalendarIcon,
   ChatbubblesOutline as ChatIcon,
   CodeSlashOutline as CodeIcon,
@@ -142,16 +172,23 @@ import {
   SearchOutline as SearchIcon,
   SettingsOutline as SettingsIcon,
   SparklesOutline as SparklesIcon,
+  FlashOutline as AutonomyIcon,
+  ReaderOutline as ReportIcon,
   SunnyOutline as SunnyIcon,
   TimeOutline as TaskIcon,
   ConstructOutline as ToolIcon
 } from '@vicons/ionicons5'
 import { useThemeStore } from '@/stores/theme'
+import { autonomyService, chatHistoryService, reportService } from '@/services/api'
+import type { CommandPaletteItem } from '@/types'
 
 const router = useRouter()
 const route = useRoute()
 const themeStore = useThemeStore()
 const collapsed = ref(false)
+const showCommandPalette = ref(false)
+const commandQuery = ref('')
+const { message } = createDiscreteApi(['message'])
 
 const actualTheme = computed(() => {
   if (themeStore.mode === 'auto') {
@@ -269,6 +306,9 @@ const renderIcon = (icon: any) => () => h(NIcon, null, { default: () => h(icon) 
 
 const menuOptions = [
   { label: '仪表盘', key: 'Dashboard', icon: renderIcon(DashboardIcon) },
+  { label: '统一收件箱', key: 'Inbox', icon: renderIcon(InboxIcon) },
+  { label: '自治中心', key: 'Autonomy', icon: renderIcon(AutonomyIcon) },
+  { label: '日报周报', key: 'Reports', icon: renderIcon(ReportIcon) },
   { label: 'AI 聊天', key: 'Chat', icon: renderIcon(ChatIcon) },
   { label: '模型配置', key: 'Models', icon: renderIcon(ModelIcon) },
   { label: '知识库', key: 'Knowledge', icon: renderIcon(KnowledgeIcon) },
@@ -291,6 +331,101 @@ const handleMenuClick = (key: string) => {
 const toggleTheme = () => {
   themeStore.toggleTheme()
 }
+
+const commandItems = computed<CommandPaletteItem[]>(() => [
+  ...menuOptions.map(item => ({
+    id: `route-${item.key}`,
+    label: item.label as string,
+    description: '打开页面',
+    type: 'route' as const,
+    route: routePathByKey(item.key as string)
+  })),
+  { id: 'action-scan', label: '运行自治扫描', description: '立刻执行项目扫描', type: 'action' },
+  { id: 'action-daily', label: '生成日报', description: '生成一份今日报告并跳到报告页', type: 'action' },
+  { id: 'action-weekly', label: '生成周报', description: '生成最近七天的总结报告', type: 'action' },
+  { id: 'action-session', label: '新建聊天会话', description: '立即创建一个空白聊天会话', type: 'action' }
+])
+
+const filteredCommands = computed(() => {
+  const query = commandQuery.value.trim().toLowerCase()
+  if (!query) return commandItems.value
+  return commandItems.value.filter(item =>
+    item.label.toLowerCase().includes(query) || item.description.toLowerCase().includes(query)
+  )
+})
+
+const routePathByKey = (key: string) => {
+  const map: Record<string, string> = {
+    Dashboard: '/',
+    Inbox: '/inbox',
+    Autonomy: '/autonomy',
+    Reports: '/reports',
+    Chat: '/chat',
+    Models: '/models',
+    Knowledge: '/knowledge',
+    Tasks: '/tasks',
+    Files: '/files',
+    Schedule: '/schedule',
+    Email: '/email',
+    Search: '/search',
+    Tools: '/tools',
+    Skills: '/skills',
+    Notes: '/notes',
+    Snippets: '/snippets',
+    Settings: '/settings'
+  }
+  return map[key] || '/'
+}
+
+const openCommandPalette = () => {
+  showCommandPalette.value = true
+}
+
+const executeCommand = async (item: CommandPaletteItem) => {
+  showCommandPalette.value = false
+  commandQuery.value = ''
+  if (item.type === 'route' && item.route) {
+    await router.push(item.route)
+    return
+  }
+
+  try {
+    if (item.id === 'action-scan') {
+      await autonomyService.scan()
+      await router.push('/autonomy')
+      message.success('已触发自治扫描')
+    } else if (item.id === 'action-daily') {
+      await reportService.generate('daily')
+      await router.push('/reports')
+      message.success('日报已生成')
+    } else if (item.id === 'action-weekly') {
+      await reportService.generate('weekly')
+      await router.push('/reports')
+      message.success('周报已生成')
+    } else if (item.id === 'action-session') {
+      await chatHistoryService.createSession()
+      await router.push('/chat')
+      message.success('已创建新会话')
+    }
+  } catch (error) {
+    message.error('命令执行失败')
+  }
+}
+
+const handleGlobalKeydown = (event: KeyboardEvent) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    openCommandPalette()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+})
 </script>
 
 <style scoped>
@@ -481,6 +616,54 @@ const toggleTheme = () => {
 
 .header-right {
   gap: 12px;
+}
+
+.command-btn {
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+.command-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.command-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.command-item {
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 18px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.command-item:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary-color) 46%, white 18%);
+  box-shadow: var(--shadow-glow);
+}
+
+.command-item strong {
+  display: block;
+  color: var(--text-primary);
+}
+
+.command-item span {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .header-chip strong {

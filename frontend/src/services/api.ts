@@ -17,7 +17,17 @@ import type {
   KnowledgeDocument,
   AiModelConfig,
   ScheduledTask,
-  SystemSettings
+  SystemSettings,
+  AutonomyScanReport,
+  AutonomyVerificationResult,
+  AutonomyDraftResponse,
+  AutonomyArtifact,
+  AutonomyDiff,
+  InboxSummary,
+  NoteSemanticHit,
+  GeneratedReport,
+  ReportArtifact,
+  ChatActionResult
 } from '@/types'
 
 const api = axios.create({
@@ -634,6 +644,16 @@ export const noteService = {
   search: async (keyword: string): Promise<ApiResponse<Note[]>> => {
     const response = await api.get('/note/search', { params: { keyword } })
     return response.data
+  },
+
+  semanticSearch: async (query: string, topK = 5): Promise<ApiResponse<NoteSemanticHit[]>> => {
+    const response = await api.get('/note/semantic-search', { params: { query, topK } })
+    return response.data
+  },
+
+  reindex: async (): Promise<ApiResponse<number>> => {
+    const response = await api.post('/note/reindex')
+    return response.data
   }
 }
 
@@ -927,6 +947,89 @@ export const settingsService = {
     const response = await api.post('/file/upload/image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
+    return response.data
+  }
+}
+
+export const autonomyService = {
+  capabilities: async (): Promise<ApiResponse<Record<string, any>>> => {
+    const response = await api.get('/autonomy/capabilities')
+    return response.data
+  },
+
+  scan: async (): Promise<ApiResponse<AutonomyScanReport>> => {
+    const response = await api.post('/autonomy/scan')
+    return response.data
+  },
+
+  verify: async (backend = true, frontend = true): Promise<ApiResponse<AutonomyVerificationResult>> => {
+    const response = await api.post('/autonomy/verify', { backend, frontend })
+    return response.data
+  },
+
+  draft: async (target = 'general', includeVerification = true): Promise<ApiResponse<AutonomyDraftResponse>> => {
+    const response = await api.post('/autonomy/draft', { target, includeVerification })
+    return response.data
+  },
+
+  history: async (limit = 12): Promise<ApiResponse<AutonomyArtifact[]>> => {
+    const response = await api.get('/autonomy/history', { params: { limit } })
+    return response.data
+  },
+
+  readArtifact: async (path: string): Promise<ApiResponse<string>> => {
+    const response = await api.get('/autonomy/artifact', { params: { path } })
+    return response.data
+  },
+
+  diff: async (): Promise<ApiResponse<AutonomyDiff>> => {
+    const response = await api.get('/autonomy/diff')
+    return response.data
+  }
+}
+
+export const inboxService = {
+  summary: async (limit = 18): Promise<ApiResponse<InboxSummary>> => {
+    const response = await api.get('/inbox/summary', { params: { limit } })
+    return response.data
+  }
+}
+
+export const reportService = {
+  generate: async (period: 'daily' | 'weekly'): Promise<ApiResponse<GeneratedReport>> => {
+    const response = await api.post('/report/generate', null, { params: { period } })
+    return response.data
+  },
+
+  history: async (limit = 12): Promise<ApiResponse<ReportArtifact[]>> => {
+    const response = await api.get('/report/history', { params: { limit } })
+    return response.data
+  },
+
+  readArtifact: async (path: string): Promise<ApiResponse<string>> => {
+    const response = await api.get('/report/artifact', { params: { path } })
+    return response.data
+  }
+}
+
+export const chatActionService = {
+  createNote: async (payload: { sessionId?: number; content: string; role?: string; titleHint?: string }): Promise<ApiResponse<ChatActionResult>> => {
+    const response = await api.post('/chat/action/note', payload)
+    return response.data
+  },
+
+  createTask: async (payload: { sessionId?: number; content: string; role?: string; titleHint?: string }): Promise<ApiResponse<ChatActionResult>> => {
+    const response = await api.post('/chat/action/task', payload)
+    return response.data
+  },
+
+  createSchedule: async (payload: { sessionId?: number; content: string; role?: string; titleHint?: string }): Promise<ApiResponse<ChatActionResult>> => {
+    const response = await api.post('/chat/action/schedule', payload)
+    return response.data
+  },
+
+  storeMemory: async (payload: { sessionId?: number; content: string; role?: string; titleHint?: string }): Promise<ApiResponse<ChatActionResult>> => {
+    const response = await api.post('/chat/action/memory', payload)
     return response.data
   }
 }

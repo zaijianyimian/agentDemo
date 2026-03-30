@@ -1,0 +1,411 @@
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :resolveMainClassName UP-TO-DATE
+
+> Task :bootRun
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.5.12)
+
+2026-03-29T22:17:16.153+08:00 [34mINFO [0;39m [background-preinit] [36mo.h.validator.internal.util.Version[0;39m : HV000001: Hibernate Validator 8.0.3.Final
+2026-03-29T22:17:16.268+08:00 [34mINFO [0;39m [main] [36mcom.example.demo.DemoApplication[0;39m : Starting DemoApplication using Java 17.0.2 with PID 47472 (D:\javaproject\agentDemo\build\classes\java\main started by lenovo in D:\javaproject\agentDemo)
+2026-03-29T22:17:16.269+08:00 [39mDEBUG[0;39m [main] [36mcom.example.demo.DemoApplication[0;39m : Running with Spring Boot v3.5.12, Spring v6.2.17
+2026-03-29T22:17:16.271+08:00 [34mINFO [0;39m [main] [36mcom.example.demo.DemoApplication[0;39m : No active profile set, falling back to 1 default profile: "default"
+2026-03-29T22:17:20.667+08:00 [34mINFO [0;39m [main] [36mo.s.b.w.e.tomcat.TomcatWebServer[0;39m : Tomcat initialized with port 8013 (http)
+2026-03-29T22:17:20.710+08:00 [34mINFO [0;39m [main] [36mo.a.coyote.http11.Http11NioProtocol[0;39m : Initializing ProtocolHandler ["http-nio-8013"]
+2026-03-29T22:17:20.716+08:00 [34mINFO [0;39m [main] [36mo.a.catalina.core.StandardService[0;39m : Starting service [Tomcat]
+2026-03-29T22:17:20.720+08:00 [34mINFO [0;39m [main] [36mo.a.catalina.core.StandardEngine[0;39m : Starting Servlet engine: [Apache Tomcat/10.1.52]
+2026-03-29T22:17:20.911+08:00 [34mINFO [0;39m [main] [36mo.a.c.c.C.[Tomcat].[localhost].[/][0;39m : Initializing Spring embedded WebApplicationContext
+2026-03-29T22:17:20.912+08:00 [34mINFO [0;39m [main] [36mo.s.b.w.s.c.ServletWebServerApplicationContext[0;39m : Root WebApplicationContext: initialization completed in 4547 ms
+2026-03-29T22:17:21.134+08:00 [34mINFO [0;39m [main] [36mc.e.demo.config.AiConfiguration[0;39m : Qdrant configured at localhost:6334, collection: agent_memory
+2026-03-29T22:17:21.134+08:00 [34mINFO [0;39m [main] [36mc.e.demo.config.AiConfiguration[0;39m : Note: Ensure Qdrant collection 'agent_memory' exists before storing embeddings
+2026-03-29T22:17:21.368+08:00 [39mDEBUG[0;39m [main] [36mc.b.m.e.s.MybatisSqlSessionFactoryBean[0;39m : Registered plugin: 'MybatisPlusInterceptor{interceptors=[PaginationInnerInterceptor(logger=org.apache.ibatis.logging.slf4j.Slf4jImpl@74e497ae, overflow=false, maxLimit=null, dbType=MYSQL, dialect=null, optimizeJoin=true)]}'
+2026-03-29T22:17:21.371+08:00 [39mDEBUG[0;39m [main] [36mc.b.m.e.s.MybatisSqlSessionFactoryBean[0;39m : Property 'mapperLocations' was not specified.
+2026-03-29T22:17:22.528+08:00 [39mDEBUG[0;39m [main] [36mc.b.m.core.toolkit.Sequence[0;39m : Get /192.168.6.1 network interface 
+2026-03-29T22:17:22.587+08:00 [39mDEBUG[0;39m [main] [36mc.b.m.core.toolkit.Sequence[0;39m : Get network interface info: name:eth7 (VMware Virtual Ethernet Adapter for VMnet0)
+2026-03-29T22:17:22.892+08:00 [39mDEBUG[0;39m [main] [36mc.b.m.core.toolkit.Sequence[0;39m : Initialization Sequence datacenterId:0 workerId:28
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.5.10.1 
+2026-03-29T22:17:23.261+08:00 [34mINFO [0;39m [main] [36mc.e.demo.service.mcp.McpToolService[0;39m : 娉ㄥ唽宸ュ叿鎵ц鍣?: HTTP_API -> HttpApiToolExecutor
+2026-03-29T22:17:23.262+08:00 [34mINFO [0;39m [main] [36mc.e.demo.service.mcp.McpToolService[0;39m : 娉ㄥ唽宸ュ叿鎵ц鍣?: LOCAL_SCRIPT -> LocalScriptToolExecutor
+2026-03-29T22:17:23.262+08:00 [34mINFO [0;39m [main] [36mc.e.demo.service.mcp.McpToolService[0;39m : 娉ㄥ唽宸ュ叿鎵ц鍣?: MCP_CLIENT -> McpClientToolExecutor
+2026-03-29T22:17:23.470+08:00 [34mINFO [0;39m [main] [36mcom.zaxxer.hikari.HikariDataSource[0;39m : HikariPool-1 - Starting...
+2026-03-29T22:17:24.004+08:00 [34mINFO [0;39m [main] [36mcom.zaxxer.hikari.pool.HikariPool[0;39m : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@14df5253
+2026-03-29T22:17:24.010+08:00 [34mINFO [0;39m [main] [36mcom.zaxxer.hikari.HikariDataSource[0;39m : HikariPool-1 - Start completed.
+2026-03-29T22:17:24.024+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.McpToolMapper.selectList[0;39m : ==>  Preparing: SELECT id,name,display_name,description,tool_type,config,input_schema,enabled,remark,create_time,update_time FROM mcp_tool WHERE (enabled = ?)
+2026-03-29T22:17:24.089+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.McpToolMapper.selectList[0;39m : ==> Parameters: true(Boolean)
+2026-03-29T22:17:24.168+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.McpToolMapper.selectList[0;39m : <==      Total: 5
+2026-03-29T22:17:24.258+08:00 [34mINFO [0;39m [main] [36mc.e.demo.service.mcp.McpToolAdapter[0;39m : 宸ュ叿瑙勬牸缂撳瓨宸插埛鏂帮紝鍏? 5 涓伐鍏?
+2026-03-29T22:17:24.261+08:00 [34mINFO [0;39m [main] [36mc.e.d.c.QdrantCollectionInitializer[0;39m : Checking Qdrant collection: agent_memory at localhost:6334
+2026-03-29T22:17:24.533+08:00 [34mINFO [0;39m [main] [36mc.e.d.c.QdrantCollectionInitializer[0;39m : Collection not found, creating: agent_memory
+2026-03-29T22:17:24.753+08:00 [31mWARN [0;39m [main] [36mc.e.d.c.QdrantCollectionInitializer[0;39m : Qdrant 闆嗗悎鍒濆鍖栧け璐? Connection reset..
+2026-03-29T22:17:24.754+08:00 [31mWARN [0;39m [main] [36mc.e.d.c.QdrantCollectionInitializer[0;39m : 璇风‘淇漄drant鍦? localhost:6334 涓婃甯歌繍琛?
+2026-03-29T22:17:24.808+08:00 [34mINFO [0;39m [main] [36mc.e.demo.config.SkillInitializer[0;39m : 寮?濮嬪垵濮嬪寲棰勭疆鎶?鑳?...
+2026-03-29T22:17:24.823+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-29T22:17:24.824+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==> Parameters: web_search(String)
+2026-03-29T22:17:24.832+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : <==      Total: 1
+2026-03-29T22:17:24.833+08:00 [39mDEBUG[0;39m [main] [36mc.e.demo.config.SkillInitializer[0;39m : 鎶?鑳藉凡瀛樺湪: web_search
+2026-03-29T22:17:24.834+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-29T22:17:24.837+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==> Parameters: ai_chat(String)
+2026-03-29T22:17:24.840+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : <==      Total: 1
+2026-03-29T22:17:24.841+08:00 [39mDEBUG[0;39m [main] [36mc.e.demo.config.SkillInitializer[0;39m : 鎶?鑳藉凡瀛樺湪: ai_chat
+2026-03-29T22:17:24.842+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-29T22:17:24.843+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==> Parameters: weather_query(String)
+2026-03-29T22:17:24.846+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : <==      Total: 1
+2026-03-29T22:17:24.846+08:00 [39mDEBUG[0;39m [main] [36mc.e.demo.config.SkillInitializer[0;39m : 鎶?鑳藉凡瀛樺湪: weather_query
+2026-03-29T22:17:24.848+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-29T22:17:24.849+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==> Parameters: send_email(String)
+2026-03-29T22:17:24.854+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : <==      Total: 1
+2026-03-29T22:17:24.854+08:00 [39mDEBUG[0;39m [main] [36mc.e.demo.config.SkillInitializer[0;39m : 鎶?鑳藉凡瀛樺湪: send_email
+2026-03-29T22:17:24.856+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-29T22:17:24.857+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : ==> Parameters: file_operations(String)
+2026-03-29T22:17:24.860+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.mapper.SkillMapper.selectList[0;39m : <==      Total: 1
+2026-03-29T22:17:24.861+08:00 [39mDEBUG[0;39m [main] [36mc.e.demo.config.SkillInitializer[0;39m : 鎶?鑳藉凡瀛樺湪: file_operations
+2026-03-29T22:17:24.862+08:00 [34mINFO [0;39m [main] [36mc.e.demo.config.SkillInitializer[0;39m : 棰勭疆鎶?鑳藉垵濮嬪寲瀹屾垚锛屽垱寤? 0 涓妧鑳?
+2026-03-29T22:17:27.394+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.A.selectEnabled[0;39m : ==>  Preparing: SELECT * FROM ai_model_config WHERE enabled = 1
+2026-03-29T22:17:27.394+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.A.selectEnabled[0;39m : ==> Parameters: 
+2026-03-29T22:17:27.400+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.A.selectEnabled[0;39m : <==      Total: 1
+2026-03-29T22:17:27.432+08:00 [34mINFO [0;39m [main] [36mc.e.demo.service.ai.ModelManager[0;39m : Loaded model: TestModel (gpt-4)
+2026-03-29T22:17:27.432+08:00 [34mINFO [0;39m [main] [36mc.e.demo.service.ai.ModelManager[0;39m : Loaded 1 AI models
+2026-03-29T22:17:27.820+08:00 [34mINFO [0;39m [main] [36mc.e.d.s.email.EmailListenerService[0;39m : 鍒濆鍖栭偖浠剁洃鍚湇鍔?...
+2026-03-29T22:17:27.822+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.EmailConfigMapper.selectList[0;39m : ==>  Preparing: SELECT id,email,password,host,protocol,port,ssl_enabled,enabled,folder,poll_interval,remark,create_time,update_time FROM email_config WHERE (enabled = ?)
+2026-03-29T22:17:27.823+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.EmailConfigMapper.selectList[0;39m : ==> Parameters: true(Boolean)
+2026-03-29T22:17:27.831+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.EmailConfigMapper.selectList[0;39m : <==      Total: 0
+2026-03-29T22:17:27.831+08:00 [34mINFO [0;39m [main] [36mc.e.d.s.email.EmailListenerService[0;39m : 鎵惧埌 0 涓惎鐢ㄧ殑閭閰嶇疆
+2026-03-29T22:17:28.527+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-29T22:17:28.528+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==> Parameters: web_search(String)
+2026-03-29T22:17:28.531+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : <==      Total: 1
+2026-03-29T22:17:28.534+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.s.skill.SkillLoaderService[0;39m : 鎶?鑳藉凡瀛樺湪: web_search
+2026-03-29T22:17:28.534+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-29T22:17:28.534+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==> Parameters: ai_chat(String)
+2026-03-29T22:17:28.537+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : <==      Total: 1
+2026-03-29T22:17:28.539+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.s.skill.SkillLoaderService[0;39m : 鎶?鑳藉凡瀛樺湪: ai_chat
+2026-03-29T22:17:28.539+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-29T22:17:28.539+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==> Parameters: weather_query(String)
+2026-03-29T22:17:28.542+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : <==      Total: 1
+2026-03-29T22:17:28.543+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.s.skill.SkillLoaderService[0;39m : 鎶?鑳藉凡瀛樺湪: weather_query
+2026-03-29T22:17:28.543+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-29T22:17:28.544+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==> Parameters: send_email(String)
+2026-03-29T22:17:28.546+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : <==      Total: 1
+2026-03-29T22:17:28.547+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.s.skill.SkillLoaderService[0;39m : 鎶?鑳藉凡瀛樺湪: send_email
+2026-03-29T22:17:28.547+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-29T22:17:28.548+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : ==> Parameters: file_operations(String)
+2026-03-29T22:17:28.551+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.SkillMapper.selectByCode[0;39m : <==      Total: 1
+2026-03-29T22:17:28.552+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.s.skill.SkillLoaderService[0;39m : 鎶?鑳藉凡瀛樺湪: file_operations
+2026-03-29T22:17:28.552+08:00 [34mINFO [0;39m [main] [36mc.e.d.s.skill.SkillLoaderService[0;39m : 鎴愬姛鍔犺浇 0 涓妧鑳?
+2026-03-29T22:17:28.623+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.S.selectEnabled[0;39m : ==>  Preparing: SELECT * FROM scheduled_task WHERE enabled = 1
+2026-03-29T22:17:28.623+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.S.selectEnabled[0;39m : ==> Parameters: 
+2026-03-29T22:17:28.630+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.m.S.selectEnabled[0;39m : <==      Total: 2
+2026-03-29T22:17:28.644+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.s.task.ScheduledTaskService[0;39m : 宸茶皟搴︿换鍔?: test (0 0 9 * * ?)
+2026-03-29T22:17:28.644+08:00 [39mDEBUG[0;39m [main] [36mc.e.d.s.task.ScheduledTaskService[0;39m : 宸茶皟搴︿换鍔?: TestTask (0 0 12 * * ?)
+2026-03-29T22:17:28.644+08:00 [34mINFO [0;39m [main] [36mc.e.d.s.task.ScheduledTaskService[0;39m : 宸插姞杞? 2 涓畾鏃朵换鍔?
+2026-03-29T22:17:28.651+08:00 [34mINFO [0;39m [main] [36mc.e.d.s.email.EmailProcessingService[0;39m : EmailProcessingService 宸叉敞鍐屽埌閭欢鐩戝惉鏈嶅姟
+2026-03-29T22:17:28.653+08:00 [31mWARN [0;39m [main] [36mc.e.d.s.email.EmailSenderService[0;39m : SMTP瀵嗙爜鏈缃紝閭欢鍙戦?佸姛鑳藉皢涓嶅彲鐢ㄣ?傝鍦╝pplication.yaml涓厤缃產pp.mail.smtp-password
+2026-03-29T22:17:28.654+08:00 [34mINFO [0;39m [main] [36mc.e.d.s.s.ScheduleSummaryService[0;39m : 鏃ョ▼姹囨?绘湇鍔″凡鍚姩
+2026-03-29T22:17:28.654+08:00 [34mINFO [0;39m [main] [36mc.e.d.s.s.ScheduleSummaryService[0;39m : 姣忔棩姹囨?绘椂闂?: 0 0 20 * * ?
+2026-03-29T22:17:28.655+08:00 [34mINFO [0;39m [main] [36mc.e.d.s.s.ScheduleSummaryService[0;39m : 鏃╀笂鎻愰啋鏃堕棿: 0 0 8 * * ?
+2026-03-29T22:17:29.141+08:00 [39mDEBUG[0;39m [main] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : 195 mappings in 'requestMappingHandlerMapping'
+2026-03-29T22:17:29.220+08:00 [39mDEBUG[0;39m [main] [36mo.s.w.s.h.SimpleUrlHandlerMapping[0;39m : Patterns [/webjars/**, /**] in 'resourceHandlerMapping'
+2026-03-29T22:17:29.264+08:00 [39mDEBUG[0;39m [main] [36mo.s.w.s.m.m.a.RequestMappingHandlerAdapter[0;39m : ControllerAdvice beans: 0 @ModelAttribute, 0 @InitBinder, 1 RequestBodyAdvice, 1 ResponseBodyAdvice
+2026-03-29T22:17:29.362+08:00 [39mDEBUG[0;39m [main] [36mo.s.w.s.m.m.a.ExceptionHandlerExceptionResolver[0;39m : ControllerAdvice beans: 1 @ExceptionHandler, 1 ResponseBodyAdvice
+2026-03-29T22:17:29.706+08:00 [34mINFO [0;39m [main] [36mo.a.coyote.http11.Http11NioProtocol[0;39m : Starting ProtocolHandler ["http-nio-8013"]
+2026-03-29T22:17:29.739+08:00 [34mINFO [0;39m [main] [36mo.s.b.w.e.tomcat.TomcatWebServer[0;39m : Tomcat started on port 8013 (http) with context path '/'
+2026-03-29T22:17:29.765+08:00 [34mINFO [0;39m [main] [36mcom.example.demo.DemoApplication[0;39m : Started DemoApplication in 14.95 seconds (process running for 16.306)
+2026-03-29T22:17:30.276+08:00 [34mINFO [0;39m [http-nio-8013-exec-3] [36mo.a.c.c.C.[Tomcat].[localhost].[/][0;39m : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-03-29T22:17:30.276+08:00 [34mINFO [0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Initializing Servlet 'dispatcherServlet'
+2026-03-29T22:17:30.276+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Detected StandardServletMultipartResolver
+2026-03-29T22:17:30.276+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Detected AcceptHeaderLocaleResolver
+2026-03-29T22:17:30.276+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Detected FixedThemeResolver
+2026-03-29T22:17:30.278+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Detected org.springframework.web.servlet.view.DefaultRequestToViewNameTranslator@1d57b8f1
+2026-03-29T22:17:30.278+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Detected org.springframework.web.servlet.support.SessionFlashMapManager@dddcd91
+2026-03-29T22:17:30.278+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : enableLoggingRequestDetails='false': request parameters and headers will be masked to prevent unsafe logging of potentially sensitive data
+2026-03-29T22:17:30.279+08:00 [34mINFO [0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed initialization in 2 ms
+2026-03-29T22:17:30.298+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/autonomy/capabilities", parameters={}
+2026-03-29T22:17:30.316+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.AutonomyController#getCapabilities()
+2026-03-29T22:17:30.382+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:17:30.390+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data={enabled=true, workspaceRoot=D:\javaproject\agentDem (truncated)...]
+2026-03-29T22:17:30.416+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:18:18.909+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/autonomy/capabilities", parameters={}
+2026-03-29T22:18:18.909+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.AutonomyController#getCapabilities()
+2026-03-29T22:18:18.911+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:18:18.911+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data={enabled=true, workspaceRoot=D:\javaproject\agentDem (truncated)...]
+2026-03-29T22:18:18.912+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:18:19.007+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/autonomy/scan", parameters={}
+2026-03-29T22:18:19.007+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.AutonomyController#scanProject()
+2026-03-29T22:18:39.152+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:18:39.158+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=AutonomyScanReport(scanTime=2026-03-29T22:18:19.0089 (truncated)...]
+2026-03-29T22:18:39.162+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:18:40.187+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/autonomy/scan", parameters={}
+2026-03-29T22:18:40.188+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.AutonomyController#scanProject()
+2026-03-29T22:19:00.233+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:00.234+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=AutonomyScanReport(scanTime=2026-03-29T22:18:40.1905 (truncated)...]
+2026-03-29T22:19:00.235+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:00.245+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/autonomy/diff", parameters={}
+2026-03-29T22:19:00.246+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.AutonomyController#diff()
+2026-03-29T22:19:00.283+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:00.293+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=AutonomyDiff(latestScanTime=null, previousScanTime=n (truncated)...]
+2026-03-29T22:19:00.320+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:00.327+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/inbox/summary", parameters={}
+2026-03-29T22:19:00.328+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.InboxController#summary(int)
+2026-03-29T22:19:00.378+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event ORDER BY event_time DESC
+2026-03-29T22:19:00.381+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 
+2026-03-29T22:19:00.396+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 11
+2026-03-29T22:19:00.400+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,name,description,task_type,cron_expression,params,skill_code,last_execute_time,last_execute_result,next_execute_time,execute_count,success_count,fail_count,enabled,create_time,update_time FROM scheduled_task ORDER BY update_time DESC
+2026-03-29T22:19:00.402+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 
+2026-03-29T22:19:00.408+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 3
+2026-03-29T22:19:00.410+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : ==>  Preparing: SELECT * FROM note ORDER BY is_pinned DESC, update_time DESC
+2026-03-29T22:19:00.411+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : ==> Parameters: 
+2026-03-29T22:19:00.415+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : <==      Total: 2
+2026-03-29T22:19:00.418+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectRecent[0;39m : ==>  Preparing: SELECT * FROM search_history ORDER BY create_time DESC LIMIT ?
+2026-03-29T22:19:00.419+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectRecent[0;39m : ==> Parameters: 18(Integer)
+2026-03-29T22:19:00.427+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectRecent[0;39m : <==      Total: 7
+2026-03-29T22:19:00.428+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.EmailConfigMapper.selectList[0;39m : ==>  Preparing: SELECT id,email,password,host,protocol,port,ssl_enabled,enabled,folder,poll_interval,remark,create_time,update_time FROM email_config
+2026-03-29T22:19:00.429+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.EmailConfigMapper.selectList[0;39m : ==> Parameters: 
+2026-03-29T22:19:00.429+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.EmailConfigMapper.selectList[0;39m : <==      Total: 0
+2026-03-29T22:19:00.457+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:00.467+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=InboxSummary(generatedAt=2026-03-29T22:19:00.4572339 (truncated)...]
+2026-03-29T22:19:00.477+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:00.487+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/report/generate?period=daily", parameters={masked}
+2026-03-29T22:19:00.487+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ReportController#generate(String)
+2026-03-29T22:19:00.492+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event WHERE (event_date >= ? AND event_date <= ?) ORDER BY event_time ASC
+2026-03-29T22:19:00.493+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 2026-03-29(LocalDate), 2026-03-29(LocalDate)
+2026-03-29T22:19:00.502+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 0
+2026-03-29T22:19:00.504+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,name,description,task_type,cron_expression,params,skill_code,last_execute_time,last_execute_result,next_execute_time,execute_count,success_count,fail_count,enabled,create_time,update_time FROM scheduled_task WHERE (update_time >= ?) ORDER BY update_time DESC
+2026-03-29T22:19:00.504+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 2026-03-29T00:00(LocalDateTime)
+2026-03-29T22:19:00.509+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 1
+2026-03-29T22:19:00.509+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : ==>  Preparing: SELECT * FROM note ORDER BY is_pinned DESC, update_time DESC
+2026-03-29T22:19:00.510+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : ==> Parameters: 
+2026-03-29T22:19:00.511+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : <==      Total: 2
+2026-03-29T22:19:00.512+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectRecent[0;39m : ==>  Preparing: SELECT * FROM search_history ORDER BY create_time DESC LIMIT ?
+2026-03-29T22:19:00.512+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectRecent[0;39m : ==> Parameters: 6(Integer)
+2026-03-29T22:19:00.515+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectRecent[0;39m : <==      Total: 6
+2026-03-29T22:19:00.516+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.C.findAllOrderByLastMessageTime[0;39m : ==>  Preparing: SELECT * FROM chat_session ORDER BY last_message_time DESC, create_time DESC
+2026-03-29T22:19:00.516+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.C.findAllOrderByLastMessageTime[0;39m : ==> Parameters: 
+2026-03-29T22:19:00.519+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.C.findAllOrderByLastMessageTime[0;39m : <==      Total: 8
+2026-03-29T22:19:00.535+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:00.535+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=GeneratedReport(period=daily, generatedAt=2026-03-29 (truncated)...]
+2026-03-29T22:19:00.537+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:00.546+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/report/generate?period=weekly", parameters={masked}
+2026-03-29T22:19:00.546+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ReportController#generate(String)
+2026-03-29T22:19:00.547+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event WHERE (event_date >= ? AND event_date <= ?) ORDER BY event_time ASC
+2026-03-29T22:19:00.548+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 2026-03-23(LocalDate), 2026-03-29(LocalDate)
+2026-03-29T22:19:00.550+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 1
+2026-03-29T22:19:00.552+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,name,description,task_type,cron_expression,params,skill_code,last_execute_time,last_execute_result,next_execute_time,execute_count,success_count,fail_count,enabled,create_time,update_time FROM scheduled_task WHERE (update_time >= ?) ORDER BY update_time DESC
+2026-03-29T22:19:00.552+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 2026-03-23T00:00(LocalDateTime)
+2026-03-29T22:19:00.555+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 1
+2026-03-29T22:19:00.556+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : ==>  Preparing: SELECT * FROM note ORDER BY is_pinned DESC, update_time DESC
+2026-03-29T22:19:00.556+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : ==> Parameters: 
+2026-03-29T22:19:00.558+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : <==      Total: 2
+2026-03-29T22:19:00.559+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.S.selectRecent[0;39m : ==>  Preparing: SELECT * FROM search_history ORDER BY create_time DESC LIMIT ?
+2026-03-29T22:19:00.559+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.S.selectRecent[0;39m : ==> Parameters: 12(Integer)
+2026-03-29T22:19:00.562+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.S.selectRecent[0;39m : <==      Total: 7
+2026-03-29T22:19:00.563+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.C.findAllOrderByLastMessageTime[0;39m : ==>  Preparing: SELECT * FROM chat_session ORDER BY last_message_time DESC, create_time DESC
+2026-03-29T22:19:00.564+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.C.findAllOrderByLastMessageTime[0;39m : ==> Parameters: 
+2026-03-29T22:19:00.568+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.m.C.findAllOrderByLastMessageTime[0;39m : <==      Total: 8
+2026-03-29T22:19:00.575+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:00.575+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=GeneratedReport(period=weekly, generatedAt=2026-03-2 (truncated)...]
+2026-03-29T22:19:00.576+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:00.584+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/report/history?limit=5", parameters={masked}
+2026-03-29T22:19:00.585+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ReportController#history(int)
+2026-03-29T22:19:00.592+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:00.592+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=[ReportArtifact(period=weekly, name=weekly-report-20 (truncated)...]
+2026-03-29T22:19:00.595+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:00.621+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/chat/action/note", parameters={}
+2026-03-29T22:19:00.622+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ChatActionController#createNote(ChatActionRequest)
+2026-03-29T22:19:00.652+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Read "application/json;charset=UTF-8" to [ChatActionRequest[sessionId=99123, content=2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?, role=assistant, tit (truncated)...]
+2026-03-29T22:19:00.692+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.demo.mapper.NoteMapper.insert[0;39m : ==>  Preparing: INSERT INTO note ( title, tags, is_pinned, create_time, update_time ) VALUES ( ?, ?, ?, ?, ? )
+2026-03-29T22:19:00.694+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.demo.mapper.NoteMapper.insert[0;39m : ==> Parameters: 娴嬭瘯浼氳瘽(String), chat,quick-capture(String), false(Boolean), 2026-03-29T22:19:00.682837700(LocalDateTime), 2026-03-29T22:19:00.682837700(LocalDateTime)
+2026-03-29T22:19:00.715+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.demo.mapper.NoteMapper.insert[0;39m : <==    Updates: 1
+2026-03-29T22:19:00.721+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.demo.service.note.NoteService[0;39m : 淇濆瓨绗旇鏂囦欢: filePath=data/notes/7.md, size=78 bytes
+2026-03-29T22:19:00.728+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.mapper.NoteMapper.updateById[0;39m : ==>  Preparing: UPDATE note SET title=?, file_path=?, tags=?, is_pinned=?, create_time=?, update_time=? WHERE id=?
+2026-03-29T22:19:00.728+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.mapper.NoteMapper.updateById[0;39m : ==> Parameters: 娴嬭瘯浼氳瘽(String), data/notes/7.md(String), chat,quick-capture(String), false(Boolean), 2026-03-29T22:19:00.682837700(LocalDateTime), 2026-03-29T22:19:00.682837700(LocalDateTime), 7(Long)
+2026-03-29T22:19:00.734+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.mapper.NoteMapper.updateById[0;39m : <==    Updates: 1
+2026-03-29T22:19:00.834+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.client.DefaultRestClient[0;39m : Writing [{
+  "model" : "nomic-embed-text:latest",
+  "input" : [ "娴嬭瘯浼氳瘽\nchat,quick-capture\n# 娴嬭瘯浼氳瘽\n\n> 鏉ユ簮浼氳瘽: 99123\n> 鏉ユ簮瑙掕壊: assistant\n\n2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?" ]
+}] as "application/json" with org.springframework.http.converter.StringHttpMessageConverter
+2026-03-29T22:19:04.671+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.client.DefaultRestClient[0;39m : Reading to [java.lang.String] as "application/json;charset=utf-8"
+2026-03-29T22:19:04.921+08:00 [34mINFO [0;39m [http-nio-8013-exec-10] [36mc.e.demo.service.note.NoteService[0;39m : 鍒涘缓绗旇: id=7, filePath=data/notes/7.md
+2026-03-29T22:19:04.942+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:04.942+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=ChatActionResult(target=note, message=宸蹭粠鑱婂ぉ鍐呭鐢熸垚绗旇, en (truncated)...]
+2026-03-29T22:19:04.946+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:04.954+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/chat/action/task", parameters={}
+2026-03-29T22:19:04.954+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ChatActionController#createTask(ChatActionRequest)
+2026-03-29T22:19:04.955+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Read "application/json;charset=UTF-8" to [ChatActionRequest[sessionId=99123, content=2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?, role=assistant, tit (truncated)...]
+2026-03-29T22:19:04.962+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.ScheduledTaskMapper.insert[0;39m : ==>  Preparing: INSERT INTO scheduled_task ( name, description, task_type, cron_expression, params, execute_count, success_count, fail_count, enabled, create_time, update_time ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
+2026-03-29T22:19:04.964+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.ScheduledTaskMapper.insert[0;39m : ==> Parameters: 娴嬭瘯浼氳瘽(String), 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?(String), REMINDER(String), 0 0 9 * * ?(String), 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?(String), 0(Integer), 0(Integer), 0(Integer), false(Boolean), 2026-03-29T22:19:04.956613(LocalDateTime), 2026-03-29T22:19:04.956613(LocalDateTime)
+2026-03-29T22:19:04.969+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.ScheduledTaskMapper.insert[0;39m : <==    Updates: 1
+2026-03-29T22:19:04.970+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:04.971+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=ChatActionResult(target=task, message=宸茬敓鎴愬緟鍚敤鐨勬彁閱掍换鍔?, e (truncated)...]
+2026-03-29T22:19:04.972+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:04.979+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/chat/action/schedule", parameters={}
+2026-03-29T22:19:04.980+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ChatActionController#createSchedule(ChatActionRequest)
+2026-03-29T22:19:04.980+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Read "application/json;charset=UTF-8" to [ChatActionRequest[sessionId=99123, content=2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?, role=assistant, tit (truncated)...]
+2026-03-29T22:19:04.984+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.ScheduleEventMapper.insert[0;39m : ==>  Preparing: INSERT INTO schedule_event ( title, description, event_time, event_date, reminder_status, summary_status, reminder_enabled, status, create_time, update_time ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
+2026-03-29T22:19:04.987+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.ScheduleEventMapper.insert[0;39m : ==> Parameters: 娴嬭瘯浼氳瘽(String), 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?(String), 2026-04-02T15:30(LocalDateTime), 2026-04-02(LocalDate), pending(String), pending(String), true(Boolean), pending(String), 2026-03-29T22:19:04.982026400(LocalDateTime), 2026-03-29T22:19:04.982026400(LocalDateTime)
+2026-03-29T22:19:04.992+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.ScheduleEventMapper.insert[0;39m : <==    Updates: 1
+2026-03-29T22:19:04.994+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event WHERE (event_date = ?)
+2026-03-29T22:19:04.994+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 2026-04-02(LocalDate)
+2026-03-29T22:19:04.997+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 1
+2026-03-29T22:19:04.999+08:00 [34mINFO [0;39m [http-nio-8013-exec-2] [36mc.e.d.s.schedule.ScheduleFileService[0;39m : 鏃ョ▼鏂囦欢宸茬敓鎴?: .\data\schedules\schedule-2026-04-02.md
+2026-03-29T22:19:05.004+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.updateById[0;39m : ==>  Preparing: UPDATE schedule_event SET title=?, description=?, event_time=?, event_date=?, reminder_status=?, summary_status=?, reminder_enabled=?, status=?, file_path=?, create_time=?, update_time=? WHERE id=?
+2026-03-29T22:19:05.005+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.updateById[0;39m : ==> Parameters: 娴嬭瘯浼氳瘽(String), 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?(String), 2026-04-02T15:30(LocalDateTime), 2026-04-02(LocalDate), pending(String), pending(String), true(Boolean), pending(String), .\data\schedules\schedule-2026-04-02.md(String), 2026-03-29T22:19:04.982026400(LocalDateTime), 2026-03-29T22:19:04.982026400(LocalDateTime), 14(Long)
+2026-03-29T22:19:05.011+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.m.S.updateById[0;39m : <==    Updates: 1
+2026-03-29T22:19:05.011+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:05.012+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=ChatActionResult(target=schedule, message=宸蹭粠鑱婂ぉ鍐呭鐢熸垚鏃ョ▼ (truncated)...]
+2026-03-29T22:19:05.012+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:05.020+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/chat/action/memory", parameters={}
+2026-03-29T22:19:05.021+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ChatActionController#storeMemory(ChatActionRequest)
+2026-03-29T22:19:05.022+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Read "application/json;charset=UTF-8" to [ChatActionRequest[sessionId=99123, content=2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?, role=assistant, tit (truncated)...]
+2026-03-29T22:19:05.024+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:05.024+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=ChatActionResult(target=memory, message=宸叉彁鍙栧苟鍐欏叆闀挎湡璁板繂,  (truncated)...]
+2026-03-29T22:19:05.025+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:05.040+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : PUT "/api/note/7/pin", parameters={}
+2026-03-29T22:19:05.041+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.NoteController#togglePin(Long)
+2026-03-29T22:19:05.044+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==>  Preparing: SELECT id,title,file_path,tags,ai_summary,is_pinned,create_time,update_time FROM note WHERE id=?
+2026-03-29T22:19:05.045+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==> Parameters: 7(Long)
+2026-03-29T22:19:05.047+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : <==      Total: 1
+2026-03-29T22:19:05.049+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mc.e.d.mapper.NoteMapper.updateById[0;39m : ==>  Preparing: UPDATE note SET title=?, file_path=?, tags=?, is_pinned=?, create_time=?, update_time=? WHERE id=?
+2026-03-29T22:19:05.049+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mc.e.d.mapper.NoteMapper.updateById[0;39m : ==> Parameters: 娴嬭瘯浼氳瘽(String), data/notes/7.md(String), chat,quick-capture(String), true(Boolean), 2026-03-29T22:19:01(LocalDateTime), 2026-03-29T22:19:05.047980900(LocalDateTime), 7(Long)
+2026-03-29T22:19:05.052+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mc.e.d.mapper.NoteMapper.updateById[0;39m : <==    Updates: 1
+2026-03-29T22:19:05.060+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:05.065+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=Note(id=7, title=娴嬭瘯浼氳瘽, content=# 娴嬭瘯浼氳瘽<EOL><EOL>> 鏉ユ簮浼氳瘽: 99123 (truncated)...]
+2026-03-29T22:19:05.068+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:05.075+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/task/6/execute", parameters={masked}
+2026-03-29T22:19:05.076+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.TaskController#execute(Long)
+2026-03-29T22:19:05.076+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.selectById[0;39m : ==>  Preparing: SELECT id,name,description,task_type,cron_expression,params,skill_code,last_execute_time,last_execute_result,next_execute_time,execute_count,success_count,fail_count,enabled,create_time,update_time FROM scheduled_task WHERE id=?
+2026-03-29T22:19:05.077+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.selectById[0;39m : ==> Parameters: 6(Long)
+2026-03-29T22:19:05.078+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.selectById[0;39m : <==      Total: 1
+2026-03-29T22:19:05.078+08:00 [34mINFO [0;39m [http-nio-8013-exec-10] [36mc.e.d.s.task.ScheduledTaskService[0;39m : 鎵ц瀹氭椂浠诲姟: 娴嬭瘯浼氳瘽 (REMINDER)
+2026-03-29T22:19:05.079+08:00 [34mINFO [0;39m [http-nio-8013-exec-10] [36mc.e.d.s.task.ScheduledTaskService[0;39m : 鎻愰啋浠诲姟: 娴嬭瘯浼氳瘽 - 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?
+2026-03-29T22:19:05.085+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.updateById[0;39m : ==>  Preparing: UPDATE scheduled_task SET name=?, description=?, task_type=?, cron_expression=?, params=?, last_execute_time=?, last_execute_result=?, next_execute_time=?, execute_count=?, success_count=?, fail_count=?, enabled=?, create_time=?, update_time=? WHERE id=?
+2026-03-29T22:19:05.086+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.updateById[0;39m : ==> Parameters: 娴嬭瘯浼氳瘽(String), 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?(String), REMINDER(String), 0 0 9 * * ?(String), 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?(String), 2026-03-29T22:19:05.079153500(LocalDateTime), 鎻愰啋宸茶Е鍙?: 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?(String), 2026-03-30T09:00(LocalDateTime), 1(Integer), 1(Integer), 0(Integer), false(Boolean), 2026-03-29T22:19:05(LocalDateTime), 2026-03-29T22:19:05(LocalDateTime), 6(Long)
+2026-03-29T22:19:05.090+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.updateById[0;39m : <==    Updates: 1
+2026-03-29T22:19:05.090+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:05.090+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=鎻愰啋宸茶Е鍙?: 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?, total=n (truncated)...]
+2026-03-29T22:19:05.092+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:05.101+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : PUT "/api/schedule/14/complete", parameters={}
+2026-03-29T22:19:05.101+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ScheduleController#markComplete(Long)
+2026-03-29T22:19:05.102+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectById[0;39m : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event WHERE id=?
+2026-03-29T22:19:05.102+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectById[0;39m : ==> Parameters: 14(Long)
+2026-03-29T22:19:05.104+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectById[0;39m : <==      Total: 1
+2026-03-29T22:19:05.105+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.updateById[0;39m : ==>  Preparing: UPDATE schedule_event SET title=?, description=?, event_time=?, event_date=?, reminder_status=?, summary_status=?, reminder_enabled=?, status=?, file_path=?, create_time=?, update_time=? WHERE id=?
+2026-03-29T22:19:05.106+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.updateById[0;39m : ==> Parameters: 娴嬭瘯浼氳瘽(String), 2026-04-02 15:30 椤圭洰澶嶇洏浼氳锛屾暣鐞嗘湰鍛ㄩ噸鐐瑰苟瀹夋帓璺熻繘銆?(String), 2026-04-02T15:30(LocalDateTime), 2026-04-02(LocalDate), pending(String), pending(String), true(Boolean), completed(String), .\data\schedules\schedule-2026-04-02.md(String), 2026-03-29T22:19:05(LocalDateTime), 2026-03-29T22:19:05.104933200(LocalDateTime), 14(Long)
+2026-03-29T22:19:05.109+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.updateById[0;39m : <==    Updates: 1
+2026-03-29T22:19:05.111+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event WHERE (event_date = ?)
+2026-03-29T22:19:05.112+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 2026-04-02(LocalDate)
+2026-03-29T22:19:05.114+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 1
+2026-03-29T22:19:05.116+08:00 [34mINFO [0;39m [http-nio-8013-exec-3] [36mc.e.d.s.schedule.ScheduleFileService[0;39m : 鏃ョ▼鏂囦欢宸茬敓鎴?: .\data\schedules\schedule-2026-04-02.md
+2026-03-29T22:19:05.122+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.HttpEntityMethodProcessor[0;39m : Using 'application/json;charset=UTF-8', given [application/json] and supported [text/plain, text/html, application/json, text/plain;charset=UTF-8, application/json;charset=UTF-8, */*, application/*+json, application/yaml]
+2026-03-29T22:19:05.122+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.HttpEntityMethodProcessor[0;39m : Writing ["宸叉爣璁板畬鎴?"]
+2026-03-29T22:19:05.124+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:05.149+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/note/semantic-search?query=%E5%A4%8D%E7%9B%98%E4%BC%9A%E8%AE%AE&topK=3", parameters={masked}
+2026-03-29T22:19:05.149+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.NoteController#semanticSearch(String, int)
+2026-03-29T22:19:05.151+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.client.DefaultRestClient[0;39m : Writing [{
+  "model" : "nomic-embed-text:latest",
+  "input" : [ "澶嶇洏浼氳" ]
+}] as "application/json" with org.springframework.http.converter.StringHttpMessageConverter
+2026-03-29T22:19:05.231+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.client.DefaultRestClient[0;39m : Reading to [java.lang.String] as "application/json;charset=utf-8"
+2026-03-29T22:19:05.305+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==>  Preparing: SELECT id,title,file_path,tags,ai_summary,is_pinned,create_time,update_time FROM note WHERE id=?
+2026-03-29T22:19:05.305+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==> Parameters: 2(Long)
+2026-03-29T22:19:05.306+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : <==      Total: 1
+2026-03-29T22:19:05.309+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==>  Preparing: SELECT id,title,file_path,tags,ai_summary,is_pinned,create_time,update_time FROM note WHERE id=?
+2026-03-29T22:19:05.309+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==> Parameters: 7(Long)
+2026-03-29T22:19:05.311+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : <==      Total: 1
+2026-03-29T22:19:05.312+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==>  Preparing: SELECT id,title,file_path,tags,ai_summary,is_pinned,create_time,update_time FROM note WHERE id=?
+2026-03-29T22:19:05.312+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==> Parameters: 3(Long)
+2026-03-29T22:19:05.313+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : <==      Total: 1
+2026-03-29T22:19:05.314+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:05.314+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=[NoteSemanticHit(noteId=2, title=UpdatedNote, conten (truncated)...]
+2026-03-29T22:19:05.318+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:05.327+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : DELETE "/api/note/7", parameters={}
+2026-03-29T22:19:05.327+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.NoteController#deleteNote(Long)
+2026-03-29T22:19:05.328+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==>  Preparing: SELECT id,title,file_path,tags,ai_summary,is_pinned,create_time,update_time FROM note WHERE id=?
+2026-03-29T22:19:05.329+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : ==> Parameters: 7(Long)
+2026-03-29T22:19:05.330+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.mapper.NoteMapper.selectById[0;39m : <==      Total: 1
+2026-03-29T22:19:05.331+08:00 [34mINFO [0;39m [http-nio-8013-exec-5] [36mc.e.demo.service.note.NoteService[0;39m : 鍒犻櫎绗旇鏂囦欢: data/notes/7.md
+2026-03-29T22:19:05.333+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.mapper.NoteMapper.deleteById[0;39m : ==>  Preparing: DELETE FROM note WHERE id=?
+2026-03-29T22:19:05.334+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.mapper.NoteMapper.deleteById[0;39m : ==> Parameters: 7(Long)
+2026-03-29T22:19:05.337+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mc.e.d.mapper.NoteMapper.deleteById[0;39m : <==    Updates: 1
+2026-03-29T22:19:05.393+08:00 [34mINFO [0;39m [http-nio-8013-exec-5] [36mc.e.demo.service.note.NoteService[0;39m : 鍒犻櫎绗旇: id=7, result=true
+2026-03-29T22:19:05.397+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:05.397+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=null, total=null)]
+2026-03-29T22:19:05.399+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:05.410+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : DELETE "/api/task/6", parameters={}
+2026-03-29T22:19:05.411+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.TaskController#delete(Long)
+2026-03-29T22:19:05.412+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mc.e.d.m.S.deleteById[0;39m : ==>  Preparing: DELETE FROM scheduled_task WHERE id=?
+2026-03-29T22:19:05.412+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mc.e.d.m.S.deleteById[0;39m : ==> Parameters: 6(Long)
+2026-03-29T22:19:05.417+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mc.e.d.m.S.deleteById[0;39m : <==    Updates: 1
+2026-03-29T22:19:05.417+08:00 [34mINFO [0;39m [http-nio-8013-exec-7] [36mc.e.d.s.task.ScheduledTaskService[0;39m : 鍒犻櫎瀹氭椂浠诲姟: 6
+2026-03-29T22:19:05.418+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:05.418+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=null, total=null)]
+2026-03-29T22:19:05.419+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:05.427+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : DELETE "/api/schedule/14", parameters={}
+2026-03-29T22:19:05.428+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ScheduleController#delete(Long)
+2026-03-29T22:19:05.428+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.selectById[0;39m : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event WHERE id=?
+2026-03-29T22:19:05.428+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.selectById[0;39m : ==> Parameters: 14(Long)
+2026-03-29T22:19:05.433+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.selectById[0;39m : <==      Total: 1
+2026-03-29T22:19:05.433+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.deleteById[0;39m : ==>  Preparing: DELETE FROM schedule_event WHERE id=?
+2026-03-29T22:19:05.434+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.deleteById[0;39m : ==> Parameters: 14(Long)
+2026-03-29T22:19:05.439+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.deleteById[0;39m : <==    Updates: 1
+2026-03-29T22:19:05.442+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event WHERE (event_date = ?)
+2026-03-29T22:19:05.442+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 2026-04-02(LocalDate)
+2026-03-29T22:19:05.444+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 0
+2026-03-29T22:19:05.445+08:00 [34mINFO [0;39m [http-nio-8013-exec-10] [36mc.e.d.s.schedule.ScheduleFileService[0;39m : 宸插垹闄ゆ棩绋嬫枃浠?: .\data\schedules\schedule-2026-04-02.md
+2026-03-29T22:19:05.446+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.HttpEntityMethodProcessor[0;39m : Using 'application/json;charset=UTF-8', given [application/json] and supported [text/plain, text/html, application/json, text/plain;charset=UTF-8, application/json;charset=UTF-8, */*, application/*+json, application/yaml]
+2026-03-29T22:19:05.446+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.HttpEntityMethodProcessor[0;39m : Writing ["鍒犻櫎鎴愬姛"]
+2026-03-29T22:19:05.447+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:28.947+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : POST "/api/report/generate?period=daily", parameters={masked}
+2026-03-29T22:19:28.947+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ReportController#generate(String)
+2026-03-29T22:19:28.954+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,title,description,event_time,event_date,location,source_email_id,source_email,reminder_status,summary_status,reminder_enabled,status,file_path,create_time,update_time FROM schedule_event WHERE (event_date >= ? AND event_date <= ?) ORDER BY event_time ASC
+2026-03-29T22:19:28.955+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 2026-03-29(LocalDate), 2026-03-29(LocalDate)
+2026-03-29T22:19:28.958+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 0
+2026-03-29T22:19:28.960+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==>  Preparing: SELECT id,name,description,task_type,cron_expression,params,skill_code,last_execute_time,last_execute_result,next_execute_time,execute_count,success_count,fail_count,enabled,create_time,update_time FROM scheduled_task WHERE (update_time >= ?) ORDER BY update_time DESC
+2026-03-29T22:19:28.961+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : ==> Parameters: 2026-03-29T00:00(LocalDateTime)
+2026-03-29T22:19:28.964+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectList[0;39m : <==      Total: 1
+2026-03-29T22:19:28.965+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : ==>  Preparing: SELECT * FROM note ORDER BY is_pinned DESC, update_time DESC
+2026-03-29T22:19:28.966+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : ==> Parameters: 
+2026-03-29T22:19:28.969+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.N.findAllOrderByPinnedAndTime[0;39m : <==      Total: 2
+2026-03-29T22:19:28.971+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectRecent[0;39m : ==>  Preparing: SELECT * FROM search_history ORDER BY create_time DESC LIMIT ?
+2026-03-29T22:19:28.971+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectRecent[0;39m : ==> Parameters: 6(Integer)
+2026-03-29T22:19:28.974+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.S.selectRecent[0;39m : <==      Total: 6
+2026-03-29T22:19:28.976+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.C.findAllOrderByLastMessageTime[0;39m : ==>  Preparing: SELECT * FROM chat_session ORDER BY last_message_time DESC, create_time DESC
+2026-03-29T22:19:28.977+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.C.findAllOrderByLastMessageTime[0;39m : ==> Parameters: 
+2026-03-29T22:19:28.979+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mc.e.d.m.C.findAllOrderByLastMessageTime[0;39m : <==      Total: 8
+2026-03-29T22:19:28.987+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:28.987+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=GeneratedReport(period=daily, generatedAt=2026-03-29 (truncated)...]
+2026-03-29T22:19:28.989+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:29.111+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/report/history?limit=1", parameters={masked}
+2026-03-29T22:19:29.111+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ReportController#history(int)
+2026-03-29T22:19:29.115+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:29.115+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=[ReportArtifact(period=weekly, name=weekly-report-20 (truncated)...]
+2026-03-29T22:19:29.119+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-2] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:48.712+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/autonomy/history?limit=5", parameters={masked}
+2026-03-29T22:19:48.712+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.AutonomyController#history(int)
+2026-03-29T22:19:48.722+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:48.723+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=[AutonomyArtifact(type=verify, name=verify-20260329- (truncated)...]
+2026-03-29T22:19:48.725+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-5] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:48.800+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/autonomy/artifact?path=D%3A%5Cjavaproject%5CagentDemo%5Cgenerated%5Cautonomy%5Cscan-20260329-221840.md", parameters={masked}
+2026-03-29T22:19:48.800+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.AutonomyController#readArtifact(String)
+2026-03-29T22:19:48.803+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:48.803+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=# 椤圭洰鑷不鎵弿鎶ュ憡<EOL><EOL>- 鎵弿鏃堕棿: 2026-03-29T22:18:40.190536100<EOL>-  (truncated)...]
+2026-03-29T22:19:48.804+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-7] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:48.812+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/report/history?limit=1", parameters={masked}
+2026-03-29T22:19:48.812+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ReportController#history(int)
+2026-03-29T22:19:48.815+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:48.815+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=[ReportArtifact(period=weekly, name=weekly-report-20 (truncated)...]
+2026-03-29T22:19:48.816+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-10] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK
+2026-03-29T22:19:48.824+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : GET "/api/report/artifact?path=D%3A%5Cjavaproject%5CagentDemo%5Cgenerated%5Creports%5Cweekly-report-20260329-221900.md", parameters={masked}
+2026-03-29T22:19:48.825+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestMappingHandlerMapping[0;39m : Mapped to com.example.demo.controller.ReportController#artifact(String)
+2026-03-29T22:19:48.827+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Using 'application/json', given [application/json] and supported [application/json, application/*+json, application/yaml]
+2026-03-29T22:19:48.827+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.w.s.m.m.a.RequestResponseBodyMethodProcessor[0;39m : Writing [ApiResponse(success=true, message=success, data=# 鍛ㄦ姤<EOL><EOL>- 鏃堕棿鑼冨洿: 2026-03-23 ~ 2026-03-29<EOL>- 鐢熸垚鏃堕棿: 2026-0 (truncated)...]
+2026-03-29T22:19:48.829+08:00 [39mDEBUG[0;39m [http-nio-8013-exec-3] [36mo.s.web.servlet.DispatcherServlet[0;39m : Completed 200 OK

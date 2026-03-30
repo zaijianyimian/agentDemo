@@ -101,7 +101,7 @@
         <div class="coverage-list">
           <div class="coverage-item">
             <span>已接入主模块</span>
-            <strong>14 / 14</strong>
+            <strong>17 / 17</strong>
           </div>
           <div class="coverage-item">
             <span>服务层封装</span>
@@ -130,11 +130,14 @@ import {
   NTag
 } from 'naive-ui'
 import {
+  FlashOutline as AutonomyIcon,
   BookOutline as KnowledgeIcon,
   ChatbubblesOutline as ChatIcon,
   CubeOutline as ModelIcon,
+  FileTrayFullOutline as InboxIcon,
   FolderOutline as FolderIcon,
   MailOutline as MailIcon,
+  ReaderOutline as ReportIcon,
   RocketOutline as SkillIcon,
   SearchOutline as SearchIcon,
   SettingsOutline as SettingsIcon,
@@ -175,6 +178,9 @@ const metricCards = computed(() => [
 
 const modules = [
   { name: 'AI 聊天', path: '/chat', description: '会话、流式与 MCP Agent 对话', icon: ChatIcon, color: '#f59e0b' },
+  { name: '统一收件箱', path: '/inbox', description: '聚合日程、任务、笔记、搜索与自治发现项', icon: InboxIcon, color: '#fb923c' },
+  { name: '自治中心', path: '/autonomy', description: '执行项目扫描、验证与补全草稿生成', icon: AutonomyIcon, color: '#f97316' },
+  { name: '日报周报', path: '/reports', description: '生成日报、周报并沉淀历史报告', icon: ReportIcon, color: '#fdba74' },
   { name: '知识库', path: '/knowledge', description: '创建库、上传文档、检索片段', icon: KnowledgeIcon, color: '#fbbf24' },
   { name: '定时任务', path: '/tasks', description: 'Cron、技能执行与手动触发', icon: TaskIcon, color: '#fb923c' },
   { name: '网络搜索', path: '/search', description: '搜索、总结、历史与兴趣画像', icon: SearchIcon, color: '#fdba74' },

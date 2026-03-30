@@ -79,3 +79,12 @@ app:
   file:
     upload-dir: ./data/documents
     allowed-types: txt,md,pdf,doc,docx
+  autonomy:
+    enabled: true
+    workspace-root: .
+    output-dir: ./generated/autonomy
+    allow-backend-verify: true
+    allow-frontend-verify: true
+    allow-source-write: false
+    allow-remote-update: false
+    command-timeout-seconds: 180

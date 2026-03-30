@@ -135,6 +135,12 @@
                     <n-icon size="14"><CopyIcon /></n-icon>
                   </n-button>
                 </div>
+                <div class="message-actions" v-if="msg.content">
+                  <n-button text size="tiny" @click="captureMessage('note', msg)">转笔记</n-button>
+                  <n-button text size="tiny" @click="captureMessage('task', msg)">转任务</n-button>
+                  <n-button text size="tiny" @click="captureMessage('schedule', msg)">转日程</n-button>
+                  <n-button text size="tiny" @click="captureMessage('memory', msg)">存记忆</n-button>
+                </div>
               </div>
             </div>
           </div>
@@ -245,7 +251,7 @@ import {
   CopyOutline as CopyIcon
 } from '@vicons/ionicons5'
 import type { ChatMessage, ChatSession } from '@/types'
-import { chatHistoryService } from '@/services/api'
+import { chatActionService, chatHistoryService } from '@/services/api'
 import axios from 'axios'
 import dayjs from 'dayjs'
 import { marked } from 'marked'
@@ -677,6 +683,30 @@ const copyMessage = async (content: string) => {
     message.success('已复制')
   } catch {
     message.error('复制失败')
+  }
+}
+
+const captureMessage = async (target: 'note' | 'task' | 'schedule' | 'memory', msg: ChatMessage) => {
+  try {
+    const payload = {
+      sessionId: currentSession.value?.id,
+      content: msg.content,
+      role: msg.role,
+      titleHint: currentSession.value?.title
+    }
+    const action = target === 'note'
+      ? chatActionService.createNote
+      : target === 'task'
+        ? chatActionService.createTask
+        : target === 'schedule'
+          ? chatActionService.createSchedule
+          : chatActionService.storeMemory
+    const res = await action(payload)
+    if (res.success && res.data) {
+      message.success(res.data.message || '处理成功')
+    }
+  } catch (error) {
+    message.error('转换失败')
   }
 }
 
@@ -1205,6 +1235,13 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   margin-top: 6px;
+}
+
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
 }
 
 .message-time {

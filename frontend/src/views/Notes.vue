@@ -28,6 +28,39 @@
         </div>
 
         <div class="notes-list">
+          <div class="search-toolbar">
+            <n-input
+              v-model:value="semanticQuery"
+              placeholder="语义搜索笔记主题或内容"
+              clearable
+              @keyup.enter="runSemanticSearch"
+            />
+            <div class="search-toolbar__actions">
+              <n-button tertiary size="small" @click="runSemanticSearch" :loading="searching">
+                语义搜索
+              </n-button>
+              <n-button tertiary size="small" @click="reindexNotes" :loading="reindexing">
+                重建向量
+              </n-button>
+            </div>
+          </div>
+
+          <div v-if="semanticHits.length" class="semantic-results">
+            <button
+              v-for="hit in semanticHits"
+              :key="hit.noteId"
+              type="button"
+              class="semantic-hit"
+              @click="openSemanticHit(hit.noteId)"
+            >
+              <div class="semantic-hit__head">
+                <strong>{{ hit.title }}</strong>
+                <span>{{ formatScore(hit.score) }}</span>
+              </div>
+              <p>{{ hit.contentSnippet || hit.aiSummary || '暂无摘要' }}</p>
+            </button>
+          </div>
+
           <div
             v-for="note in sortedNotes"
             :key="note.id"
@@ -151,6 +184,10 @@ const message = useMessage()
 const notes = ref<Note[]>([])
 const currentNote = ref<Note | null>(null)
 const summarizing = ref(false)
+const semanticQuery = ref('')
+const semanticHits = ref<Array<{ noteId: number; title: string; contentSnippet: string; aiSummary?: string; score: number }>>([])
+const searching = ref(false)
+const reindexing = ref(false)
 
 // 配置 marked
 marked.setOptions({
@@ -273,6 +310,57 @@ const summarizeNote = async () => {
   }
 }
 
+const runSemanticSearch = async () => {
+  if (!semanticQuery.value.trim()) {
+    semanticHits.value = []
+    return
+  }
+  searching.value = true
+  try {
+    const res = await noteService.semanticSearch(semanticQuery.value.trim(), 5)
+    if (res.success && res.data) {
+      semanticHits.value = res.data
+      if (!res.data.length) {
+        message.info('没有找到语义相近的笔记')
+      }
+    }
+  } catch (error) {
+    message.error('语义搜索失败')
+  } finally {
+    searching.value = false
+  }
+}
+
+const reindexNotes = async () => {
+  reindexing.value = true
+  try {
+    const res = await noteService.reindex()
+    if (res.success) {
+      message.success(`已重建 ${res.data || 0} 篇笔记的向量索引`)
+    }
+  } catch (error) {
+    message.error('向量重建失败')
+  } finally {
+    reindexing.value = false
+  }
+}
+
+const openSemanticHit = async (id: number) => {
+  const existing = notes.value.find(item => item.id === id)
+  if (existing) {
+    currentNote.value = { ...existing }
+    return
+  }
+  try {
+    const res = await noteService.get(id)
+    if (res.success && res.data) {
+      currentNote.value = res.data
+    }
+  } catch (error) {
+    message.error('打开笔记失败')
+  }
+}
+
 // 删除笔记
 const deleteCurrentNote = async () => {
   if (!currentNote.value) return
@@ -295,6 +383,8 @@ const formatTime = (time: string) => {
   if (now.diff(d, 'day') < 7) return `${now.diff(d, 'day')}天前`
   return d.format('MM-DD')
 }
+
+const formatScore = (score = 0) => `相似度 ${(score * 100).toFixed(0)}%`
 
 onMounted(() => {
   loadNotes()
@@ -400,6 +490,55 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 12px;
+}
+
+.search-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.search-toolbar__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.semantic-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.semantic-hit {
+  border: 1px solid rgba(245, 158, 11, 0.18);
+  background: rgba(255, 247, 237, 0.56);
+  border-radius: 18px;
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.semantic-hit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 28px rgba(245, 158, 11, 0.12);
+}
+
+.semantic-hit__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.semantic-hit p {
+  margin: 0;
+  color: #7c4a14;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .note-item {
