@@ -1,5 +1,6 @@
 package com.example.demo.service.skill;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.entity.McpTool;
 import com.example.demo.entity.Skill;
 import com.example.demo.entity.SkillToolMapping;
@@ -7,6 +8,7 @@ import com.example.demo.entity.ToolType;
 import com.example.demo.mapper.McpToolMapper;
 import com.example.demo.mapper.SkillMapper;
 import com.example.demo.mapper.SkillToolMappingMapper;
+import com.example.demo.service.mcp.McpAutoSyncService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import jakarta.annotation.PostConstruct;
@@ -15,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,8 +27,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 技能加载服务
@@ -40,6 +48,7 @@ public class SkillLoaderService {
     private final McpToolMapper mcpToolMapper;
     private final SkillToolMappingMapper skillToolMappingMapper;
     private final ObjectMapper objectMapper;
+    private final McpAutoSyncService mcpAutoSyncService;
 
     @Value("${app.skills.config-path:skills.yaml}")
     private String configPath;
@@ -56,7 +65,17 @@ public class SkillLoaderService {
     @Value("${app.skills.findskills-timeout-seconds:10}")
     private int findskillsTimeoutSeconds;
 
+    @Value("${app.skills.findskills-token:}")
+    private String findskillsToken;
+
+    @Value("${app.skills.findskills-presync-mcp:true}")
+    private boolean findskillsPreSyncMcp;
+
+    @Value("${app.skills.findskills-merge-existing:true}")
+    private boolean findskillsMergeExisting;
+
     private final HttpClient httpClient = HttpClient.newBuilder().build();
+    private final AtomicReference<FindskillsSyncResult> lastFindskillsSync = new AtomicReference<>();
 
     /**
      * 启动时自动加载技能
@@ -67,8 +86,16 @@ public class SkillLoaderService {
             loadSkillsFromConfig();
         }
         if (findskillsEnabled) {
-            loadSkillsFromFindskills();
+            syncFindskills(false);
         }
+    }
+
+    @Scheduled(cron = "${app.skills.findskills-cron:0 */10 * * * ?}")
+    public void scheduledFindskillsSync() {
+        if (!findskillsEnabled) {
+            return;
+        }
+        syncFindskills(false);
     }
 
     /**
@@ -102,49 +129,136 @@ public class SkillLoaderService {
      */
     @Transactional
     public int loadSkillsFromFindskills() {
+        return syncFindskills(false).getLoaded();
+    }
+
+    @Transactional
+    public FindskillsSyncResult syncFindskills(boolean dryRun) {
+        LocalDateTime start = LocalDateTime.now();
+        int loaded = 0;
+        int created = 0;
+        int updated = 0;
+        int skipped = 0;
+        List<String> warnings = new ArrayList<>();
+
         if (findskillsUrl == null || findskillsUrl.isBlank()) {
             log.warn("findskills 已启用，但未配置 app.skills.findskills-url");
-            return 0;
+            FindskillsSyncResult result = FindskillsSyncResult.builder()
+                    .success(false)
+                    .startTime(start)
+                    .endTime(LocalDateTime.now())
+                    .loaded(0)
+                    .created(0)
+                    .updated(0)
+                    .skipped(0)
+                    .message("findskills 未配置远端地址")
+                    .warnings(List.of("请设置 app.skills.findskills-url"))
+                    .build();
+            lastFindskillsSync.set(result);
+            return result;
         }
 
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            if (findskillsPreSyncMcp) {
+                McpAutoSyncService.SyncResult syncResult = mcpAutoSyncService.syncNow(dryRun);
+                if (!syncResult.isSuccess()) {
+                    warnings.add("预同步 MCP 失败: " + syncResult.getMessage());
+                }
+            }
+
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(findskillsUrl.trim()))
                     .header("Accept", "application/json")
                     .GET()
-                    .timeout(java.time.Duration.ofSeconds(Math.max(3, findskillsTimeoutSeconds)))
-                    .build();
+                    .timeout(java.time.Duration.ofSeconds(Math.max(3, findskillsTimeoutSeconds)));
+            String token = findskillsToken == null ? "" : findskillsToken.trim();
+            if (!token.isBlank()) {
+                requestBuilder.header("Authorization", "Bearer " + token);
+            }
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 log.warn("findskills 加载失败，HTTP状态: {}", response.statusCode());
-                return 0;
+                FindskillsSyncResult result = FindskillsSyncResult.builder()
+                        .success(false)
+                        .startTime(start)
+                        .endTime(LocalDateTime.now())
+                        .loaded(0)
+                        .created(0)
+                        .updated(0)
+                        .skipped(0)
+                        .message("findskills 拉取失败，HTTP " + response.statusCode())
+                        .warnings(warnings)
+                        .build();
+                lastFindskillsSync.set(result);
+                return result;
             }
 
             String body = response.body();
             if (body == null || body.isBlank()) {
                 log.warn("findskills 返回为空");
-                return 0;
+                FindskillsSyncResult result = FindskillsSyncResult.builder()
+                        .success(true)
+                        .startTime(start)
+                        .endTime(LocalDateTime.now())
+                        .loaded(0)
+                        .created(0)
+                        .updated(0)
+                        .skipped(0)
+                        .message("findskills 返回为空")
+                        .warnings(warnings)
+                        .build();
+                lastFindskillsSync.set(result);
+                return result;
             }
 
-            String trimmed = body.trim();
-            if (trimmed.startsWith("[")) {
-                List<SkillDefinition> defs = objectMapper.readValue(
-                        trimmed,
-                        objectMapper.getTypeFactory().constructCollectionType(List.class, SkillDefinition.class)
-                );
-                return loadSkills(defs);
+            List<SkillDefinition> defs = parseFindskillsBody(body);
+            for (SkillDefinition def : defs) {
+                try {
+                    UpsertOutcome outcome = upsertSkill(def, dryRun);
+                    if (outcome == UpsertOutcome.CREATED) {
+                        created++;
+                        loaded++;
+                    } else if (outcome == UpsertOutcome.UPDATED) {
+                        updated++;
+                        loaded++;
+                    } else {
+                        skipped++;
+                    }
+                } catch (Exception ex) {
+                    skipped++;
+                    warnings.add("技能 " + (def == null ? "unknown" : def.getCode()) + " 同步失败: " + ex.getMessage());
+                }
             }
 
-            SkillsConfig config = objectMapper.readValue(trimmed, SkillsConfig.class);
-            if (config == null || config.getSkills() == null) {
-                log.warn("findskills 返回格式无效，缺少 skills 字段");
-                return 0;
-            }
-            return loadSkills(config.getSkills());
+            FindskillsSyncResult result = FindskillsSyncResult.builder()
+                    .success(true)
+                    .startTime(start)
+                    .endTime(LocalDateTime.now())
+                    .loaded(loaded)
+                    .created(created)
+                    .updated(updated)
+                    .skipped(skipped)
+                    .message("findskills 同步完成")
+                    .warnings(warnings)
+                    .build();
+            lastFindskillsSync.set(result);
+            return result;
         } catch (Exception e) {
             log.error("从 findskills 加载技能失败: {}", findskillsUrl, e);
-            return 0;
+            FindskillsSyncResult result = FindskillsSyncResult.builder()
+                    .success(false)
+                    .startTime(start)
+                    .endTime(LocalDateTime.now())
+                    .loaded(loaded)
+                    .created(created)
+                    .updated(updated)
+                    .skipped(skipped)
+                    .message("findskills 同步失败: " + e.getMessage())
+                    .warnings(warnings)
+                    .build();
+            lastFindskillsSync.set(result);
+            return result;
         }
     }
 
@@ -228,6 +342,90 @@ public class SkillLoaderService {
         return true;
     }
 
+    private UpsertOutcome upsertSkill(SkillDefinition def, boolean dryRun) {
+        if (def == null || def.getCode() == null || def.getName() == null) {
+            return UpsertOutcome.SKIPPED;
+        }
+
+        Skill existing = skillMapper.selectByCode(def.getCode());
+        if (existing == null) {
+            if (dryRun) {
+                return UpsertOutcome.CREATED;
+            }
+            boolean created = loadSkill(def);
+            return created ? UpsertOutcome.CREATED : UpsertOutcome.SKIPPED;
+        }
+
+        if (!findskillsMergeExisting) {
+            return UpsertOutcome.SKIPPED;
+        }
+
+        if (dryRun) {
+            return UpsertOutcome.UPDATED;
+        }
+
+        Skill merged = Skill.builder()
+                .id(existing.getId())
+                .code(existing.getCode())
+                .name(nonBlank(def.getName(), existing.getName()))
+                .description(nonBlank(def.getDescription(), existing.getDescription()))
+                .category(nonBlank(def.getCategory(), existing.getCategory()))
+                .icon(nonBlank(def.getIcon(), existing.getIcon()))
+                .enabled(def.isEnabled())
+                .isBuiltin(existing.getIsBuiltin() != null ? existing.getIsBuiltin() : def.isBuiltin())
+                .config(existing.getConfig())
+                .remark(existing.getRemark())
+                .createTime(existing.getCreateTime())
+                .updateTime(LocalDateTime.now())
+                .build();
+        skillMapper.updateById(merged);
+        syncSkillToolMappings(merged, def.getTools());
+        return UpsertOutcome.UPDATED;
+    }
+
+    private void syncSkillToolMappings(Skill skill, List<ToolDefinition> toolDefs) {
+        if (skill == null || skill.getId() == null) {
+            return;
+        }
+        List<ToolDefinition> definitions = toolDefs == null ? List.of() : toolDefs;
+
+        List<SkillToolMapping> existing = skillToolMappingMapper.selectList(new LambdaQueryWrapper<SkillToolMapping>()
+                .eq(SkillToolMapping::getSkillId, skill.getId()));
+        Set<Long> expectedToolIds = new HashSet<>();
+
+        int order = 0;
+        for (ToolDefinition toolDef : definitions) {
+            McpTool tool = createTool(toolDef);
+            if (tool == null || tool.getId() == null) {
+                continue;
+            }
+            expectedToolIds.add(tool.getId());
+            SkillToolMapping mapped = existing.stream()
+                    .filter(item -> tool.getId().equals(item.getToolId()))
+                    .findFirst()
+                    .orElse(null);
+            if (mapped == null) {
+                skillToolMappingMapper.insert(SkillToolMapping.builder()
+                        .skillId(skill.getId())
+                        .toolId(tool.getId())
+                        .invokeOrder(order)
+                        .isRequired(true)
+                        .build());
+            } else {
+                mapped.setInvokeOrder(order);
+                mapped.setIsRequired(true);
+                skillToolMappingMapper.updateById(mapped);
+            }
+            order++;
+        }
+
+        for (SkillToolMapping mapping : existing) {
+            if (!expectedToolIds.contains(mapping.getToolId())) {
+                skillToolMappingMapper.deleteById(mapping.getId());
+            }
+        }
+    }
+
     /**
      * 创建工具
      */
@@ -235,6 +433,16 @@ public class SkillLoaderService {
         // 检查工具是否已存在
         McpTool existing = mcpToolMapper.selectByName(def.getName());
         if (existing != null) {
+            existing.setDisplayName(nonBlank(def.getDisplayName(), existing.getDisplayName()));
+            existing.setDescription(nonBlank(def.getDescription(), existing.getDescription()));
+            try {
+                existing.setToolType(ToolType.valueOf(def.getToolType().toUpperCase()));
+                existing.setConfig(objectMapper.writeValueAsString(def.getConfig()));
+                existing.setInputSchema(objectMapper.writeValueAsString(def.getInputSchema()));
+            } catch (Exception e) {
+                log.warn("更新已有工具配置失败，保留原配置: {}", def.getName());
+            }
+            mcpToolMapper.updateById(existing);
             return existing;
         }
 
@@ -344,5 +552,69 @@ public class SkillLoaderService {
         private String toolType;
         private Map<String, Object> config;
         private Map<String, Object> inputSchema;
+    }
+
+    @Data
+    @lombok.Builder
+    public static class FindskillsSyncResult {
+        private boolean success;
+        private LocalDateTime startTime;
+        private LocalDateTime endTime;
+        private int loaded;
+        private int created;
+        private int updated;
+        private int skipped;
+        private String message;
+        private List<String> warnings;
+    }
+
+    public FindskillsSyncResult getLastFindskillsSync() {
+        return lastFindskillsSync.get();
+    }
+
+    private List<SkillDefinition> parseFindskillsBody(String body) throws IOException {
+        String trimmed = body.trim();
+        if (trimmed.startsWith("[")) {
+            return objectMapper.readValue(
+                    trimmed,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, SkillDefinition.class)
+            );
+        }
+
+        com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(trimmed);
+        if (root == null || root.isNull()) {
+            return List.of();
+        }
+        if (root.isObject() && root.has("skills") && root.get("skills").isArray()) {
+            return objectMapper.convertValue(root.get("skills"),
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, SkillDefinition.class));
+        }
+        if (root.isObject() && root.has("data")) {
+            com.fasterxml.jackson.databind.JsonNode data = root.get("data");
+            if (data.isArray()) {
+                return objectMapper.convertValue(data,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, SkillDefinition.class));
+            }
+            if (data.isObject() && data.has("skills") && data.get("skills").isArray()) {
+                return objectMapper.convertValue(data.get("skills"),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, SkillDefinition.class));
+            }
+        }
+        SkillsConfig config = objectMapper.readValue(trimmed, SkillsConfig.class);
+        if (config != null && config.getSkills() != null) {
+            return config.getSkills();
+        }
+        return List.of();
+    }
+
+    private String nonBlank(String value, String fallback) {
+        String safe = value == null ? "" : value.trim();
+        return safe.isBlank() ? fallback : safe;
+    }
+
+    private enum UpsertOutcome {
+        CREATED,
+        UPDATED,
+        SKIPPED
     }
 }

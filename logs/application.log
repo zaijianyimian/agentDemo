@@ -831,3 +831,106 @@ Please, configure an AsyncTaskExecutor through the WebMvc config.
 2026-03-31T13:59:12.458+08:00 INFO  [SpringApplicationShutdownHook] c.e.d.service.tool.McpClientManager : Closing all MCP Server connections...
 2026-03-31T13:59:12.461+08:00 INFO  [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Shutdown initiated...
 2026-03-31T13:59:12.473+08:00 INFO  [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Shutdown completed.
+2026-03-31T15:36:21.706+08:00 INFO  [background-preinit] o.h.validator.internal.util.Version : HV000001: Hibernate Validator 8.0.3.Final
+2026-03-31T15:36:21.863+08:00 INFO  [Test worker] c.example.demo.DemoApplicationTests : Starting DemoApplicationTests using Java 17.0.2 with PID 35836 (started by lenovo in D:\javaproject\agentDemo)
+2026-03-31T15:36:21.864+08:00 DEBUG [Test worker] c.example.demo.DemoApplicationTests : Running with Spring Boot v3.5.12, Spring v6.2.17
+2026-03-31T15:36:21.866+08:00 INFO  [Test worker] c.example.demo.DemoApplicationTests : No active profile set, falling back to 1 default profile: "default"
+2026-03-31T15:36:22.008+08:00 DEBUG [Test worker] o.s.w.c.s.GenericWebApplicationContext : Refreshing org.springframework.web.context.support.GenericWebApplicationContext@65d57e4e
+2026-03-31T15:36:27.299+08:00 INFO  [Test worker] c.e.demo.config.AiConfiguration : Qdrant configured at localhost:6334, collection: agent_memory
+2026-03-31T15:36:27.299+08:00 INFO  [Test worker] c.e.demo.config.AiConfiguration : Note: Ensure Qdrant collection 'agent_memory' exists before storing embeddings
+2026-03-31T15:36:28.005+08:00 DEBUG [Test worker] c.b.m.e.s.MybatisSqlSessionFactoryBean : Registered plugin: 'MybatisPlusInterceptor{interceptors=[PaginationInnerInterceptor(logger=org.apache.ibatis.logging.slf4j.Slf4jImpl@4aeaff64, overflow=false, maxLimit=null, dbType=MYSQL, dialect=null, optimizeJoin=true)]}'
+2026-03-31T15:36:28.018+08:00 DEBUG [Test worker] c.b.m.e.s.MybatisSqlSessionFactoryBean : Property 'mapperLocations' was not specified.
+2026-03-31T15:36:28.862+08:00 DEBUG [Test worker] c.b.m.core.toolkit.Sequence : Get /192.168.6.1 network interface 
+2026-03-31T15:36:28.917+08:00 DEBUG [Test worker] c.b.m.core.toolkit.Sequence : Get network interface info: name:eth7 (VMware Virtual Ethernet Adapter for VMnet0)
+2026-03-31T15:36:28.983+08:00 DEBUG [Test worker] c.b.m.core.toolkit.Sequence : Initialization Sequence datacenterId:0 workerId:9
+2026-03-31T15:36:29.729+08:00 INFO  [Test worker] c.e.demo.service.mcp.McpToolService : 注册工具执行器: HTTP_API -> HttpApiToolExecutor
+2026-03-31T15:36:29.732+08:00 INFO  [Test worker] c.e.demo.service.mcp.McpToolService : 注册工具执行器: LOCAL_SCRIPT -> LocalScriptToolExecutor
+2026-03-31T15:36:29.733+08:00 INFO  [Test worker] c.e.demo.service.mcp.McpToolService : 注册工具执行器: MCP_CLIENT -> McpClientToolExecutor
+2026-03-31T15:36:30.198+08:00 INFO  [Test worker] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Starting...
+2026-03-31T15:36:31.187+08:00 INFO  [Test worker] com.zaxxer.hikari.pool.HikariPool : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@5151accb
+2026-03-31T15:36:31.190+08:00 INFO  [Test worker] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Start completed.
+2026-03-31T15:36:31.202+08:00 DEBUG [Test worker] c.e.d.m.McpToolMapper.selectList : ==>  Preparing: SELECT id,name,display_name,description,tool_type,config,input_schema,enabled,remark,create_time,update_time FROM mcp_tool WHERE (enabled = ?)
+2026-03-31T15:36:31.250+08:00 DEBUG [Test worker] c.e.d.m.McpToolMapper.selectList : ==> Parameters: true(Boolean)
+2026-03-31T15:36:31.502+08:00 DEBUG [Test worker] c.e.d.m.McpToolMapper.selectList : <==      Total: 5
+2026-03-31T15:36:31.570+08:00 INFO  [Test worker] c.e.demo.service.mcp.McpToolAdapter : 工具规格缓存已刷新，共 5 个工具
+2026-03-31T15:36:31.574+08:00 INFO  [Test worker] c.e.d.c.QdrantCollectionInitializer : Checking Qdrant collection: agent_memory at localhost:6334
+2026-03-31T15:36:31.701+08:00 INFO  [Test worker] c.e.d.c.QdrantCollectionInitializer : Collection not found, creating: agent_memory
+2026-03-31T15:36:31.930+08:00 WARN  [Test worker] c.e.d.c.QdrantCollectionInitializer : Qdrant 集合初始化失败 Connection reset..
+2026-03-31T15:36:31.930+08:00 WARN  [Test worker] c.e.d.c.QdrantCollectionInitializer : 请确保Qdrant在 localhost:6334 上正常运行
+2026-03-31T15:36:31.992+08:00 INFO  [Test worker] c.e.demo.config.SkillInitializer : 开始初始化预置技能...
+2026-03-31T15:36:32.018+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-31T15:36:32.025+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==> Parameters: web_search(String)
+2026-03-31T15:36:32.065+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : <==      Total: 1
+2026-03-31T15:36:32.066+08:00 DEBUG [Test worker] c.e.demo.config.SkillInitializer : 技能已存在: web_search
+2026-03-31T15:36:32.068+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-31T15:36:32.069+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==> Parameters: ai_chat(String)
+2026-03-31T15:36:32.071+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : <==      Total: 1
+2026-03-31T15:36:32.072+08:00 DEBUG [Test worker] c.e.demo.config.SkillInitializer : 技能已存在: ai_chat
+2026-03-31T15:36:32.073+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-31T15:36:32.075+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==> Parameters: weather_query(String)
+2026-03-31T15:36:32.077+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : <==      Total: 1
+2026-03-31T15:36:32.078+08:00 DEBUG [Test worker] c.e.demo.config.SkillInitializer : 技能已存在: weather_query
+2026-03-31T15:36:32.080+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-31T15:36:32.081+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==> Parameters: send_email(String)
+2026-03-31T15:36:32.086+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : <==      Total: 1
+2026-03-31T15:36:32.087+08:00 DEBUG [Test worker] c.e.demo.config.SkillInitializer : 技能已存在: send_email
+2026-03-31T15:36:32.090+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==>  Preparing: SELECT id,code,name,description,category,icon,enabled,is_builtin,config,remark,create_time,update_time FROM skill WHERE (code = ?)
+2026-03-31T15:36:32.091+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : ==> Parameters: file_operations(String)
+2026-03-31T15:36:32.096+08:00 DEBUG [Test worker] c.e.d.mapper.SkillMapper.selectList : <==      Total: 1
+2026-03-31T15:36:32.096+08:00 DEBUG [Test worker] c.e.demo.config.SkillInitializer : 技能已存在: file_operations
+2026-03-31T15:36:32.097+08:00 INFO  [Test worker] c.e.demo.config.SkillInitializer : 预置技能初始化完成，创建 0 个技能
+2026-03-31T15:36:32.585+08:00 INFO  [Test worker] c.e.d.s.email.EmailSenderService : 邮件发送服务初始化完成: your_mail@example.com
+2026-03-31T15:36:36.760+08:00 DEBUG [Test worker] c.e.d.m.A.selectEnabled : ==>  Preparing: SELECT * FROM ai_model_config WHERE enabled = 1
+2026-03-31T15:36:36.760+08:00 DEBUG [Test worker] c.e.d.m.A.selectEnabled : ==> Parameters: 
+2026-03-31T15:36:36.815+08:00 DEBUG [Test worker] c.e.d.m.A.selectEnabled : <==      Total: 1
+2026-03-31T15:36:36.832+08:00 INFO  [Test worker] c.e.demo.service.ai.ModelManager : Loaded model: Deepseek (deepseek-chat)
+2026-03-31T15:36:36.832+08:00 INFO  [Test worker] c.e.demo.service.ai.ModelManager : Loaded 1 AI models
+2026-03-31T15:36:37.143+08:00 INFO  [Test worker] c.e.d.s.email.EmailListenerService : 初始化邮件监听服务...
+2026-03-31T15:36:37.148+08:00 DEBUG [Test worker] c.e.d.m.EmailConfigMapper.selectList : ==>  Preparing: SELECT id,email,password,host,protocol,port,ssl_enabled,enabled,folder,poll_interval,remark,create_time,update_time FROM email_config WHERE (enabled = ?)
+2026-03-31T15:36:37.149+08:00 DEBUG [Test worker] c.e.d.m.EmailConfigMapper.selectList : ==> Parameters: true(Boolean)
+2026-03-31T15:36:37.171+08:00 DEBUG [Test worker] c.e.d.m.EmailConfigMapper.selectList : <==      Total: 1
+2026-03-31T15:36:37.172+08:00 INFO  [Test worker] c.e.d.s.email.EmailListenerService : 找到 1 个启用的邮箱配置
+2026-03-31T15:36:37.177+08:00 INFO  [email-thread-1] c.e.d.s.email.EmailListenerService : 正在连接邮箱: your_mail@example.com
+2026-03-31T15:36:37.907+08:00 DEBUG [Test worker] c.e.d.m.S.selectEnabled : ==>  Preparing: SELECT * FROM scheduled_task WHERE enabled = 1
+2026-03-31T15:36:37.908+08:00 DEBUG [Test worker] c.e.d.m.S.selectEnabled : ==> Parameters: 
+2026-03-31T15:36:37.938+08:00 DEBUG [Test worker] c.e.d.m.S.selectEnabled : <==      Total: 2
+2026-03-31T15:36:37.965+08:00 DEBUG [Test worker] c.e.d.s.task.ScheduledTaskService : 已调度任务: test (0 0 9 * * ?)
+2026-03-31T15:36:37.967+08:00 DEBUG [Test worker] c.e.d.s.task.ScheduledTaskService : 已调度任务: TestTask (0 0 12 * * ?)
+2026-03-31T15:36:37.967+08:00 INFO  [Test worker] c.e.d.s.task.ScheduledTaskService : 已重载 2 个定时任务
+2026-03-31T15:36:39.077+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-31T15:36:39.078+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==> Parameters: web_search(String)
+2026-03-31T15:36:39.081+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : <==      Total: 1
+2026-03-31T15:36:39.081+08:00 DEBUG [Test worker] c.e.d.s.skill.SkillLoaderService : 技能已存在: web_search
+2026-03-31T15:36:39.081+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-31T15:36:39.083+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==> Parameters: ai_chat(String)
+2026-03-31T15:36:39.086+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : <==      Total: 1
+2026-03-31T15:36:39.086+08:00 DEBUG [Test worker] c.e.d.s.skill.SkillLoaderService : 技能已存在: ai_chat
+2026-03-31T15:36:39.087+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-31T15:36:39.088+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==> Parameters: weather_query(String)
+2026-03-31T15:36:39.090+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : <==      Total: 1
+2026-03-31T15:36:39.091+08:00 DEBUG [Test worker] c.e.d.s.skill.SkillLoaderService : 技能已存在: weather_query
+2026-03-31T15:36:39.091+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-31T15:36:39.092+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==> Parameters: send_email(String)
+2026-03-31T15:36:39.094+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : <==      Total: 1
+2026-03-31T15:36:39.095+08:00 DEBUG [Test worker] c.e.d.s.skill.SkillLoaderService : 技能已存在: send_email
+2026-03-31T15:36:39.096+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==>  Preparing: SELECT * FROM skill WHERE code = ?
+2026-03-31T15:36:39.096+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : ==> Parameters: file_operations(String)
+2026-03-31T15:36:39.099+08:00 DEBUG [Test worker] c.e.d.m.SkillMapper.selectByCode : <==      Total: 1
+2026-03-31T15:36:39.099+08:00 DEBUG [Test worker] c.e.d.s.skill.SkillLoaderService : 技能已存在: file_operations
+2026-03-31T15:36:39.099+08:00 INFO  [Test worker] c.e.d.s.skill.SkillLoaderService : 成功加载 0 个技能
+2026-03-31T15:36:39.168+08:00 INFO  [Test worker] c.e.d.s.email.EmailProcessingService : EmailProcessingService 已注册到邮件监听服务
+2026-03-31T15:36:39.170+08:00 INFO  [Test worker] c.e.d.s.s.ScheduleSummaryService : 日程汇总服务已启动
+2026-03-31T15:36:39.170+08:00 INFO  [Test worker] c.e.d.s.s.ScheduleSummaryService : 每日汇总时间: 0 0 20 * * ?
+2026-03-31T15:36:39.170+08:00 INFO  [Test worker] c.e.d.s.s.ScheduleSummaryService : 早上提醒时间: 0 0 8 * * ?
+2026-03-31T15:36:40.139+08:00 ERROR [email-thread-1] c.e.d.s.email.EmailListenerService : 邮箱 your_mail@example.com 监听异常: A3 NO SELECT Unsafe Login. Please contact kefu@188.com for help
+2026-03-31T15:36:40.636+08:00 DEBUG [Test worker] o.s.w.s.m.m.a.RequestMappingHandlerMapping : 223 mappings in 'requestMappingHandlerMapping'
+2026-03-31T15:36:40.906+08:00 DEBUG [Test worker] o.s.w.s.h.SimpleUrlHandlerMapping : Patterns [/webjars/**, /**] in 'resourceHandlerMapping'
+2026-03-31T15:36:41.829+08:00 DEBUG [Test worker] o.s.w.s.m.m.a.RequestMappingHandlerAdapter : ControllerAdvice beans: 0 @ModelAttribute, 0 @InitBinder, 1 RequestBodyAdvice, 1 ResponseBodyAdvice
+2026-03-31T15:36:42.010+08:00 DEBUG [Test worker] o.s.w.s.m.m.a.ExceptionHandlerExceptionResolver : ControllerAdvice beans: 1 @ExceptionHandler, 1 ResponseBodyAdvice
+2026-03-31T15:36:42.626+08:00 INFO  [Test worker] c.example.demo.DemoApplicationTests : Started DemoApplicationTests in 21.947 seconds (process running for 26.086)
+2026-03-31T15:36:44.855+08:00 DEBUG [SpringApplicationShutdownHook] o.s.w.c.s.GenericWebApplicationContext : Closing org.springframework.web.context.support.GenericWebApplicationContext@65d57e4e, started on Tue Mar 31 15:36:22 CST 2026
+2026-03-31T15:36:44.894+08:00 INFO  [SpringApplicationShutdownHook] c.e.d.s.task.ScheduledTaskService : 已取消所有定时任务
+2026-03-31T15:36:44.895+08:00 INFO  [SpringApplicationShutdownHook] c.e.d.s.email.EmailListenerService : 关闭邮件监听服务...
+2026-03-31T15:36:44.908+08:00 INFO  [SpringApplicationShutdownHook] c.e.d.service.tool.McpClientManager : Closing all MCP Server connections...
+2026-03-31T15:36:44.912+08:00 INFO  [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Shutdown initiated...
+2026-03-31T15:36:44.923+08:00 INFO  [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Shutdown completed.

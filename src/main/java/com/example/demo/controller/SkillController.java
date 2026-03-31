@@ -267,12 +267,42 @@ public class SkillController {
             @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
     })
     public ResponseEntity<Map<String, Object>> reloadSkillsFromFindskills() {
-        int loaded = skillLoaderService.loadSkillsFromFindskills();
+        SkillLoaderService.FindskillsSyncResult result = skillLoaderService.syncFindskills(false);
         return ResponseEntity.ok(Map.of(
                 "success", true,
-                "message", "成功从 findskills 加载 " + loaded + " 个技能",
-                "count", loaded
+                "message", result.getMessage(),
+                "count", result.getLoaded(),
+                "created", result.getCreated(),
+                "updated", result.getUpdated(),
+                "skipped", result.getSkipped(),
+                "warnings", result.getWarnings()
         ));
+    }
+
+    /**
+     * 手动触发 findskills 自动同步（支持 dryRun）
+     */
+    @PostMapping("/sync")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
+    })
+    public ApiResponse<SkillLoaderService.FindskillsSyncResult> syncFindskills(
+            @RequestParam(defaultValue = "false") boolean dryRun) {
+        return ApiResponse.success(skillLoaderService.syncFindskills(dryRun));
+    }
+
+    /**
+     * 获取最近一次 findskills 同步状态
+     */
+    @GetMapping("/sync/status")
+    public ApiResponse<SkillLoaderService.FindskillsSyncResult> syncFindskillsStatus() {
+        return ApiResponse.success(skillLoaderService.getLastFindskillsSync());
     }
 
     /**

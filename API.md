@@ -117,6 +117,8 @@
 | 测试技能执行 | POST | `/skill/{id}/test` | 测试指定技能执行 | ✅ 新增 |
 | 重新加载技能 | POST | `/skill/reload` | 从YAML重新加载技能 | ✅ 已通过 |
 | 远程重载技能 | POST | `/skill/reload-findskills` | 从 findskills 远程地址加载技能 | ✅ 新增 |
+| findskills 手动同步 | POST | `/skill/sync` | 手动触发远程技能同步（支持 dryRun） | ✅ 新增 |
+| findskills 同步状态 | GET | `/skill/sync/status` | 获取最近一次 findskills 同步结果 | ✅ 新增 |
 | 导入技能 | POST | `/skill/import` | JSON导入技能 | ✅ 已通过 |
 | 导出技能 | GET | `/skill/{id}/export` | 导出技能为JSON | ✅ 已通过 |
 

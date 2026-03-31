@@ -104,7 +104,11 @@ app:
     auto-load: true
     findskills-enabled: false
     findskills-url: ""
+    findskills-token: ""
     findskills-timeout-seconds: 10
+    findskills-cron: "0 */10 * * * ?"
+    findskills-presync-mcp: true
+    findskills-merge-existing: true
   security:
     issuer: agent-demo
     jwt-secret: ${JWT_SECRET:replace_with_a_32_plus_byte_secret=}
