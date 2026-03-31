@@ -50,5 +50,24 @@ export default defineConfig({
         charset: false
       }
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 1300,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('naive-ui')) return 'ui-naive'
+            if (id.includes('@vicons')) return 'ui-icons'
+            if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) return 'vendor-vue'
+            if (id.includes('axios')) return 'vendor-axios'
+            if (id.includes('marked')) return 'vendor-markdown'
+            if (id.includes('highlight.js')) return 'vendor-highlight'
+            if (id.includes('dayjs')) return 'vendor-dayjs'
+            return 'vendor-misc'
+          }
+        }
+      }
+    }
   }
 })

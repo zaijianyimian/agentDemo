@@ -37,6 +37,19 @@ onMounted(async () => {
       throw new Error(res.message || 'GitHub 登录失败')
     }
 
+    if (res.data.token.requiresSecondFactor) {
+      message.info('请完成人脸二次验证')
+      await router.replace({
+        path: '/login',
+        query: {
+          preAuthToken: res.data.token.preAuthToken || '',
+          preAuthExpiresIn: String(res.data.token.preAuthExpiresIn || 0),
+          redirect: res.data.redirectPath || '/'
+        }
+      })
+      return
+    }
+
     authStore.setSession(res.data.token)
     message.success('GitHub 登录成功')
     await router.replace(res.data.redirectPath || '/')

@@ -130,27 +130,28 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
   const isPublic = Boolean(to.meta.public)
   const hasToken = hasAccessToken()
 
   if (to.path === '/login' && hasToken) {
-    next('/')
-    return
+    return '/'
   }
 
   if (!isPublic && !hasToken) {
-    next(buildLoginRedirectUrl(to.fullPath))
-    return
+    return buildLoginRedirectUrl(to.fullPath)
   }
 
   if (hasToken && !authStore.user && !authStore.initialized) {
-    authStore.hydrate()
+    await authStore.hydrate()
+    if (!authStore.user && !isPublic) {
+      return buildLoginRedirectUrl(to.fullPath)
+    }
   }
 
   document.title = `${to.meta.title || 'AI Agent'} - Dashboard`
-  next()
+  return true
 })
 
 export default router

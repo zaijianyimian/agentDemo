@@ -55,6 +55,24 @@
 
       <div class="surface-panel span-6 motion-card">
         <div class="section-head">
+          <div><div class="page-eyebrow">Face 2FA</div><h3>人脸二次验证</h3></div>
+        </div>
+        <div class="setting-row">
+          <span>已绑定人脸</span>
+          <strong>{{ faceStatus?.enrolled ? '是' : '否' }}</strong>
+        </div>
+        <div class="setting-row">
+          <span>强制登录二次验证</span>
+          <n-switch :value="faceRequired" :disabled="!faceStatus?.enrolled" @update:value="toggleFaceRequired" />
+        </div>
+        <div class="backup-actions">
+          <input type="file" accept="image/*" @change="onFaceFileSelect" />
+          <n-button size="small" type="primary" :loading="faceSaving" @click="saveFaceProfile">上传并绑定人脸</n-button>
+        </div>
+      </div>
+
+      <div class="surface-panel span-6 motion-card">
+        <div class="section-head">
           <div><div class="page-eyebrow">Backup</div><h3>数据备份与恢复</h3></div>
         </div>
         <div class="backup-actions">
@@ -101,8 +119,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { NButton, NEmpty, NSwitch, NUpload, useMessage } from 'naive-ui'
-import { personalService, settingsService } from '@/services/api'
-import type { PersonalInsight, TaskTemplate } from '@/types'
+import { authService, personalService, settingsService } from '@/services/api'
+import type { FaceStatusResponse, PersonalInsight, TaskTemplate } from '@/types'
 import {
   clearRecentActions,
   isFocusMode,
@@ -124,12 +142,17 @@ const knowledgeDedupeEnabled = ref(true)
 const knowledgeIncrementalEnabled = ref(true)
 const replaceExisting = ref(false)
 const recentActions = ref<RecentActionItem[]>(readRecentActions())
+const faceStatus = ref<FaceStatusResponse | null>(null)
+const faceRequired = ref(false)
+const faceImageBase64 = ref('')
+const faceSaving = ref(false)
 
 const loadData = async () => {
-  const [insightRes, templateRes, settingsRes] = await Promise.all([
+  const [insightRes, templateRes, settingsRes, faceStatusRes] = await Promise.all([
     personalService.insights(),
     personalService.listTaskTemplates(),
-    settingsService.getSystem()
+    settingsService.getSystem(),
+    authService.faceStatus()
   ])
 
   if (insightRes.success && insightRes.data) {
@@ -141,6 +164,10 @@ const loadData = async () => {
   if (settingsRes.success && settingsRes.data) {
     knowledgeDedupeEnabled.value = settingsRes.data.knowledge_dedupe_enabled !== 'false'
     knowledgeIncrementalEnabled.value = settingsRes.data.knowledge_incremental_enabled !== 'false'
+  }
+  if (faceStatusRes.success && faceStatusRes.data) {
+    faceStatus.value = faceStatusRes.data
+    faceRequired.value = faceStatusRes.data.required
   }
 }
 
@@ -248,6 +275,67 @@ const clearHistory = () => {
   clearRecentActions()
   syncRecentActions()
   message.success('历史记录已清空')
+}
+
+const toBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('图片读取失败'))
+    reader.readAsDataURL(file)
+  })
+
+const onFaceFileSelect = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) {
+    faceImageBase64.value = ''
+    return
+  }
+  if (!file.type.startsWith('image/')) {
+    message.warning('请选择图片文件')
+    target.value = ''
+    return
+  }
+  faceImageBase64.value = await toBase64(file)
+}
+
+const saveFaceProfile = async () => {
+  if (!faceImageBase64.value) {
+    message.warning('请先选择人脸图片')
+    return
+  }
+  faceSaving.value = true
+  try {
+    const res = await authService.registerFace({ imageBase64: faceImageBase64.value })
+    if (!res.success || !res.data) {
+      throw new Error(res.message || '绑定失败')
+    }
+    faceStatus.value = res.data
+    faceRequired.value = res.data.required
+    message.success('人脸绑定成功')
+    appendAction('绑定人脸二次验证')
+  } catch (e: any) {
+    message.error(e?.message || '绑定失败')
+  } finally {
+    faceSaving.value = false
+  }
+}
+
+const toggleFaceRequired = async (value: boolean) => {
+  try {
+    const res = await authService.toggleFaceRequired({ required: value })
+    if (!res.success || !res.data) {
+      throw new Error(res.message || '更新失败')
+    }
+    faceStatus.value = res.data
+    faceRequired.value = res.data.required
+    message.success(value ? '已开启人脸二次验证' : '已关闭人脸二次验证')
+    appendAction('切换人脸二次验证', value ? '开启' : '关闭')
+  } catch (e: any) {
+    faceRequired.value = !!faceStatus.value?.required
+    message.error(e?.message || '更新失败')
+  }
 }
 
 onMounted(loadData)

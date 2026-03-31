@@ -258,7 +258,7 @@ const commonTheme = {
     errorColor: '#ef4444',
     borderRadius: '14px',
     borderRadiusSmall: '10px',
-    fontFamily: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif"
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif"
   },
   Card: {
     borderRadius: '18px'
@@ -565,7 +565,9 @@ onUnmounted(() => {
 .app-shell {
   position: relative;
   height: 100vh;
-  background: linear-gradient(180deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 94%, #000 6%) 100%);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--primary-color) 12%, transparent), transparent 24%),
+    linear-gradient(180deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 95%, #000 5%) 100%);
   overflow: hidden;
 }
 
@@ -605,7 +607,7 @@ onUnmounted(() => {
     linear-gradient(180deg, rgba(255, 247, 237, 0.06), rgba(255, 247, 237, 0.02)),
     var(--bg-card);
   backdrop-filter: blur(var(--blur-lg));
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
 }
@@ -673,31 +675,18 @@ onUnmounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--primary-color) 28%, transparent) transparent;
 }
 
 .app-menu::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.app-menu::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 999px;
-}
-
-.sider-panel:hover .app-menu {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--primary-color) 34%, transparent) transparent;
-}
-
-.sider-panel:hover .app-menu::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-.sider-panel:hover .app-menu::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--primary-color) 34%, transparent);
+.app-menu::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--primary-color) 26%, transparent);
+  border-radius: 999px;
 }
 
 .sider-footer {
@@ -751,8 +740,7 @@ onUnmounted(() => {
   border-radius: var(--radius-2xl);
   background: var(--bg-card);
   backdrop-filter: blur(var(--blur-lg));
-  box-shadow: var(--shadow-sm);
-  position: relative;
+  box-shadow: var(--shadow-xs);
   position: sticky;
   top: 20px;
   z-index: 30;
@@ -920,7 +908,7 @@ onUnmounted(() => {
 }
 
 .app-content {
-  padding: 20px;
+  padding: 18px 20px 20px;
   background: transparent;
   flex: 1;
   min-height: 0;
@@ -931,6 +919,7 @@ onUnmounted(() => {
 .content-frame {
   min-height: auto;
   padding: 8px 0 0;
+  max-width: 1800px;
   animation: fadeInUp 0.4s ease;
 }
 
@@ -947,6 +936,10 @@ onUnmounted(() => {
 
 @media (max-width: 1100px) {
   .header-chip {
+    display: none;
+  }
+
+  .command-btn {
     display: none;
   }
 }
@@ -975,6 +968,13 @@ onUnmounted(() => {
 
   .page-subtitle {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
   }
 }
 </style>

@@ -69,7 +69,7 @@
         <n-empty v-else description="今天没有待跟进的日程" />
       </div>
 
-      <div class="surface-panel span-6">
+      <div class="surface-panel span-12">
         <div class="section-head">
           <div>
             <div class="page-eyebrow">Latest Files</div>
@@ -91,32 +91,6 @@
         <n-empty v-else description="暂无文件数据" />
       </div>
 
-      <div class="surface-panel span-6">
-        <div class="section-head">
-          <div>
-            <div class="page-eyebrow">Coverage</div>
-            <h3>接口入口覆盖</h3>
-          </div>
-        </div>
-        <div class="coverage-list">
-          <div class="coverage-item">
-            <span>已接入主模块</span>
-            <strong>17 / 17</strong>
-          </div>
-          <div class="coverage-item">
-            <span>服务层封装</span>
-            <strong>统一 `api.ts`</strong>
-          </div>
-          <div class="coverage-item">
-            <span>主题方向</span>
-            <strong>Amber Citrus</strong>
-          </div>
-          <div class="coverage-item">
-            <span>设计语言</span>
-            <strong>暖橙玻璃面板</strong>
-          </div>
-        </div>
-      </div>
     </section>
   </div>
 </template>
@@ -276,8 +250,7 @@ onMounted(loadDashboard)
 .metric-card,
 .module-card,
 .timeline-item,
-.activity-row,
-.coverage-item {
+.activity-row {
   border: 1px solid var(--border-color);
   background: var(--gradient-card);
   position: relative;
@@ -312,7 +285,7 @@ onMounted(loadDashboard)
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
 }
 
@@ -342,7 +315,7 @@ onMounted(loadDashboard)
 .metric-card:hover {
   transform: translateY(-1px);
   border-color: var(--border-glow);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
 }
 
 .metric-card:hover::before {
@@ -385,8 +358,7 @@ onMounted(loadDashboard)
 .metric-card__copy span,
 .module-card p,
 .activity-row p,
-.timeline-copy p,
-.coverage-item span {
+.timeline-copy p {
   color: var(--text-secondary);
   font-size: 0.88rem;
 }
@@ -422,7 +394,7 @@ onMounted(loadDashboard)
 
 .module-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 14px;
 }
 
@@ -464,15 +436,13 @@ onMounted(loadDashboard)
 }
 
 .timeline-list,
-.activity-list,
-.coverage-list {
+.activity-list {
   display: grid;
   gap: 12px;
 }
 
 .timeline-item,
-.activity-row,
-.coverage-item {
+.activity-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -483,8 +453,7 @@ onMounted(loadDashboard)
 }
 
 .timeline-item:hover,
-.activity-row:hover,
-.coverage-item:hover {
+.activity-row:hover {
   border-color: var(--border-glow);
   background: var(--bg-hover);
   transform: translateX(1px);
@@ -509,14 +478,9 @@ onMounted(loadDashboard)
   flex: 1;
 }
 
-.coverage-item strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
 @media (max-width: 1100px) {
-  .metrics-grid {
-    grid-template-columns: 1fr 1fr;
+  .metric-card__copy strong {
+    font-size: 1.7rem;
   }
 }
 

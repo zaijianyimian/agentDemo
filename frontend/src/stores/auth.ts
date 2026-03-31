@@ -10,6 +10,9 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!authTokenStorage.getAccessToken() && !!user.value)
 
   const setSession = (payload: AuthTokenResponse) => {
+    if (!payload.accessToken || !payload.refreshToken || !payload.user) {
+      throw new Error('登录态数据不完整')
+    }
     authTokenStorage.setTokens(payload.accessToken, payload.refreshToken)
     user.value = payload.user
   }
@@ -39,15 +42,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const loginByPassword = async (username: string, password: string) => {
-    await withAuthResponse(authService.loginByPassword({ username, password }), '登录失败')
+  const loginByPassword = async (username: string, password: string, captchaTicket: string): Promise<AuthTokenResponse> => {
+    return await withAuthResponse(authService.loginByPassword({ username, password, captchaTicket }), '登录失败')
   }
 
-  const loginByEmailCode = async (email: string, code: string) => {
-    await withAuthResponse(authService.loginByEmailCode({ email, code }), '登录失败')
+  const loginByEmailCode = async (email: string, code: string, captchaTicket: string): Promise<AuthTokenResponse> => {
+    return await withAuthResponse(authService.loginByEmailCode({ email, code, captchaTicket }), '登录失败')
   }
 
-  const register = async (payload: { username: string; email: string; password: string; displayName?: string }) => {
+  const verifyFaceLogin = async (preAuthToken: string, imageBase64: string): Promise<AuthTokenResponse> => {
+    return await withAuthResponse(authService.verifyFaceLogin({ preAuthToken, imageBase64 }), '人脸验证失败')
+  }
+
+  const register = async (payload: { username: string; email: string; password: string; captchaTicket: string; displayName?: string }) => {
     const res = await authService.register(payload)
     if (!res.success) {
       throw new Error(res.message || '注册失败')
@@ -66,12 +73,16 @@ export const useAuthStore = defineStore('auth', () => {
   const withAuthResponse = async (
     promise: Promise<{ success: boolean; message?: string; data?: AuthTokenResponse }>,
     fallbackMessage: string
-  ) => {
+  ): Promise<AuthTokenResponse> => {
     const res = await promise
     if (!res.success || !res.data) {
       throw new Error(res.message || fallbackMessage)
     }
+    if (res.data.requiresSecondFactor) {
+      return res.data
+    }
     setSession(res.data)
+    return res.data
   }
 
   return {
@@ -83,6 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
     clearSession,
     loginByPassword,
     loginByEmailCode,
+    verifyFaceLogin,
     register,
     logout
   }

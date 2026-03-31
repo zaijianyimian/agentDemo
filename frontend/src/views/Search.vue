@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import {
   NCard,
   NInput,
@@ -173,7 +173,22 @@ import { searchService } from '@/services/api'
 import { fetchWithAuth } from '@/services/auth-fetch'
 import type { SearchResult } from '@/types'
 import { marked } from 'marked'
-import hljs from 'highlight.js'
+import hljs from 'highlight.js/lib/core'
+import javascript from 'highlight.js/lib/languages/javascript'
+import typescript from 'highlight.js/lib/languages/typescript'
+import json from 'highlight.js/lib/languages/json'
+import xml from 'highlight.js/lib/languages/xml'
+import bash from 'highlight.js/lib/languages/bash'
+
+hljs.registerLanguage('javascript', javascript)
+hljs.registerLanguage('js', javascript)
+hljs.registerLanguage('typescript', typescript)
+hljs.registerLanguage('ts', typescript)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('xml', xml)
+hljs.registerLanguage('html', xml)
+hljs.registerLanguage('bash', bash)
+hljs.registerLanguage('shell', bash)
 
 // 自定义渲染器添加代码高亮
 const renderer = new marked.Renderer()
@@ -471,9 +486,9 @@ const getCategoryColor = (category: string): 'default' | 'primary' | 'info' | 's
 }
 
 // 计算权重百分比
-const maxWeight = Math.max(...topInterests.value.map(i => i.weight), 1)
+const maxWeight = computed(() => Math.max(...topInterests.value.map(i => i.weight), 1))
 const getWeightPercentage = (weight: number) => {
-  return Math.round((weight / maxWeight) * 100)
+  return Math.round((weight / maxWeight.value) * 100)
 }
 
 // 组件卸载时清理

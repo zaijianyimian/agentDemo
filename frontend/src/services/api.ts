@@ -31,8 +31,11 @@ import type {
   AuthTokenResponse,
   AuthUserProfile,
   EmailCodeSendResponse,
+  PuzzleCaptchaResponse,
+  PuzzleCaptchaVerifyResponse,
   GithubAuthorizeResponse,
   GithubExchangeResponse,
+  FaceStatusResponse,
   PersonalInsight,
   TaskTemplate
 } from '@/types'
@@ -58,6 +61,8 @@ api.interceptors.request.use(config => {
     requestUrl.startsWith('/auth/register') ||
     requestUrl.startsWith('/auth/login/') ||
     requestUrl.startsWith('/auth/token/refresh') ||
+    requestUrl.startsWith('/auth/captcha/') ||
+    requestUrl.startsWith('/auth/face/verify-login') ||
     requestUrl.startsWith('/auth/oauth/github/')
 
   if (shouldSkipAuthHeader) {
@@ -86,7 +91,9 @@ api.interceptors.response.use(
     const shouldSkipRefresh =
       requestUrl.startsWith('/auth/token/refresh') ||
       requestUrl.startsWith('/auth/register') ||
-      requestUrl.startsWith('/auth/login/')
+      requestUrl.startsWith('/auth/login/') ||
+      requestUrl.startsWith('/auth/captcha/') ||
+      requestUrl.startsWith('/auth/face/verify-login')
 
     if (
       status === 401 &&
@@ -105,8 +112,13 @@ api.interceptors.response.use(
                 if (!payload?.success || !payload.data) {
                   throw new Error(payload?.message || '刷新令牌失败')
                 }
-                setTokens(payload.data.accessToken, payload.data.refreshToken)
-                return payload.data.accessToken
+                const accessToken = payload.data.accessToken
+                const refreshTokenNext = payload.data.refreshToken
+                if (!accessToken || !refreshTokenNext) {
+                  throw new Error('刷新令牌失败')
+                }
+                setTokens(accessToken, refreshTokenNext)
+                return accessToken
               })
               .finally(() => {
                 refreshingPromise = null
@@ -1157,22 +1169,32 @@ export const chatActionService = {
 }
 
 export const authService = {
-  register: async (payload: { username: string; email: string; password: string; displayName?: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
+  getPuzzleCaptcha: async (): Promise<ApiResponse<PuzzleCaptchaResponse>> => {
+    const response = await api.get('/auth/captcha/puzzle')
+    return response.data
+  },
+
+  verifyPuzzleCaptcha: async (payload: { captchaId: string; sliderPercent: number }): Promise<ApiResponse<PuzzleCaptchaVerifyResponse>> => {
+    const response = await api.post('/auth/captcha/puzzle/verify', payload)
+    return response.data
+  },
+
+  register: async (payload: { username: string; email: string; password: string; captchaTicket: string; displayName?: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
     const response = await api.post('/auth/register', payload)
     return response.data
   },
 
-  loginByPassword: async (payload: { username: string; password: string }): Promise<ApiResponse<AuthTokenResponse>> => {
+  loginByPassword: async (payload: { username: string; password: string; captchaTicket: string }): Promise<ApiResponse<AuthTokenResponse>> => {
     const response = await api.post('/auth/login/password', payload)
     return response.data
   },
 
-  sendEmailCode: async (payload: { email: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
+  sendEmailCode: async (payload: { email: string; captchaTicket: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
     const response = await api.post('/auth/login/email/send-code', payload)
     return response.data
   },
 
-  loginByEmailCode: async (payload: { email: string; code: string }): Promise<ApiResponse<AuthTokenResponse>> => {
+  loginByEmailCode: async (payload: { email: string; code: string; captchaTicket: string }): Promise<ApiResponse<AuthTokenResponse>> => {
     const response = await api.post('/auth/login/email', payload)
     return response.data
   },
@@ -1199,6 +1221,26 @@ export const authService = {
 
   githubExchange: async (payload: { code: string; state: string }): Promise<ApiResponse<GithubExchangeResponse>> => {
     const response = await api.post('/auth/oauth/github/exchange', payload)
+    return response.data
+  },
+
+  faceStatus: async (): Promise<ApiResponse<FaceStatusResponse>> => {
+    const response = await api.get('/auth/face/status')
+    return response.data
+  },
+
+  registerFace: async (payload: { imageBase64: string }): Promise<ApiResponse<FaceStatusResponse>> => {
+    const response = await api.post('/auth/face/register', payload)
+    return response.data
+  },
+
+  toggleFaceRequired: async (payload: { required: boolean }): Promise<ApiResponse<FaceStatusResponse>> => {
+    const response = await api.put('/auth/face/required', payload)
+    return response.data
+  },
+
+  verifyFaceLogin: async (payload: { preAuthToken: string; imageBase64: string }): Promise<ApiResponse<AuthTokenResponse>> => {
+    const response = await api.post('/auth/face/verify-login', payload)
     return response.data
   }
 }

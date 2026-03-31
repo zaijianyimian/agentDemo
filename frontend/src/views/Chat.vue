@@ -1,12 +1,5 @@
 <template>
   <div class="chat-page">
-    <!-- 温暖背景装饰 -->
-    <div class="warm-bg-decoration">
-      <div class="gradient-orb orb-1"></div>
-      <div class="gradient-orb orb-2"></div>
-      <div class="gradient-orb orb-3"></div>
-    </div>
-
     <!-- 会话列表侧边栏 -->
     <div class="session-sidebar">
       <div class="sidebar-header">
@@ -258,10 +251,76 @@ const renderMarkdown = (content: string): string => {
   try {
     const html = marked.parse(content) as string
     // 后处理：为代码块添加高亮
-    return html.replace(/<pre><code class="language-(\w+)">/g, '<pre class="hljs"><code class="language-$1">')
+    const highlighted = html.replace(/<pre><code class="language-(\w+)">/g, '<pre class="hljs"><code class="language-$1">')
+    return sanitizeHtml(highlighted)
   } catch {
-    return content
+    return sanitizeHtml(content)
   }
+}
+
+const sanitizeHtml = (html: string): string => {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+
+  const blockedTags = ['script', 'iframe', 'object', 'embed', 'link', 'meta', 'style']
+  blockedTags.forEach(tag => {
+    doc.querySelectorAll(tag).forEach(node => node.remove())
+  })
+
+  doc.querySelectorAll('*').forEach(el => {
+    const attrs = Array.from(el.attributes)
+    attrs.forEach(attr => {
+      const name = attr.name.toLowerCase()
+      const value = attr.value
+      if (name.startsWith('on')) {
+        el.removeAttribute(attr.name)
+        return
+      }
+      if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(value)) {
+        el.removeAttribute(attr.name)
+        return
+      }
+      if (name === 'style') {
+        el.removeAttribute('style')
+      }
+    })
+    if (el.tagName.toLowerCase() === 'a') {
+      const href = el.getAttribute('href')
+      if (href && !/^(https?:|mailto:|\/|#)/i.test(href)) {
+        el.removeAttribute('href')
+      } else {
+        el.setAttribute('rel', 'noopener noreferrer nofollow')
+        el.setAttribute('target', '_blank')
+      }
+    }
+  })
+
+  return doc.body.innerHTML
+}
+
+const parseSseEvents = (rawEvent: string): string[] => {
+  const lines = rawEvent.replace(/\r/g, '').split('\n')
+  const chunks: string[] = []
+  let dataBuffer = ''
+  for (const line of lines) {
+    if (line.startsWith('data:')) {
+      const data = line.slice(5).trim()
+      if (data && data !== '[DONE]') {
+        dataBuffer += data
+      }
+      continue
+    }
+    if (line.startsWith(':') || line.startsWith('event:') || line.startsWith('id:') || line.startsWith('retry:')) {
+      continue
+    }
+    if (line.trim()) {
+      dataBuffer += line
+    }
+  }
+  if (dataBuffer) {
+    chunks.push(dataBuffer)
+  }
+  return chunks
 }
 
 const message = useMessage()
@@ -528,46 +587,25 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
 
       buffer += decoder.decode(value, { stream: true })
 
-      // SSE 格式：每个事件以 \n\n 结尾
-      // 按双换行符分割事件
-      const events = buffer.split('\n\n')
+      // SSE event 以空行分隔，兼容 \r\n\r\n 与 \n\n
+      const events = buffer.split(/\r?\n\r?\n/)
       buffer = events.pop() || ''
 
       for (const event of events) {
         if (!event.trim()) continue
-
-        // 处理事件中的每一行
-        const lines = event.split('\n')
-        for (const line of lines) {
-          if (line.startsWith('data:')) {
-            const data = line.slice(5).trim()
-            if (data === '[DONE]') continue
-
-            // 直接追加内容，不需要JSON解析（后端返回纯文本）
-            if (data && data !== '[DONE]') {
-              messageObj.content += data
-              await flushUI()
-            }
-          } else if (line.startsWith('event:')) {
-            // 可以处理事件类型
-            console.log('SSE event:', line.slice(6).trim())
-          } else if (line.trim() && !line.startsWith(':')) {
-            // 非 SSE 格式的行，直接追加
-            messageObj.content += line
-            await flushUI()
-          }
+        const chunks = parseSseEvents(event)
+        for (const chunk of chunks) {
+          messageObj.content += chunk
+          await flushUI()
         }
       }
     }
 
     // 处理剩余缓冲区
     if (buffer.trim()) {
-      // 解析剩余的数据
-      if (buffer.startsWith('data:')) {
-        const data = buffer.slice(5).trim()
-        if (data && data !== '[DONE]') {
-          messageObj.content += data
-        }
+      const chunks = parseSseEvents(buffer)
+      for (const chunk of chunks) {
+        messageObj.content += chunk
       }
     }
 
@@ -706,64 +744,19 @@ onMounted(async () => {
 <style scoped>
 .chat-page {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 312px 1fr;
   gap: 0;
   height: calc(100vh - 120px);
   position: relative;
   overflow: hidden;
-  background: var(--bg-base);
-}
-
-/* 温暖背景装饰 */
-.warm-bg-decoration {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.gradient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.12;
-  animation: float 15s ease-in-out infinite;
-}
-
-.orb-1 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, var(--primary-color), transparent 60%);
-  top: -150px;
-  right: -150px;
-  animation-delay: 0s;
-}
-
-.orb-2 {
-  width: 350px;
-  height: 350px;
-  background: radial-gradient(circle, var(--primary-light), transparent 60%);
-  bottom: -80px;
-  left: 15%;
-  animation-delay: -4s;
-}
-
-.orb-3 {
-  width: 280px;
-  height: 280px;
-  background: radial-gradient(circle, var(--warning), transparent 60%);
-  top: 35%;
-  left: -80px;
-  animation-delay: -8s;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-base) 97%, #fff 3%), var(--bg-base));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-2xl);
 }
 
 /* 会话侧边栏 */
 .session-sidebar {
-  background: var(--bg-elevated);
+  background: color-mix(in srgb, var(--bg-elevated) 96%, transparent);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -844,6 +837,8 @@ onMounted(async () => {
   min-height: 0;
   overflow-y: auto;
   padding: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--primary-color) 30%, transparent) transparent;
 }
 
 .session-item {
@@ -883,7 +878,7 @@ onMounted(async () => {
 }
 
 .session-item.active {
-  background: var(--bg-active);
+  background: color-mix(in srgb, var(--bg-active) 72%, transparent);
   border-color: var(--primary-color);
   box-shadow: var(--shadow-xs);
 }
@@ -970,7 +965,6 @@ onMounted(async () => {
 .chat-main {
   display: flex;
   flex-direction: column;
-  z-index: 10;
   position: relative;
   background: transparent;
   height: 100%;
@@ -986,7 +980,9 @@ onMounted(async () => {
   justify-content: space-between;
   background: var(--bg-card);
   backdrop-filter: blur(var(--blur-md));
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
 .chat-header::after {
@@ -1026,7 +1022,7 @@ onMounted(async () => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 28px;
+  padding: 26px;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -1092,7 +1088,7 @@ onMounted(async () => {
   border-radius: var(--radius-lg);
   line-height: 1.7;
   position: relative;
-  max-width: 80%;
+  max-width: min(78%, 860px);
   box-shadow: var(--shadow-sm);
 }
 
@@ -1104,7 +1100,7 @@ onMounted(async () => {
 }
 
 .ai-text {
-  background: var(--bg-card);
+  background: color-mix(in srgb, var(--bg-card) 96%, #fff 4%);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
   border-bottom-right-radius: var(--radius-xs);
@@ -1334,7 +1330,7 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 24px;
+  padding: 72px 24px;
 }
 
 .empty-illustration {
@@ -1373,7 +1369,7 @@ onMounted(async () => {
   padding: 22px 28px;
   border-top: 1px solid var(--border-color);
   background: var(--bg-card);
-  backdrop-filter: blur(var(--blur-md));
+  backdrop-filter: blur(var(--blur-sm));
   position: relative;
 }
 
@@ -1394,13 +1390,13 @@ onMounted(async () => {
   padding: 16px;
   border-radius: var(--radius-lg);
   background: var(--bg-input);
-  border: 1px solid var(--border-color);
+  border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
   transition: all var(--transition-base);
 }
 
 .input-container:focus-within {
   border-color: var(--primary-color);
-  box-shadow: var(--shadow-focus);
+  box-shadow: var(--shadow-focus), 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
 .chat-input {
@@ -1479,13 +1475,10 @@ onMounted(async () => {
 @media (max-width: 900px) {
   .chat-page {
     grid-template-columns: 1fr;
+    border-radius: var(--radius-xl);
   }
 
   .session-sidebar {
-    display: none;
-  }
-
-  .warm-bg-decoration {
     display: none;
   }
 }

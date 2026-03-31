@@ -274,16 +274,35 @@ export interface AuthUserProfile {
 }
 
 export interface AuthTokenResponse {
-  tokenType: string
-  accessToken: string
-  refreshToken: string
-  expiresIn: number
-  user: AuthUserProfile
+  tokenType?: string
+  accessToken?: string
+  refreshToken?: string
+  expiresIn?: number
+  user?: AuthUserProfile
+  requiresSecondFactor?: boolean
+  preAuthToken?: string
+  preAuthExpiresIn?: number
 }
 
 export interface EmailCodeSendResponse {
   cooldownSeconds: number
   message: string
+}
+
+export interface PuzzleCaptchaResponse {
+  captchaId: string
+  backgroundImage: string
+  pieceImage: string
+  pieceWidth: number
+  pieceHeight: number
+  expiresInSeconds: number
+}
+
+export interface PuzzleCaptchaVerifyResponse {
+  passed: boolean
+  ticket?: string
+  ticketExpiresInSeconds?: number
+  message?: string
 }
 
 export interface GithubAuthorizeResponse {
@@ -294,6 +313,14 @@ export interface GithubAuthorizeResponse {
 export interface GithubExchangeResponse {
   token: AuthTokenResponse
   redirectPath: string
+}
+
+export interface FaceStatusResponse {
+  enrolled: boolean
+  required: boolean
+  enabled: boolean
+  vectorDimension?: number
+  qualityScore?: number
 }
 
 export interface PersonalInsight {
