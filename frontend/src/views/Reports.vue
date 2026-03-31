@@ -69,7 +69,7 @@
               <strong>{{ entry.value }}</strong>
             </div>
           </div>
-          <pre>{{ currentReport.content }}</pre>
+          <div class="report-markdown markdown-content" v-html="renderedReportContent"></div>
         </div>
         <n-empty v-else description="生成或打开一份报告开始查看" />
       </div>
@@ -83,6 +83,7 @@ import { NButton, NEmpty, NTag, useMessage } from 'naive-ui'
 import type { GeneratedReport, ReportArtifact } from '@/types'
 import { reportService } from '@/services/api'
 import dayjs from 'dayjs'
+import { marked } from 'marked'
 
 const message = useMessage()
 const history = ref<ReportArtifact[]>([])
@@ -94,6 +95,15 @@ const activePeriodLabel = computed(() => currentReport.value?.period || '未打�
 const metricEntries = computed(() => {
   const metrics = currentReport.value?.metrics || {}
   return Object.entries(metrics).map(([label, value]) => ({ label, value }))
+})
+const renderedReportContent = computed(() => {
+  const content = currentReport.value?.content || ''
+  if (!content) return ''
+  try {
+    return marked.parse(content, { breaks: true, gfm: true }) as string
+  } catch {
+    return content
+  }
 })
 
 const loadHistory = async () => {
@@ -213,16 +223,51 @@ onMounted(loadHistory)
   margin-top: 6px;
 }
 
-.report-preview pre {
+.report-markdown {
   margin: 0;
   padding: 18px;
   border-radius: 20px;
   background: rgba(20, 16, 11, 0.78);
   color: #f8e9d4;
-  white-space: pre-wrap;
-  word-break: break-word;
   max-height: 520px;
   overflow: auto;
+}
+
+.markdown-content :deep(h1),
+.markdown-content :deep(h2),
+.markdown-content :deep(h3),
+.markdown-content :deep(h4) {
+  margin: 16px 0 8px;
+  color: #fff7ed;
+}
+
+.markdown-content :deep(p) {
+  margin: 8px 0;
+  line-height: 1.7;
+}
+
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.markdown-content :deep(code) {
+  background: rgba(255, 255, 255, 0.12);
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.markdown-content :deep(pre) {
+  background: rgba(0, 0, 0, 0.28);
+  padding: 12px 14px;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.markdown-content :deep(pre code) {
+  background: transparent;
+  padding: 0;
 }
 
 @media (max-width: 900px) {

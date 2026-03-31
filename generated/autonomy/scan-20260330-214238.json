@@ -1,0 +1,21 @@
+{
+  "scanTime" : "2026-03-30T21:42:38.5469139",
+  "workspaceRoot" : "D:\\javaproject\\agentDemo",
+  "metrics" : {
+    "controllerCount" : 24,
+    "viewCount" : 20,
+    "routeCount" : 20,
+    "apiServiceExports" : 24,
+    "readmeExists" : true,
+    "apiDocExists" : true,
+    "gitClean" : false
+  },
+  "findings" : [ {
+    "severity" : "low",
+    "title" : "工作区非干净状态",
+    "detail" : "检测到 git 工作区存在未提交改动。",
+    "suggestion" : "执行自动补全前，建议先提交或备份当前变更。"
+  } ],
+  "reportPath" : "D:\\javaproject\\agentDemo\\generated\\autonomy\\scan-20260330-214238.json",
+  "summaryPath" : "D:\\javaproject\\agentDemo\\generated\\autonomy\\scan-20260330-214238.md"
+}

@@ -211,12 +211,14 @@ const loadDashboard = async () => {
 
     const allSchedules = schedulesRes || []
     const today = dayjs().format('YYYY-MM-DD')
+    const toolList = Array.isArray(toolsRes) ? toolsRes : (toolsRes.data || [])
+    const skillList = Array.isArray(skillsRes) ? skillsRes : (skillsRes.data || [])
 
     stats.value = {
       files: filesRes.data?.length || filesRes.total || 0,
       schedules: allSchedules.length || 0,
-      tools: toolsRes.data?.length || toolsRes.total || 0,
-      skills: skillsRes.data?.length || skillsRes.total || 0,
+      tools: toolList.length || toolsRes.total || 0,
+      skills: skillList.length || skillsRes.total || 0,
       models: modelsRes.data?.length || 0,
       tasks: tasksRes.data?.length || 0,
       knowledge: knowledgeRes.data?.length || 0

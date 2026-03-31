@@ -170,6 +170,7 @@ import {
 } from 'naive-ui'
 import { SearchOutline as SearchIcon } from '@vicons/ionicons5'
 import { searchService } from '@/services/api'
+import { fetchWithAuth } from '@/services/auth-fetch'
 import type { SearchResult } from '@/types'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
@@ -297,7 +298,7 @@ const doStreamSummary = async () => {
   abortController = new AbortController()
   isStreamingSummary.value = true
 
-  const response = await fetch(`/api/search/summary?query=${encodeURIComponent(searchQuery.value)}`, {
+  const response = await fetchWithAuth(`/api/search/summary?query=${encodeURIComponent(searchQuery.value)}`, {
     signal: abortController.signal,
     headers: {
       'Accept': 'text/event-stream'
@@ -354,7 +355,7 @@ const doStreamChat = async () => {
   abortController = new AbortController()
   isStreamingChat.value = true
 
-  const response = await fetch(`/api/search/chat/stream?message=${encodeURIComponent(searchQuery.value)}`, {
+  const response = await fetchWithAuth(`/api/search/chat/stream?message=${encodeURIComponent(searchQuery.value)}`, {
     signal: abortController.signal,
     headers: {
       'Accept': 'text/event-stream'

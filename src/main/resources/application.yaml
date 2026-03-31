@@ -61,7 +61,7 @@ app:
     smtp-port: 465
     smtp-username: your_mail@example.com
     smtp-password: "your_smtp_password_or_app_password"
-    smtp-ssl-enabled: true
+    smtp-ssl-enablit ed: true
     from-name: AI Agent
   # 日程管理配置
   schedule:

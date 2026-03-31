@@ -242,6 +242,7 @@ import {
 } from '@vicons/ionicons5'
 import type { ChatMessage, ChatSession } from '@/types'
 import { chatActionService, chatHistoryService } from '@/services/api'
+import { fetchWithAuth } from '@/services/auth-fetch'
 import dayjs from 'dayjs'
 import { marked } from 'marked'
 
@@ -406,6 +407,7 @@ const clearCurrentSession = async () => {
   }
 }
 
+
 // 发送消息
 const sendMessage = async () => {
   if (!inputText.value.trim() || loading.value) return
@@ -493,7 +495,7 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
   }
 
   try {
-    const response = await fetch(apiPath, {
+    const response = await fetchWithAuth(apiPath, {
       signal: abortController.signal,
       headers: {
         'Accept': 'text/event-stream',
@@ -586,7 +588,7 @@ const normalChat = async (query: string, messageObj: ChatMessage) => {
     apiPath = `/api/chat/complete/session?message=${encodeURIComponent(query)}&sessionId=${currentSession.value!.id}`
   }
 
-  const response = await fetch(apiPath)
+  const response = await fetchWithAuth(apiPath)
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`)
   }
@@ -1488,4 +1490,5 @@ onMounted(async () => {
   }
 }
 </style>
+
 

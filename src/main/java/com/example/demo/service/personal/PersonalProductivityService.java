@@ -56,9 +56,13 @@ public class PersonalProductivityService {
                 .count();
 
         long totalTokens = messages.stream()
-                .map(ChatMessageEntity::getTokenCount)
-                .filter(Objects::nonNull)
-                .mapToLong(Integer::longValue)
+                .mapToLong(message -> {
+                    Integer tokenCount = message.getTokenCount();
+                    if (tokenCount != null && tokenCount >= 0) {
+                        return tokenCount;
+                    }
+                    return estimateTokenCount(message.getContent());
+                })
                 .sum();
         double avgTokensPerMessage = messages.isEmpty() ? 0 : (double) totalTokens / (double) messages.size();
 
@@ -191,5 +195,23 @@ public class PersonalProductivityService {
         item.put("cronExpression", cronExpression);
         item.put("params", params);
         return item;
+    }
+
+    private int estimateTokenCount(String content) {
+        if (content == null || content.isBlank()) {
+            return 0;
+        }
+        int cjkCount = 0;
+        int otherCount = 0;
+        for (char c : content.toCharArray()) {
+            if (Character.UnicodeScript.of(c) == Character.UnicodeScript.HAN) {
+                cjkCount++;
+            } else if (!Character.isWhitespace(c)) {
+                otherCount++;
+            }
+        }
+        int englishTokens = (int) Math.ceil(otherCount / 4.0);
+        int total = cjkCount + englishTokens;
+        return Math.max(total, 1);
     }
 }

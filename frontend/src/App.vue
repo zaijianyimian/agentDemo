@@ -564,8 +564,9 @@ onUnmounted(() => {
 <style scoped>
 .app-shell {
   position: relative;
-  min-height: 100vh;
+  height: 100vh;
   background: linear-gradient(180deg, var(--bg-base) 0%, color-mix(in srgb, var(--bg-base) 94%, #000 6%) 100%);
+  overflow: hidden;
 }
 
 .app-shell--focus .app-header {
@@ -579,19 +580,23 @@ onUnmounted(() => {
 .shell-layout,
 .main-panel {
   background: transparent;
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .app-sider {
   background: transparent;
   border-right: none !important;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sider-panel {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  height: 100%;
+  height: calc(100vh - 40px);
   margin: 20px 0 20px 20px;
   padding: 24px 18px;
   border: 1px solid var(--border-color);
@@ -602,6 +607,7 @@ onUnmounted(() => {
   backdrop-filter: blur(var(--blur-lg));
   box-shadow: var(--shadow-md);
   position: relative;
+  overflow: hidden;
 }
 
 .brand-block {
@@ -663,6 +669,35 @@ onUnmounted(() => {
 
 .app-menu {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  scrollbar-width: none;
+}
+
+.app-menu::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.app-menu::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.sider-panel:hover .app-menu {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--primary-color) 34%, transparent) transparent;
+}
+
+.sider-panel:hover .app-menu::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.sider-panel:hover .app-menu::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--primary-color) 34%, transparent);
 }
 
 .sider-footer {
@@ -718,6 +753,9 @@ onUnmounted(() => {
   backdrop-filter: blur(var(--blur-lg));
   box-shadow: var(--shadow-sm);
   position: relative;
+  position: sticky;
+  top: 20px;
+  z-index: 30;
 }
 
 .header-left,
@@ -884,10 +922,14 @@ onUnmounted(() => {
 .app-content {
   padding: 20px;
   background: transparent;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .content-frame {
-  min-height: calc(100vh - 140px);
+  min-height: auto;
   padding: 8px 0 0;
   animation: fadeInUp 0.4s ease;
 }

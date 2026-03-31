@@ -230,6 +230,7 @@ import {
   MailOutline as MailIcon
 } from '@vicons/ionicons5'
 import { scheduleService } from '@/services/api'
+import { fetchWithAuth } from '@/services/auth-fetch'
 import type { ScheduleEvent } from '@/types'
 import dayjs from 'dayjs'
 
@@ -364,7 +365,7 @@ const aiAddSchedule = async () => {
 
   aiLoading.value = true
   try {
-    const res = await fetch('/api/schedule/parse-and-save', {
+    const res = await fetchWithAuth('/api/schedule/parse-and-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

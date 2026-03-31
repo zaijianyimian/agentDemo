@@ -61,4 +61,28 @@ public class AiModelConfig {
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
+
+    public void setName(String name) {
+        this.name = trim(name);
+    }
+
+    public void setProvider(String provider) {
+        this.provider = trim(provider);
+    }
+
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = trim(baseUrl);
+    }
+
+    public void setModelName(String modelName) {
+        this.modelName = trim(modelName);
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = trim(apiKey);
+    }
+
+    private String trim(String value) {
+        return value == null ? null : value.trim();
+    }
 }

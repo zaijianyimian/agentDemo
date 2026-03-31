@@ -73,6 +73,7 @@ public class ScheduledTaskService {
      * 创建任务
      */
     public ScheduledTask createTask(ScheduledTask task) {
+        normalizeTask(task);
         // 验证 Cron 表达式
         if (!CronExpression.isValidExpression(task.getCronExpression())) {
             throw new IllegalArgumentException("无效的 Cron 表达式: " + task.getCronExpression());
@@ -97,6 +98,7 @@ public class ScheduledTaskService {
      * 更新任务
      */
     public ScheduledTask updateTask(ScheduledTask task) {
+        normalizeTask(task);
         ScheduledTask existing = taskMapper.selectById(task.getId());
         if (existing == null) {
             throw new IllegalArgumentException("任务不存在: " + task.getId());
@@ -234,6 +236,7 @@ public class ScheduledTaskService {
      * 执行任务
      */
     private String doExecuteTask(ScheduledTask task) {
+        normalizeTask(task);
         log.info("执行定时任务: {} ({})", task.getName(), task.getTaskType());
         String result;
         boolean success = false;
@@ -311,6 +314,9 @@ public class ScheduledTaskService {
      */
     private String executeChatTask(ScheduledTask task) {
         String message = task.getParams();
+        if (message != null) {
+            message = message.trim();
+        }
         if (message == null || message.isEmpty()) {
             message = "请告诉我当前时间和日期";
         }
@@ -336,5 +342,27 @@ public class ScheduledTaskService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private void normalizeTask(ScheduledTask task) {
+        if (task == null) {
+            return;
+        }
+        task.setName(trimToNull(task.getName()));
+        task.setDescription(trimToNull(task.getDescription()));
+        task.setCronExpression(trimToNull(task.getCronExpression()));
+        task.setSkillCode(trimToNull(task.getSkillCode()));
+        task.setParams(trimToNull(task.getParams()));
+
+        String taskType = trimToNull(task.getTaskType());
+        task.setTaskType(taskType == null ? null : taskType.toUpperCase(Locale.ROOT));
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

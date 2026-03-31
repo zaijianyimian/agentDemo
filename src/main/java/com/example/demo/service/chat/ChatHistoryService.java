@@ -91,12 +91,14 @@ public class ChatHistoryService {
      */
     @Transactional
     public ChatMessageEntity addMessage(Long sessionId, String role, String content, String model) {
+        int estimatedTokenCount = estimateTokenCount(content);
         // 创建消息
         ChatMessageEntity message = ChatMessageEntity.builder()
                 .sessionId(sessionId)
                 .role(role)
                 .content(content)
                 .model(model)
+                .tokenCount(estimatedTokenCount)
                 .createTime(LocalDateTime.now())
                 .build();
         chatMessageMapper.insert(message);
@@ -158,5 +160,29 @@ public class ChatHistoryService {
             title = title.substring(0, 30) + "...";
         }
         return title;
+    }
+
+    /**
+     * 粗略估算 token 数：
+     * - 英文按 4 字符约 1 token
+     * - 中文按 1 字约 1 token
+     * 该值用于统计看板，不作为计费精确值。
+     */
+    private int estimateTokenCount(String content) {
+        if (content == null || content.isBlank()) {
+            return 0;
+        }
+        int cjkCount = 0;
+        int otherCount = 0;
+        for (char c : content.toCharArray()) {
+            if (Character.UnicodeScript.of(c) == Character.UnicodeScript.HAN) {
+                cjkCount++;
+            } else if (!Character.isWhitespace(c)) {
+                otherCount++;
+            }
+        }
+        int englishTokens = (int) Math.ceil(otherCount / 4.0);
+        int total = cjkCount + englishTokens;
+        return Math.max(total, 1);
     }
 }

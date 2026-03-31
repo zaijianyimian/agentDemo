@@ -62,6 +62,7 @@ public class ModelController {
     @PostMapping
     public ApiResponse<Map<String, Object>> create(@RequestBody AiModelConfig config) {
         try {
+            normalizeConfig(config);
             // 编码 API Key
             config.setApiKey(encodingService.encode(config.getApiKey()));
 
@@ -103,6 +104,7 @@ public class ModelController {
 
         try {
             config.setId(id);
+            normalizeConfig(config);
 
             // 如果更新了 API Key，需要编码
             if (config.getApiKey() != null && !config.getApiKey().isEmpty()) {
@@ -227,6 +229,7 @@ public class ModelController {
     @PostMapping("/test")
     public ApiResponse<String> test(@RequestBody AiModelConfig config) {
         try {
+            normalizeConfig(config);
             String result = modelManager.testConnection(config);
             return ApiResponse.success(result);
         } catch (Exception e) {
@@ -272,5 +275,14 @@ public class ModelController {
             map.put("apiKeyPreview", "****");
         }
         return map;
+    }
+
+    private void normalizeConfig(AiModelConfig config) {
+        if (config == null) {
+            return;
+        }
+        if (config.getProvider() != null) {
+            config.setProvider(config.getProvider().toLowerCase());
+        }
     }
 }

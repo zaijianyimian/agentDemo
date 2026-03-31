@@ -23,7 +23,7 @@
     </section>
 
     <section class="section-grid">
-      <div class="surface-panel span-4">
+      <div class="surface-panel span-3">
         <div class="section-head">
           <div>
             <div class="page-eyebrow">Actions</div>
@@ -47,20 +47,23 @@
         </div>
       </div>
 
-      <div class="surface-panel span-8">
+      <div class="surface-panel span-9">
         <div class="section-head">
           <div>
             <div class="page-eyebrow">Overview</div>
             <h3>模型面板</h3>
           </div>
         </div>
-        <n-data-table
-          :columns="columns"
-          :data="models"
-          :loading="loading"
-          :row-key="(row: AiModelConfig) => row.id"
-          striped
-        />
+        <div class="model-table-wrap">
+          <n-data-table
+            :columns="columns"
+            :data="models"
+            :loading="loading"
+            :row-key="(row: AiModelConfig) => row.id"
+            :scroll-x="1320"
+            striped
+          />
+        </div>
       </div>
     </section>
 
@@ -164,11 +167,11 @@ const enabledCount = computed(() => models.value.filter(item => item.enabled).le
 const defaultModel = computed(() => models.value.find(item => item.isDefault))
 
 const columns: DataTableColumns<AiModelConfig> = [
-  { title: '名称', key: 'name', width: 160 },
+  { title: '名称', key: 'name', width: 140, ellipsis: { tooltip: true } },
   { title: '提供商', key: 'provider', width: 120, render: row => h(NTag, { size: 'small', round: true }, { default: () => row.provider }) },
-  { title: '模型', key: 'modelName', width: 160 },
-  { title: 'API 地址', key: 'baseUrl', ellipsis: { tooltip: true } },
-  { title: 'Key 预览', key: 'apiKeyPreview', width: 140 },
+  { title: '模型', key: 'modelName', width: 150, ellipsis: { tooltip: true } },
+  { title: 'API 地址', key: 'baseUrl', width: 230, ellipsis: { tooltip: true } },
+  { title: 'Key 预览', key: 'apiKeyPreview', width: 130 },
   {
     title: '默认',
     key: 'isDefault',
@@ -186,15 +189,16 @@ const columns: DataTableColumns<AiModelConfig> = [
     width: 90,
     render: row => h(NTag, { type: row.enabled ? 'success' : 'default', size: 'small', round: true }, { default: () => row.enabled ? '启用' : '禁用' })
   },
-  { title: '创建时间', key: 'createTime', width: 160, render: row => formatTime(row.createTime) },
+  { title: '创建时间', key: 'createTime', width: 145, render: row => formatTime(row.createTime) },
   {
     title: '操作',
     key: 'actions',
-    width: 170,
+    width: 220,
+    fixed: 'right',
     render: row => h(NSpace, null, {
       default: () => [
         h(NButton, { size: 'small', quaternary: true, onClick: () => editModel(row) }, { default: () => '编辑' }),
-        h(NButton, { size: 'small', quaternary: true, onClick: () => toggleEnabled(row) }, { default: () => row.enabled ? '禁用' : '启用此模型' }),
+        h(NButton, { size: 'small', quaternary: true, type: row.enabled ? 'default' : 'success', onClick: () => toggleEnabled(row) }, { default: () => row.enabled ? '禁用' : '启用' }),
         h(NButton, { size: 'small', quaternary: true, type: 'error', onClick: () => confirmDelete(row) }, { icon: () => h(NIcon, null, { default: () => h(TrashIcon) }) })
       ]
     })
@@ -327,5 +331,13 @@ onMounted(async () => {
 .hero-stat strong { display:block; margin-top:6px; font-size:1.3rem; }
 .provider-pills { display:flex; flex-wrap:wrap; gap:10px; }
 .provider-pill { padding:8px 12px; border-radius:999px; color:var(--text-secondary); font-size:.86rem; }
+.span-3 { grid-column: span 3; }
+.span-9 { grid-column: span 9; }
+.model-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
 @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
 </style>
+
