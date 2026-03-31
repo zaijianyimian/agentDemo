@@ -13,4 +13,7 @@ public class EmailCodeLoginRequest {
 
     @NotBlank(message = "验证码不能为空")
     private String code;
+
+    @NotBlank(message = "请先完成图形验证")
+    private String captchaTicket;
 }

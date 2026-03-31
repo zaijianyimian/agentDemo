@@ -1,8 +1,12 @@
 package com.example.demo.service;
 
+import com.example.demo.config.CacheConfig;
 import com.example.demo.entity.SystemSettings;
 import com.example.demo.mapper.SystemSettingsMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +30,7 @@ public class SystemSettingsService {
     /**
      * 获取所有配置
      */
+    @Cacheable(cacheNames = CacheConfig.SETTINGS_ALL)
     public Map<String, Map<String, String>> getAllSettings() {
         Map<String, Map<String, String>> result = new HashMap<>();
 
@@ -46,6 +51,7 @@ public class SystemSettingsService {
     /**
      * 获取指定分类的配置
      */
+    @Cacheable(cacheNames = CacheConfig.SETTINGS_BY_CATEGORY, key = "#category")
     public Map<String, String> getSettingsByCategory(String category) {
         Map<String, String> result = new HashMap<>();
 
@@ -65,6 +71,7 @@ public class SystemSettingsService {
     /**
      * 获取单个配置值
      */
+    @Cacheable(cacheNames = CacheConfig.SETTINGS_BY_KEY, key = "#category + ':' + #key")
     public String getSetting(String category, String key) {
         try {
             SystemSettings setting = settingsMapper.selectByCategoryAndKey(category, key);
@@ -87,6 +94,11 @@ public class SystemSettingsService {
      * 设置单个配置
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SETTINGS_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SETTINGS_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SETTINGS_BY_KEY, allEntries = true)
+    })
     public void setSetting(String category, String key, String value) {
         try {
             SystemSettings setting = settingsMapper.selectByCategoryAndKey(category, key);
@@ -114,6 +126,11 @@ public class SystemSettingsService {
      * 批量设置配置
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SETTINGS_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SETTINGS_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SETTINGS_BY_KEY, allEntries = true)
+    })
     public void setSettings(String category, Map<String, String> settings) {
         for (Map.Entry<String, String> entry : settings.entrySet()) {
             setSetting(category, entry.getKey(), entry.getValue());
@@ -124,6 +141,11 @@ public class SystemSettingsService {
      * 删除配置
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SETTINGS_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SETTINGS_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SETTINGS_BY_KEY, allEntries = true)
+    })
     public void deleteSetting(String category, String key) {
         try {
             SystemSettings setting = settingsMapper.selectByCategoryAndKey(category, key);

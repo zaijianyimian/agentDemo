@@ -1,7 +1,9 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.ToolExecutionResult;
 import com.example.demo.entity.McpTool;
+import com.example.demo.service.mcp.McpAutoSyncService;
 import com.example.demo.service.mcp.McpToolService;
 import jakarta.annotation.Resource;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,8 @@ public class McpToolController {
 
     @Resource
     private McpToolService mcpToolService;
+    @Resource
+    private McpAutoSyncService mcpAutoSyncService;
 
     // ==================== 工具管理 ====================
 
@@ -141,5 +145,22 @@ public class McpToolController {
                 "toolName", tool.getName(),
                 "toolType", tool.getToolType()
         ));
+    }
+
+    /**
+     * 手动触发 MCP 工具自动同步
+     */
+    @PostMapping("/sync")
+    public ApiResponse<McpAutoSyncService.SyncResult> syncNow(
+            @RequestParam(defaultValue = "false") boolean dryRun) {
+        return ApiResponse.success(mcpAutoSyncService.syncNow(dryRun));
+    }
+
+    /**
+     * 获取最近一次同步状态
+     */
+    @GetMapping("/sync/status")
+    public ApiResponse<McpAutoSyncService.SyncResult> syncStatus() {
+        return ApiResponse.success(mcpAutoSyncService.getLastSyncResult());
     }
 }

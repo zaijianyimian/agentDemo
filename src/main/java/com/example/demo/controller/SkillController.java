@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.SkillExecutionResult;
+import com.example.demo.config.CacheConfig;
 import com.example.demo.entity.McpTool;
 import com.example.demo.entity.Skill;
 import com.example.demo.service.skill.SkillExecutor;
@@ -9,6 +10,8 @@ import com.example.demo.service.skill.SkillLoaderService;
 import com.example.demo.service.mcp.SkillService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -232,11 +235,42 @@ public class SkillController {
      * 从配置文件重新加载技能
      */
     @PostMapping("/reload")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
+    })
     public ResponseEntity<Map<String, Object>> reloadSkills() {
         int loaded = skillLoaderService.loadSkillsFromConfig();
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "成功加载 " + loaded + " 个技能",
+                "count", loaded
+        ));
+    }
+
+    /**
+     * 从 findskills 远程地址重新加载技能
+     */
+    @PostMapping("/reload-findskills")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
+    })
+    public ResponseEntity<Map<String, Object>> reloadSkillsFromFindskills() {
+        int loaded = skillLoaderService.loadSkillsFromFindskills();
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "成功从 findskills 加载 " + loaded + " 个技能",
                 "count", loaded
         ));
     }

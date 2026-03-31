@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,38 +16,25 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("user_account")
-public class UserAccount {
+@TableName("user_face_profile")
+public class UserFaceProfile {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String username;
+    private Long userId;
 
-    private String email;
+    private String embedding;
 
-    private String passwordHash;
+    private Integer vectorDimension;
 
-    private String displayName;
-
-    private String role;
+    private Double qualityScore;
 
     private Boolean enabled;
 
-    private Boolean emailVerified;
-
-    private Boolean faceAuthEnabled;
-
-    private Integer tokenVersion;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime lastLoginTime;
-
     @TableField(fill = FieldFill.INSERT)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updateTime;
 }

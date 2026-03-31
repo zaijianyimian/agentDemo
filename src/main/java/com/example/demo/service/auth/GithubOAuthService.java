@@ -116,7 +116,7 @@ public class GithubOAuthService {
         }
         userAccountMapper.updateById(user);
 
-        AuthTokenResponse token = authService.issueTokensForUser(user);
+        AuthTokenResponse token = authService.issueTokensOrChallenge(user);
         return GithubExchangeResponse.builder()
                 .token(token)
                 .redirectPath(redirectPath)
@@ -205,6 +205,7 @@ public class GithubOAuthService {
                 .role(AuthConstants.DEFAULT_USER_ROLE)
                 .enabled(true)
                 .emailVerified(email != null && !email.isBlank())
+                .faceAuthEnabled(false)
                 .tokenVersion(0)
                 .build();
         userAccountMapper.insert(user);

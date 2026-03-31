@@ -9,6 +9,7 @@
 ### 文档说明
 
 - 本文档已按 `2026-03-29` 的本地实测结果校正。
+- 本文档已补充 `2026-03-31` 新增接口：拼图验证码、MCP 自动同步、findskills 重载。
 - 所有 `SSE` 接口在浏览器 `EventSource` 下可直接使用；命令行、测试脚本或网关联调时建议显式传 `Accept: text/event-stream`。
 - `POST /api/schedule` 与 `PUT /api/schedule/{id}` 的 `eventTime` 同时支持 `yyyy-MM-ddTHH:mm:ss` 和 `yyyy-MM-dd HH:mm:ss`。
 - `POST /api/model/test` 无论模型连通性成功还是失败，通常都会返回 `HTTP 200`，实际结果写在响应体 `data` 字段中。
@@ -17,6 +18,21 @@
 ---
 
 ## 接口列表
+
+按模块分组导航（便于快速查找）：
+
+### Auth
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
+| 拼图验证码获取 | GET | `/auth/captcha/puzzle` | 获取拼图验证码 challenge | ✅ 新增 |
+| 拼图验证码校验 | POST | `/auth/captcha/puzzle/verify` | 校验滑块并签发一次性 ticket | ✅ 新增 |
+| 人脸状态查询 | GET | `/auth/face/status` | 查询当前账号人脸二验状态 | ✅ 新增 |
+| 绑定人脸向量 | POST | `/auth/face/register` | 上传人脸并提取向量绑定 | ✅ 新增 |
+| 切换人脸强制校验 | PUT | `/auth/face/required` | 开启/关闭登录强制人脸二验 | ✅ 新增 |
+| 人脸二验登录校验 | POST | `/auth/face/verify-login` | 使用 preAuthToken + 人脸完成登录 | ✅ 新增 |
+
+### Chat / Analyze / Embedding
 
 | 接口 | 方法 | 路径 | 描述 | 状态 |
 |------|------|------|------|------|
@@ -31,10 +47,20 @@
 | 内容分析 | GET | `/analyze` | 分析文本的重要程度、标签等 | ✅ 已通过 |
 | 文本向量化 | GET | `/embedding` | 返回文本的向量数组 | ❌ 超时(Ollama未启动) |
 | 文本向量化(完整) | GET | `/embedding/full` | 返回完整的向量化响应 | ⏳ 待测 |
+
+### Search
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 网络搜索 | GET | `/search` | 执行网络搜索 | ✅ 已通过 |
 | 搜索+AI总结 | GET | `/search/summary` | 搜索并返回AI总结 | ✅ 已通过 |
 | 带搜索聊天 | GET | `/search/chat` | 先搜索再回答(结构化) | ✅ 已通过 |
 | 带搜索流式聊天 | GET | `/search/chat/stream` | 先搜索再流式回答 | ✅ 已通过 |
+
+### Email
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 邮箱配置列表 | GET | `/email/config/list` | 获取所有邮箱配置 | ✅ 已通过 |
 | 启用的邮箱配置 | GET | `/email/config/enabled` | 获取所有启用的邮箱配置 | ✅ 新增 |
 | 邮箱配置详情 | GET | `/email/config/{id}` | 获取单个邮箱配置 | ✅ 新增 |
@@ -48,6 +74,11 @@
 | 邮箱服务器模板 | GET | `/email/templates` | 获取常用邮箱服务器配置 | ✅ 已通过 |
 | 测试邮箱连接 | POST | `/email/config/{id}/test` | 测试已保存的邮箱配置 | ⏳ 待测 |
 | 测试新配置 | POST | `/email/config/test` | 测试未保存的邮箱配置 | ⏳ 待测 |
+
+### MCP
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | MCP工具列表 | GET | `/mcp/tools` | 获取所有MCP工具 | ✅ 已通过 |
 | MCP启用工具 | GET | `/mcp/tools/enabled` | 获取启用的MCP工具 | ✅ 已通过 |
 | MCP工具详情 | GET | `/mcp/tools/{id}` | 获取单个MCP工具 | ✅ 已通过 |
@@ -58,9 +89,16 @@
 | 执行MCP工具 | POST | `/mcp/tools/{name}/execute` | 执行指定工具 | ✅ 已通过(需外部API) |
 | 测试MCP工具 | POST | `/mcp/tools/{id}/test` | 测试工具执行 | ✅ 已通过(需外部API) |
 | 验证工具配置 | POST | `/mcp/tools/{id}/validate` | 验证工具配置是否有效 | ✅ 新增 |
+| MCP 工具手动同步 | POST | `/mcp/tools/sync` | 手动触发远端工具清单同步 | ✅ 新增 |
+| MCP 同步状态 | GET | `/mcp/tools/sync/status` | 获取最近一次 MCP 同步结果 | ✅ 新增 |
 | MCP Agent对话 | GET/POST | `/mcp/agent/chat` | AI自动调用工具对话 | ✅ 已通过 |
 | MCP Agent流式 | GET | `/mcp/agent/chat/stream` | AI流式对话(SSE) | ✅ 已通过 |
 | MCP Agent带记忆 | GET | `/mcp/agent/chat/{sessionId}` | 带会话记忆对话 | ✅ 已通过 |
+
+### Skill
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 技能列表 | GET | `/skill/list` | 获取所有技能 | ✅ 已通过 |
 | 启用的技能 | GET | `/skill/enabled` | 获取所有启用的技能 | ✅ 新增 |
 | 内置技能 | GET | `/skill/builtin` | 获取内置技能 | ✅ 已通过 |
@@ -78,10 +116,21 @@
 | 执行技能 | POST | `/skill/{code}/execute` | 执行技能 | ✅ 已通过(无工具时返回提示) |
 | 测试技能执行 | POST | `/skill/{id}/test` | 测试指定技能执行 | ✅ 新增 |
 | 重新加载技能 | POST | `/skill/reload` | 从YAML重新加载技能 | ✅ 已通过 |
+| 远程重载技能 | POST | `/skill/reload-findskills` | 从 findskills 远程地址加载技能 | ✅ 新增 |
 | 导入技能 | POST | `/skill/import` | JSON导入技能 | ✅ 已通过 |
 | 导出技能 | GET | `/skill/{id}/export` | 导出技能为JSON | ✅ 已通过 |
+
+### Memory
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 记忆提取存储 | POST | `/memory/extract-store` | 从对话提取并存储记忆 | ✅ 新增 |
 | 记忆搜索 | GET | `/memory/search` | 搜索相关记忆 | ✅ 新增 |
+
+### Schedule
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 日程列表 | GET | `/schedule/list` | 获取所有日程 | ✅ 已通过 |
 | 最近日程 | GET | `/schedule/latest` | 获取最近的日程(默认5条) | ✅ 新增 |
 | 今日日程 | GET | `/schedule/today` | 获取今天的日程 | ✅ 已通过 |
@@ -101,11 +150,21 @@
 | 按日期查文件 | GET | `/schedule/file/date/{date}` | 按日期读取日程文件 | ✅ 新增 |
 | 按文件名读取 | GET | `/schedule/file/{fileName}` | 按文件名读取日程文件 | ✅ 新增 |
 | 按ID读文件 | GET | `/schedule/{id}/file` | 按日程ID读取文件 | ✅ 新增 |
+
+### File
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 文件上传 | POST | `/file/upload` | 上传文件并AI分析 | ✅ 已通过 |
 | 文件列表 | GET | `/file/list` | 获取所有文件列表 | ✅ 已通过 |
 | 文件详情 | GET | `/file/{id}` | 获取文件详情 | ✅ 已通过 |
 | 删除文件 | DELETE | `/file/{id}` | 删除文件 | ✅ 已通过 |
 | 按重要性搜索 | GET | `/file/search` | 按重要程度查询文件 | ✅ 已通过 |
+
+### Note
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 笔记列表 | GET | `/note/list` | 获取所有笔记 | ✅ 已通过 |
 | 笔记详情 | GET | `/note/{id}` | 获取笔记详情 | ✅ 已通过 |
 | 创建笔记 | POST | `/note` | 创建笔记 | ✅ 已通过 |
@@ -114,6 +173,11 @@
 | 切换置顶 | PUT | `/note/{id}/pin` | 切换置顶状态 | ✅ 已通过 |
 | AI总结笔记 | POST | `/note/{id}/summarize` | AI总结笔记内容 | ✅ 已通过 |
 | 搜索笔记 | GET | `/note/search` | 搜索笔记 | ✅ 已通过 |
+
+### Snippet
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 代码片段列表 | GET | `/snippet/list` | 获取所有代码片段 | ✅ 已通过 |
 | 片段详情 | GET | `/snippet/{id}` | 获取片段详情 | ✅ 已通过 |
 | 按语言查询 | GET | `/snippet/language/{language}` | 根据编程语言查询片段 | ✅ 新增 |
@@ -122,12 +186,22 @@
 | 删除片段 | DELETE | `/snippet/{id}` | 删除片段 | ✅ 已通过 |
 | 搜索片段 | GET | `/snippet/search` | 搜索代码片段 | ✅ 已通过 |
 | AI解释代码 | POST | `/snippet/{id}/explain` | AI解释代码 | ✅ 已通过 |
+
+### Code
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 代码生成类型 | GET | `/code/types` | 获取支持的代码类型 | ✅ 已通过 |
 | 生成代码 | POST | `/code/generate` | AI生成代码 | ✅ 已通过 |
 | 保存代码 | POST | `/code/save` | 保存代码到文件 | ✅ 已通过 |
 | 代码审查 | POST | `/code/review` | AI代码审查 | ✅ 已通过 |
 | 代码转换 | POST | `/code/convert` | 代码语言转换 | ✅ 已通过 |
 | 分析项目 | GET | `/code/analyze` | 分析项目结构 | ✅ 已通过 |
+
+### Chat History
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 创建会话 | POST | `/chat/history/session` | 创建聊天会话 | ✅ 已通过 |
 | 会话列表 | GET | `/chat/history/sessions` | 获取所有会话 | ✅ 已通过 |
 | 会话详情 | GET | `/chat/history/session/{id}` | 获取会话详情 | ✅ 已通过 |
@@ -136,6 +210,11 @@
 | 会话消息列表 | GET | `/chat/history/session/{sessionId}/messages` | 获取会话消息 | ✅ 已通过 |
 | 添加消息 | POST | `/chat/history/session/{sessionId}/message` | 添加消息到会话 | ✅ 已通过 |
 | 清空会话消息 | DELETE | `/chat/history/session/{sessionId}/messages` | 清空会话消息 | ✅ 已通过 |
+
+### Knowledge
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 知识库列表 | GET | `/knowledge/list` | 获取所有知识库 | ✅ 新增 |
 | 知识库详情 | GET | `/knowledge/{id}` | 获取知识库详情 | ✅ 新增 |
 | 创建知识库 | POST | `/knowledge` | 创建知识库 | ✅ 已修复并验证 |
@@ -147,6 +226,11 @@
 | 删除文档 | DELETE | `/knowledge/document/{docId}` | 删除文档 | ✅ 新增 |
 | RAG问答 | GET | `/knowledge/{baseId}/query` | 基于知识库问答 | ✅ 已修复并验证 |
 | 语义搜索 | GET | `/knowledge/{baseId}/search` | 搜索相关文档片段 | ✅ 已修复并验证 |
+
+### Task
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 任务列表 | GET | `/task/list` | 获取所有定时任务 | ✅ 新增 |
 | 任务详情 | GET | `/task/{id}` | 获取任务详情 | ✅ 新增 |
 | 创建任务 | POST | `/task` | 创建定时任务 | ✅ 新增 |
@@ -155,6 +239,11 @@
 | 启用禁用任务 | PUT | `/task/{id}/toggle` | 切换启用状态 | ✅ 新增 |
 | 手动执行任务 | POST | `/task/{id}/execute` | 手动执行任务 | ✅ 新增 |
 | 任务类型 | GET | `/task/types` | 获取任务类型列表 | ✅ 新增 |
+
+### Model
+
+| 接口 | 方法 | 路径 | 描述 | 状态 |
+|------|------|------|------|------|
 | 模型列表 | GET | `/model/list` | 获取所有模型配置 | ✅ 新增 |
 | 模型详情 | GET | `/model/{id}` | 获取模型详情 | ✅ 新增 |
 | 创建模型 | POST | `/model` | 创建模型配置 | ✅ 新增 |
@@ -164,6 +253,128 @@
 | 设置默认模型 | PUT | `/model/{id}/default` | 设置为默认模型 | ✅ 新增 |
 | 测试模型连接 | POST | `/model/test` | 测试模型连接 | ✅ 已验证(结果见响应体) |
 | 提供商列表 | GET | `/model/providers` | 获取支持的提供商 | ✅ 新增 |
+
+---
+
+## 29. 拼图验证码与认证联动
+
+### 29.1 获取验证码 challenge
+
+```
+GET /api/auth/captcha/puzzle
+```
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "data": {
+    "captchaId": "c5d8...f1",
+    "backgroundImage": "data:image/svg+xml;base64,...",
+    "pieceImage": "data:image/svg+xml;base64,...",
+    "pieceWidth": 44,
+    "pieceHeight": 44,
+    "expiresInSeconds": 180
+  }
+}
+```
+
+### 29.2 校验验证码并获取 ticket
+
+```
+POST /api/auth/captcha/puzzle/verify
+Content-Type: application/json
+```
+
+**请求体：**
+```json
+{
+  "captchaId": "c5d8...f1",
+  "sliderPercent": 52.6
+}
+```
+
+**响应示例：**
+```json
+{
+  "success": true,
+  "data": {
+    "passed": true,
+    "ticket": "a1b2...z9",
+    "ticketExpiresInSeconds": 180,
+    "message": "验证通过"
+  }
+}
+```
+
+### 29.3 认证接口 ticket 要求
+
+以下接口请求体已要求传 `captchaTicket`：
+- `POST /api/auth/register`
+- `POST /api/auth/login/password`
+- `POST /api/auth/login/email/send-code`
+- `POST /api/auth/login/email`
+
+---
+
+## 30. MCP 自动同步接口
+
+### 30.1 手动触发同步
+
+```
+POST /api/mcp/tools/sync?dryRun=false
+```
+
+`dryRun=true` 时仅计算差异，不落库。
+
+### 30.2 查询同步状态
+
+```
+GET /api/mcp/tools/sync/status
+```
+
+返回最近一次同步开始/结束时间、增量统计、告警与结果信息。
+
+### 30.3 自动同步配置
+
+```yaml
+app:
+  mcp:
+    auto-sync:
+      enabled: false
+      url: ""
+      token: ""
+      cron: "0 */5 * * * ?"
+      connect-timeout-seconds: 5
+      read-timeout-seconds: 15
+      sync-enabled-state: true
+      disable-missing: true
+      missing-threshold: 2
+```
+
+---
+
+## 31. findskills 远程自动加载
+
+技能自动加载支持两条链路：
+- 本地 YAML：`POST /api/skill/reload`
+- 远程 findskills：`POST /api/skill/reload-findskills`
+
+配置示例：
+
+```yaml
+app:
+  skills:
+    config-path: skills.yaml
+    auto-load: true
+    findskills-enabled: false
+    findskills-url: ""
+    findskills-timeout-seconds: 10
+```
+
+远程返回支持：
+- `{"skills":[...]}`
+- `[...]`
 
 ---
 

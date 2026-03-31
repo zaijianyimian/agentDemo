@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS `user_account` (
     `role` VARCHAR(30) DEFAULT 'USER' COMMENT '角色',
     `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
     `email_verified` TINYINT(1) DEFAULT 0 COMMENT '邮箱是否已验证',
+    `face_auth_enabled` TINYINT(1) DEFAULT 0 COMMENT '是否开启人脸二次验证',
     `token_version` INT NOT NULL DEFAULT 0 COMMENT 'JWT版本号，用于令牌失效',
     `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -69,6 +70,20 @@ CREATE TABLE IF NOT EXISTS `user_account` (
     UNIQUE KEY `uk_user_account_email` (`email`),
     INDEX `idx_user_account_enabled` (`enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户账号表';
+
+CREATE TABLE IF NOT EXISTS `user_face_profile` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `embedding` LONGTEXT NOT NULL COMMENT '人脸向量(JSON数组)',
+    `vector_dimension` INT NOT NULL COMMENT '向量维度',
+    `quality_score` DOUBLE DEFAULT NULL COMMENT '图像质量分(0-1)',
+    `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY `uk_user_face_profile_user_id` (`user_id`),
+    INDEX `idx_user_face_profile_enabled` (`enabled`),
+    CONSTRAINT `fk_user_face_profile_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户人脸认证向量表';
 
 CREATE TABLE IF NOT EXISTS `oauth_account` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',

@@ -20,6 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
 
@@ -43,6 +47,17 @@ public class SkillLoaderService {
     @Value("${app.skills.auto-load:true}")
     private boolean autoLoad;
 
+    @Value("${app.skills.findskills-enabled:false}")
+    private boolean findskillsEnabled;
+
+    @Value("${app.skills.findskills-url:}")
+    private String findskillsUrl;
+
+    @Value("${app.skills.findskills-timeout-seconds:10}")
+    private int findskillsTimeoutSeconds;
+
+    private final HttpClient httpClient = HttpClient.newBuilder().build();
+
     /**
      * 启动时自动加载技能
      */
@@ -50,6 +65,9 @@ public class SkillLoaderService {
     public void init() {
         if (autoLoad) {
             loadSkillsFromConfig();
+        }
+        if (findskillsEnabled) {
+            loadSkillsFromFindskills();
         }
     }
 
@@ -72,6 +90,60 @@ public class SkillLoaderService {
             }
         } catch (IOException e) {
             log.error("加载技能配置失败", e);
+            return 0;
+        }
+    }
+
+    /**
+     * 从 findskills 远程地址加载技能定义（JSON）
+     * 支持两种格式：
+     * 1) {"skills":[...]}
+     * 2) [...]
+     */
+    @Transactional
+    public int loadSkillsFromFindskills() {
+        if (findskillsUrl == null || findskillsUrl.isBlank()) {
+            log.warn("findskills 已启用，但未配置 app.skills.findskills-url");
+            return 0;
+        }
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(findskillsUrl.trim()))
+                    .header("Accept", "application/json")
+                    .GET()
+                    .timeout(java.time.Duration.ofSeconds(Math.max(3, findskillsTimeoutSeconds)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.warn("findskills 加载失败，HTTP状态: {}", response.statusCode());
+                return 0;
+            }
+
+            String body = response.body();
+            if (body == null || body.isBlank()) {
+                log.warn("findskills 返回为空");
+                return 0;
+            }
+
+            String trimmed = body.trim();
+            if (trimmed.startsWith("[")) {
+                List<SkillDefinition> defs = objectMapper.readValue(
+                        trimmed,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, SkillDefinition.class)
+                );
+                return loadSkills(defs);
+            }
+
+            SkillsConfig config = objectMapper.readValue(trimmed, SkillsConfig.class);
+            if (config == null || config.getSkills() == null) {
+                log.warn("findskills 返回格式无效，缺少 skills 字段");
+                return 0;
+            }
+            return loadSkills(config.getSkills());
+        } catch (Exception e) {
+            log.error("从 findskills 加载技能失败: {}", findskillsUrl, e);
             return 0;
         }
     }

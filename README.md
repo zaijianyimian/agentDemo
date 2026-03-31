@@ -2,6 +2,14 @@
 
 一个基于 **Spring Boot 3 + LangChain4j + Vue 3** 的全栈 AI Agent 项目，覆盖聊天、记忆、搜索、RAG、工具编排、技能系统、邮件监听、日程管理、定时任务、报告生成与受控自治等能力。
 
+## 最新更新（2026-03-31）
+
+- 登录/注册接入后端拼图验证码（challenge + verify + 一次性 ticket）
+- 登录支持“密码/邮箱后人脸二次验证”链路（preAuthToken + 人脸向量比对）
+- 新增 MCP 工具自动同步（定时拉取、手动触发、幂等增量、失联下线保护）
+- 技能支持 `findskills` 远程自动加载（可开关）
+- 接入 Caffeine 缓存，减少用户、模型、技能、系统设置读库压力
+
 ## 项目定位
 
 本项目面向“个人 AI 工作台”场景：
@@ -46,6 +54,7 @@ agentDemo/
 │  ├─ skills.yaml
 │  └─ sql/
 │     ├─ agent.sql
+│     ├─ migration_20260331_face_auth_non_destructive.sql
 │     ├─ search_history.sql
 │     └─ system_settings.sql
 ├─ frontend/           # Vue 前端工程
@@ -135,6 +144,7 @@ CREATE DATABASE agent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 再执行脚本：
 - `src/main/resources/sql/agent.sql`
+- `src/main/resources/sql/migration_20260331_face_auth_non_destructive.sql`
 - `src/main/resources/sql/search_history.sql`
 - `src/main/resources/sql/system_settings.sql`
 
@@ -147,6 +157,8 @@ CREATE DATABASE agent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 - `app.search.*`
 - `app.mail.*`
 - `app.security.*`（JWT 与登录安全配置）
+- `app.mcp.auto-sync.*`（MCP 自动同步）
+- `app.skills.*`（技能 YAML 与 findskills 自动加载）
 
 注意：仓库中的配置可能包含本地敏感值，部署前请替换为你自己的配置。
 
@@ -222,6 +234,37 @@ npm run preview
 - `app.file`：文档上传目录与类型
 - `app.autonomy`：项目自治扫描、验证与产物输出
 - `app.security`：JWT、刷新令牌、邮箱验证码与 GitHub OAuth
+- `app.mcp.auto-sync`：MCP 工具自动同步（URL、token、cron、缺失下线策略）
+- `app.skills`：技能配置路径、自动加载、findskills 远程加载
+
+### MCP 自动同步示例
+
+```yaml
+app:
+  mcp:
+    auto-sync:
+      enabled: true
+      url: "https://your-domain.example.com/mcp/tools"
+      token: "your-bearer-token"
+      cron: "0 */5 * * * ?"
+      connect-timeout-seconds: 5
+      read-timeout-seconds: 15
+      sync-enabled-state: true
+      disable-missing: true
+      missing-threshold: 2
+```
+
+### findskills 自动加载示例
+
+```yaml
+app:
+  skills:
+    config-path: skills.yaml
+    auto-load: true
+    findskills-enabled: true
+    findskills-url: "https://your-domain.example.com/findskills.json"
+    findskills-timeout-seconds: 10
+```
 
 ## 运行数据目录
 

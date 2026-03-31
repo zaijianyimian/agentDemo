@@ -41,6 +41,9 @@ public class SecurityConfig {
                                 "/api/auth/login/email/send-code",
                                 "/api/auth/login/email",
                                 "/api/auth/token/refresh",
+                                "/api/auth/captcha/puzzle",
+                                "/api/auth/captcha/puzzle/verify",
+                                "/api/auth/face/verify-login",
                                 "/api/auth/oauth/github/authorize",
                                 "/api/auth/oauth/github/exchange"
                         ).permitAll()

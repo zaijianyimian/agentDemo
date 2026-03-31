@@ -1,7 +1,7 @@
 package com.example.demo.service.auth;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.dto.auth.AuthTokenResponse;
+import com.example.demo.dto.auth.FaceStatusResponse;
 import com.example.demo.dto.auth.EmailCodeSendResponse;
 import com.example.demo.dto.auth.AuthUserProfile;
 import com.example.demo.dto.auth.RegisterRequest;
@@ -23,8 +23,14 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
     private final EmailCodeService emailCodeService;
+    private final PuzzleCaptchaService puzzleCaptchaService;
+    private final UserAccountCacheService userAccountCacheService;
+    private final FaceAuthService faceAuthService;
+    private final PreAuthTokenService preAuthTokenService;
 
     public EmailCodeSendResponse register(RegisterRequest request) {
+        puzzleCaptchaService.consumeTicket(request.getCaptchaTicket());
+
         String username = normalize(request.getUsername());
         String email = normalizeEmail(request.getEmail());
 
@@ -45,6 +51,7 @@ public class AuthService {
                 .role(AuthConstants.DEFAULT_USER_ROLE)
                 .enabled(true)
                 .emailVerified(false)
+                .faceAuthEnabled(false)
                 .tokenVersion(0)
                 .build();
 
@@ -56,7 +63,8 @@ public class AuthService {
                 .build();
     }
 
-    public AuthTokenResponse loginByPassword(String usernameOrEmail, String password) {
+    public AuthTokenResponse loginByPassword(String usernameOrEmail, String password, String captchaTicket) {
+        puzzleCaptchaService.consumeTicket(captchaTicket);
         UserAccount user = requireActiveUser(findByUsernameOrEmail(usernameOrEmail));
         if (!Boolean.TRUE.equals(user.getEmailVerified())) {
             throw new IllegalArgumentException("邮箱未验证，请先使用邮箱验证码登录完成确认");
@@ -65,15 +73,17 @@ public class AuthService {
             throw new IllegalArgumentException("用户名或密码错误");
         }
         markLoginSuccess(user);
-        return issueTokens(user);
+        return issueTokensOrChallenge(user);
     }
 
-    public int sendLoginCode(String email) {
+    public int sendLoginCode(String email, String captchaTicket) {
+        puzzleCaptchaService.consumeTicket(captchaTicket);
         UserAccount user = requireActiveUser(findByEmail(email));
         return emailCodeService.sendLoginCode(user.getEmail());
     }
 
-    public AuthTokenResponse loginByEmailCode(String email, String code) {
+    public AuthTokenResponse loginByEmailCode(String email, String code, String captchaTicket) {
+        puzzleCaptchaService.consumeTicket(captchaTicket);
         UserAccount user = requireActiveUser(findByEmail(email));
 
         boolean ok = emailCodeService.verifyAndConsumeAuthCode(user.getEmail(), code);
@@ -83,7 +93,7 @@ public class AuthService {
 
         user.setEmailVerified(true);
         markLoginSuccess(user);
-        return issueTokens(user);
+        return issueTokensOrChallenge(user);
     }
 
     public AuthTokenResponse refreshToken(String refreshToken) {
@@ -103,14 +113,14 @@ public class AuthService {
             throw new IllegalArgumentException("refreshToken 无效");
         }
 
-        UserAccount user = requireActiveUser(userAccountMapper.selectById(userId));
+        UserAccount user = requireActiveUser(userAccountCacheService.findById(userId));
         validateTokenVersion(jwt, user);
 
         return issueTokens(user);
     }
 
     public AuthUserProfile getProfile(Long userId) {
-        UserAccount user = userAccountMapper.selectById(userId);
+        UserAccount user = userAccountCacheService.findById(userId);
         if (user == null) {
             throw new IllegalArgumentException("用户不存在");
         }
@@ -118,7 +128,7 @@ public class AuthService {
     }
 
     public void changePassword(Long userId, String currentPassword, String newPassword) {
-        UserAccount user = userAccountMapper.selectById(userId);
+        UserAccount user = userAccountCacheService.findById(userId);
         if (user == null) {
             throw new IllegalArgumentException("用户不存在");
         }
@@ -130,12 +140,14 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         bumpTokenVersion(user);
         userAccountMapper.updateById(user);
+        userAccountCacheService.evictUser(user);
     }
 
     public void logout(Long userId) {
-        UserAccount user = requireActiveUser(userAccountMapper.selectById(userId));
+        UserAccount user = requireActiveUser(userAccountCacheService.findById(userId));
         bumpTokenVersion(user);
         userAccountMapper.updateById(user);
+        userAccountCacheService.evictUser(user);
     }
 
     public Long extractUserIdFromJwt(Jwt jwt) {
@@ -150,6 +162,53 @@ public class AuthService {
         return issueTokens(requireActiveUser(user));
     }
 
+    public AuthTokenResponse issueTokensOrChallenge(UserAccount user) {
+        UserAccount activeUser = requireActiveUser(user);
+        if (faceAuthService.isFaceRequired(activeUser)) {
+            FaceStatusResponse status = faceAuthService.getStatus(activeUser.getId());
+            if (!status.isEnrolled() || !status.isEnabled()) {
+                throw new IllegalArgumentException("账号已开启人脸二次验证，但未绑定可用人脸，请联系管理员处理");
+            }
+            PreAuthTokenService.PreAuthSession session = preAuthTokenService.issue(activeUser.getId());
+            return AuthTokenResponse.builder()
+                    .requiresSecondFactor(true)
+                    .preAuthToken(session.getToken())
+                    .preAuthExpiresIn(preAuthTokenService.getExpiresInSeconds())
+                    .user(toProfile(activeUser))
+                    .build();
+        }
+        return issueTokens(activeUser);
+    }
+
+    public AuthTokenResponse verifyFaceLogin(String preAuthToken, String imageBase64) {
+        PreAuthTokenService.PreAuthSession session = preAuthTokenService.consume(preAuthToken);
+        UserAccount user = requireActiveUser(userAccountCacheService.findById(session.getUserId()));
+        faceAuthService.verifyForLogin(user.getId(), imageBase64);
+        return issueTokens(user);
+    }
+
+    public FaceStatusResponse getFaceStatus(Long userId) {
+        return faceAuthService.getStatus(userId);
+    }
+
+    public FaceStatusResponse registerFace(Long userId, String imageBase64) {
+        FaceStatusResponse response = faceAuthService.register(userId, imageBase64);
+        UserAccount user = userAccountCacheService.findById(userId);
+        if (user != null) {
+            userAccountCacheService.evictUser(user);
+        }
+        return response;
+    }
+
+    public FaceStatusResponse updateFaceRequired(Long userId, boolean required) {
+        FaceStatusResponse response = faceAuthService.updateRequired(userId, required);
+        UserAccount user = userAccountCacheService.findById(userId);
+        if (user != null) {
+            userAccountCacheService.evictUser(user);
+        }
+        return response;
+    }
+
     public void validateTokenVersion(Jwt jwt, UserAccount user) {
         Number tokenVersion = jwt.getClaim("tokenVersion");
         int expectedVersion = safeTokenVersion(user);
@@ -161,7 +220,7 @@ public class AuthService {
 
     public void validateTokenVersion(Jwt jwt) {
         Long userId = extractUserIdFromJwt(jwt);
-        UserAccount user = requireActiveUser(userAccountMapper.selectById(userId));
+        UserAccount user = requireActiveUser(userAccountCacheService.findById(userId));
         validateTokenVersion(jwt, user);
     }
 
@@ -174,6 +233,7 @@ public class AuthService {
                 .refreshToken(refreshToken)
                 .expiresIn(jwtTokenService.getAccessTokenExpiresInSeconds())
                 .user(toProfile(user))
+                .requiresSecondFactor(false)
                 .build();
     }
 
@@ -198,6 +258,7 @@ public class AuthService {
     private void markLoginSuccess(UserAccount user) {
         user.setLastLoginTime(LocalDateTime.now());
         userAccountMapper.updateById(user);
+        userAccountCacheService.evictUser(user);
     }
 
     private void bumpTokenVersion(UserAccount user) {
@@ -205,23 +266,19 @@ public class AuthService {
     }
 
     private UserAccount findByUsername(String username) {
-        return userAccountMapper.selectOne(new LambdaQueryWrapper<UserAccount>()
-                .eq(UserAccount::getUsername, normalize(username))
-                .last("LIMIT 1"));
+        return userAccountCacheService.findByUsername(normalize(username));
     }
 
     private UserAccount findByEmail(String email) {
-        return userAccountMapper.selectOne(new LambdaQueryWrapper<UserAccount>()
-                .eq(UserAccount::getEmail, normalizeEmail(email))
-                .last("LIMIT 1"));
+        return userAccountCacheService.findByEmail(normalizeEmail(email));
     }
 
     private UserAccount findByUsernameOrEmail(String usernameOrEmail) {
-        String value = normalize(usernameOrEmail);
-        String lowerEmail = value.toLowerCase();
-        return userAccountMapper.selectOne(new LambdaQueryWrapper<UserAccount>()
-                .and(q -> q.eq(UserAccount::getUsername, value).or().eq(UserAccount::getEmail, lowerEmail))
-                .last("LIMIT 1"));
+        String normalized = normalize(usernameOrEmail);
+        if (normalized.contains("@")) {
+            normalized = normalized.toLowerCase();
+        }
+        return userAccountCacheService.findByUsernameOrEmail(normalized);
     }
 
     private String normalize(String value) {

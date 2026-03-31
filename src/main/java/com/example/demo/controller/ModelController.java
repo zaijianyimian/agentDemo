@@ -5,7 +5,11 @@ import com.example.demo.entity.AiModelConfig;
 import com.example.demo.mapper.AiModelConfigMapper;
 import com.example.demo.service.ai.EncodingService;
 import com.example.demo.service.ai.ModelManager;
+import com.example.demo.config.CacheConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -36,6 +40,7 @@ public class ModelController {
      * 获取模型列表（不返回 API Key）
      */
     @GetMapping("/list")
+    @Cacheable(cacheNames = CacheConfig.MODEL_LIST)
     public ApiResponse<List<Map<String, Object>>> list() {
         List<AiModelConfig> configs = configMapper.selectList(null);
         List<Map<String, Object>> result = configs.stream()
@@ -48,6 +53,7 @@ public class ModelController {
      * 获取模型详情
      */
     @GetMapping("/{id}")
+    @Cacheable(cacheNames = CacheConfig.MODEL_DETAIL, key = "#id")
     public ApiResponse<Map<String, Object>> get(@PathVariable Long id) {
         AiModelConfig config = configMapper.selectById(id);
         if (config == null) {
@@ -60,6 +66,11 @@ public class ModelController {
      * 创建模型
      */
     @PostMapping
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.MODEL_LIST, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_PROVIDERS, allEntries = true)
+    })
     public ApiResponse<Map<String, Object>> create(@RequestBody AiModelConfig config) {
         try {
             normalizeConfig(config);
@@ -96,6 +107,11 @@ public class ModelController {
      * 更新模型
      */
     @PutMapping("/{id}")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.MODEL_LIST, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_PROVIDERS, allEntries = true)
+    })
     public ApiResponse<Map<String, Object>> update(@PathVariable Long id, @RequestBody AiModelConfig config) {
         AiModelConfig existing = configMapper.selectById(id);
         if (existing == null) {
@@ -138,6 +154,11 @@ public class ModelController {
      * 删除模型
      */
     @DeleteMapping("/{id}")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.MODEL_LIST, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_PROVIDERS, allEntries = true)
+    })
     public ApiResponse<Void> delete(@PathVariable Long id) {
         AiModelConfig existing = configMapper.selectById(id);
         if (existing == null) {
@@ -164,6 +185,11 @@ public class ModelController {
      * 启用/禁用模型
      */
     @PutMapping("/{id}/toggle")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.MODEL_LIST, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_PROVIDERS, allEntries = true)
+    })
     public ApiResponse<Map<String, Object>> toggle(@PathVariable Long id) {
         AiModelConfig config = configMapper.selectById(id);
         if (config == null) {
@@ -204,6 +230,11 @@ public class ModelController {
      * 设置为默认模型
      */
     @PutMapping("/{id}/default")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.MODEL_LIST, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.MODEL_PROVIDERS, allEntries = true)
+    })
     public ApiResponse<Map<String, Object>> setDefault(@PathVariable Long id) {
         AiModelConfig config = configMapper.selectById(id);
         if (config == null) {
@@ -242,6 +273,7 @@ public class ModelController {
      * 获取支持的提供商列表
      */
     @GetMapping("/providers")
+    @Cacheable(cacheNames = CacheConfig.MODEL_PROVIDERS)
     public ApiResponse<List<Map<String, String>>> getProviders() {
         return ApiResponse.success(List.of(
                 Map.of("value", "openai", "label", "OpenAI", "baseUrl", "https://api.openai.com/v1"),

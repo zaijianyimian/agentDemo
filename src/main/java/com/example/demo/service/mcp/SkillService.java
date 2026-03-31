@@ -7,8 +7,12 @@ import com.example.demo.entity.SkillToolMapping;
 import com.example.demo.mapper.McpToolMapper;
 import com.example.demo.mapper.SkillMapper;
 import com.example.demo.mapper.SkillToolMappingMapper;
+import com.example.demo.config.CacheConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +37,7 @@ public class SkillService {
     /**
      * 获取所有技能
      */
+    @Cacheable(cacheNames = CacheConfig.SKILL_LIST_ALL)
     public List<Skill> listAll() {
         return skillMapper.selectList(null);
     }
@@ -40,6 +45,7 @@ public class SkillService {
     /**
      * 获取启用的技能
      */
+    @Cacheable(cacheNames = CacheConfig.SKILL_LIST_ENABLED)
     public List<Skill> listEnabled() {
         return skillMapper.selectList(
                 new LambdaQueryWrapper<Skill>().eq(Skill::getEnabled, true)
@@ -49,6 +55,7 @@ public class SkillService {
     /**
      * 获取内置技能
      */
+    @Cacheable(cacheNames = CacheConfig.SKILL_LIST_BUILTIN)
     public List<Skill> listBuiltin() {
         return skillMapper.selectList(
                 new LambdaQueryWrapper<Skill>().eq(Skill::getIsBuiltin, true)
@@ -58,6 +65,7 @@ public class SkillService {
     /**
      * 按分类获取技能
      */
+    @Cacheable(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, key = "#category")
     public List<Skill> listByCategory(String category) {
         return skillMapper.selectList(
                 new LambdaQueryWrapper<Skill>()
@@ -69,6 +77,7 @@ public class SkillService {
     /**
      * 获取所有分类
      */
+    @Cacheable(cacheNames = CacheConfig.SKILL_CATEGORIES)
     public List<String> listCategories() {
         List<Skill> skills = skillMapper.selectList(
                 new LambdaQueryWrapper<Skill>()
@@ -84,6 +93,7 @@ public class SkillService {
     /**
      * 根据 ID 获取技能
      */
+    @Cacheable(cacheNames = CacheConfig.SKILL_BY_ID, key = "#id", unless = "#result == null")
     public Skill getById(Long id) {
         return skillMapper.selectById(id);
     }
@@ -91,6 +101,7 @@ public class SkillService {
     /**
      * 根据编码获取技能
      */
+    @Cacheable(cacheNames = CacheConfig.SKILL_BY_CODE, key = "#code", unless = "#result == null")
     public Skill getByCode(String code) {
         return skillMapper.selectOne(
                 new LambdaQueryWrapper<Skill>().eq(Skill::getCode, code)
@@ -103,6 +114,15 @@ public class SkillService {
      * 添加技能
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
+    })
     public void add(Skill skill) {
         // 检查编码是否已存在
         Skill existing = getByCode(skill.getCode());
@@ -131,6 +151,15 @@ public class SkillService {
      * 更新技能
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
+    })
     public void update(Skill skill) {
         Skill existing = skillMapper.selectById(skill.getId());
         if (existing == null) {
@@ -150,6 +179,15 @@ public class SkillService {
      * 删除技能
      */
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
+    })
     public void delete(Long id) {
         Skill skill = skillMapper.selectById(id);
         if (skill == null) {
@@ -173,6 +211,15 @@ public class SkillService {
     /**
      * 切换启用状态
      */
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
+    })
     public void toggleEnabled(Long id) {
         Skill skill = skillMapper.selectById(id);
         if (skill == null) {

@@ -11,4 +11,7 @@ public class AuthTokenResponse {
     private String refreshToken;
     private long expiresIn;
     private AuthUserProfile user;
+    private boolean requiresSecondFactor;
+    private String preAuthToken;
+    private long preAuthExpiresIn;
 }
