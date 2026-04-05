@@ -65,9 +65,35 @@
           <span>强制登录二次验证</span>
           <n-switch :value="faceRequired" :disabled="!faceStatus?.enrolled" @update:value="toggleFaceRequired" />
         </div>
-        <div class="backup-actions">
-          <input type="file" accept="image/*" @change="onFaceFileSelect" />
-          <n-button size="small" type="primary" :loading="faceSaving" @click="saveFaceProfile">上传并绑定人脸</n-button>
+        <div class="face-capture-section">
+          <div class="camera-preview" v-if="cameraActive">
+            <video ref="videoRef" autoplay playsinline class="video-element"></video>
+            <canvas ref="canvasRef" style="display: none;"></canvas>
+          </div>
+          <div class="capture-actions" v-if="cameraActive">
+            <n-button type="primary" size="small" @click="captureFacePhoto" :loading="capturing">
+              拍照
+            </n-button>
+            <n-button size="small" @click="stopCamera">取消</n-button>
+          </div>
+          <div v-if="!cameraActive && !faceImageBase64" class="start-camera">
+            <n-button type="primary" size="small" @click="startCamera">
+              <template #icon><n-icon><CameraIcon /></n-icon></template>
+              打开摄像头
+            </n-button>
+            <div class="or-divider">或</div>
+            <div class="file-upload">
+              <input type="file" accept="image/*" @change="onFaceFileSelect" />
+              <span>选择本地图片</span>
+            </div>
+          </div>
+          <div v-if="faceImageBase64" class="preview-section">
+            <img :src="faceImageBase64" class="face-preview" alt="人脸预览" />
+            <div class="preview-actions">
+              <n-button size="small" @click="retakeFacePhoto">重新拍摄</n-button>
+              <n-button type="primary" size="small" :loading="faceSaving" @click="saveFaceProfile">确认绑定</n-button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -117,8 +143,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { NButton, NEmpty, NSwitch, NUpload, useMessage } from 'naive-ui'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { NButton, NEmpty, NIcon, NSwitch, NUpload, useMessage } from 'naive-ui'
+import { CameraOutline as CameraIcon } from '@vicons/ionicons5'
 import { authService, personalService, settingsService } from '@/services/api'
 import type { FaceStatusResponse, PersonalInsight, TaskTemplate } from '@/types'
 import {
@@ -146,6 +173,13 @@ const faceStatus = ref<FaceStatusResponse | null>(null)
 const faceRequired = ref(false)
 const faceImageBase64 = ref('')
 const faceSaving = ref(false)
+
+// 摄像头相关
+const videoRef = ref<HTMLVideoElement | null>(null)
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+const cameraActive = ref(false)
+const capturing = ref(false)
+let mediaStream: MediaStream | null = null
 
 const loadData = async () => {
   const [insightRes, templateRes, settingsRes, faceStatusRes] = await Promise.all([
@@ -300,6 +334,93 @@ const onFaceFileSelect = async (event: Event) => {
   faceImageBase64.value = await toBase64(file)
 }
 
+// 摄像头功能
+const startCamera = async () => {
+  // 检查浏览器是否支持
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    message.error('您的浏览器不支持摄像头功能，请使用现代浏览器（Chrome/Firefox/Edge）')
+    return
+  }
+
+  // 检查是否是安全上下文
+  const isSecureContext = window.isSecureContext || location.protocol === 'https:' ||
+                          location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+  if (!isSecureContext) {
+    message.error('摄像头功能需要 HTTPS 安全连接，请使用 https:// 访问或使用 localhost')
+    return
+  }
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: 640, height: 480 }
+    })
+    cameraActive.value = true
+    await new Promise(resolve => setTimeout(resolve, 100))
+    if (videoRef.value && mediaStream) {
+      videoRef.value.srcObject = mediaStream
+    }
+  } catch (error: any) {
+    console.error('Camera error:', error)
+    // 根据错误类型给出具体提示
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      message.error('摄像头权限被拒绝，请在浏览器地址栏左侧点击允许摄像头访问')
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      message.error('未检测到摄像头设备，请确保设备已连接摄像头')
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      message.error('摄像头可能被其他应用占用，请关闭其他使用摄像头的应用后重试')
+    } else if (error.name === 'OverconstrainedError') {
+      message.error('摄像头不支持所需分辨率，请尝试使用本地图片')
+    } else if (error.name === 'NotSupportedError') {
+      message.error('浏览器不支持摄像头功能，请使用本地图片')
+    } else {
+      message.error(`无法访问摄像头: ${error.message || '未知错误'}，请使用本地图片`)
+    }
+  }
+}
+
+const stopCamera = () => {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop())
+    mediaStream = null
+  }
+  cameraActive.value = false
+}
+
+const captureFacePhoto = async () => {
+  if (!videoRef.value || !canvasRef.value) return
+
+  capturing.value = true
+  try {
+    const video = videoRef.value
+    const canvas = canvasRef.value
+    const sourceWidth = video.videoWidth || 640
+    const sourceHeight = video.videoHeight || 480
+    const square = Math.min(sourceWidth, sourceHeight)
+    const sourceX = Math.floor((sourceWidth - square) / 2)
+    const sourceY = Math.floor((sourceHeight - square) / 2)
+
+    canvas.width = 320
+    canvas.height = 320
+
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.drawImage(video, sourceX, sourceY, square, square, 0, 0, canvas.width, canvas.height)
+      faceImageBase64.value = canvas.toDataURL('image/jpeg', 0.95)
+      stopCamera()
+    }
+  } catch (error) {
+    message.error('拍照失败，请重试')
+    console.error('Capture error:', error)
+  } finally {
+    capturing.value = false
+  }
+}
+
+const retakeFacePhoto = () => {
+  faceImageBase64.value = ''
+  startCamera()
+}
+
 const saveFaceProfile = async () => {
   if (!faceImageBase64.value) {
     message.warning('请先选择人脸图片')
@@ -339,6 +460,10 @@ const toggleFaceRequired = async (value: boolean) => {
 }
 
 onMounted(loadData)
+
+onUnmounted(() => {
+  stopCamera()
+})
 </script>
 
 <style scoped>
@@ -418,6 +543,79 @@ onMounted(loadData)
   align-items: center;
   gap: 12px;
 }
+
+.face-capture-section {
+  margin-top: 12px;
+}
+
+.camera-preview {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.video-element {
+  width: 100%;
+  display: block;
+  transform: scaleX(-1);
+}
+
+.capture-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  justify-content: center;
+}
+
+.start-camera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .03);
+}
+
+.or-divider {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.file-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.file-upload input {
+  cursor: pointer;
+}
+
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.face-preview {
+  width: 100%;
+  max-width: 240px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.preview-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .preset-list {
   display: flex;
   flex-wrap: wrap;

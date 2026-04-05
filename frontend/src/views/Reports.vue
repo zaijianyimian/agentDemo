@@ -82,6 +82,7 @@ import { computed, onMounted, ref } from 'vue'
 import { NButton, NEmpty, NTag, useMessage } from 'naive-ui'
 import type { GeneratedReport, ReportArtifact } from '@/types'
 import { reportService } from '@/services/api'
+import { sanitizeHtml } from '@/utils/sanitize-html'
 import dayjs from 'dayjs'
 import { marked } from 'marked'
 
@@ -100,9 +101,9 @@ const renderedReportContent = computed(() => {
   const content = currentReport.value?.content || ''
   if (!content) return ''
   try {
-    return marked.parse(content, { breaks: true, gfm: true }) as string
+    return sanitizeHtml(marked.parse(content, { breaks: true, gfm: true }) as string)
   } catch {
-    return content
+    return sanitizeHtml(content)
   }
 })
 

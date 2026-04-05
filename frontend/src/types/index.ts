@@ -38,6 +38,13 @@ export interface EmailConfig {
   id: number
   email: string
   password: string
+  authType?: 'password' | 'oauth2_access_token' | 'oauth2_refresh_token'
+  oauthClientId?: string
+  oauthClientSecret?: string
+  oauthRefreshToken?: string
+  oauthAccessToken?: string
+  oauthTokenEndpoint?: string
+  oauthScope?: string
   host: string
   port: number
   sslEnabled: boolean
@@ -287,22 +294,6 @@ export interface AuthTokenResponse {
 export interface EmailCodeSendResponse {
   cooldownSeconds: number
   message: string
-}
-
-export interface PuzzleCaptchaResponse {
-  captchaId: string
-  backgroundImage: string
-  pieceImage: string
-  pieceWidth: number
-  pieceHeight: number
-  expiresInSeconds: number
-}
-
-export interface PuzzleCaptchaVerifyResponse {
-  passed: boolean
-  ticket?: string
-  ticketExpiresInSeconds?: number
-  message?: string
 }
 
 export interface GithubAuthorizeResponse {

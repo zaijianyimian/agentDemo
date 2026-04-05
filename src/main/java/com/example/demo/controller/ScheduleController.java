@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.example.demo.dto.ApiResponse;
 import com.example.demo.entity.ScheduleEvent;
 import com.example.demo.mapper.ScheduleEventMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -50,55 +51,55 @@ public class ScheduleController {
             Sinks.many().multicast().onBackpressureBuffer();
 
     @GetMapping("/list")
-    public List<ScheduleEvent> listAll() {
-        return scheduleEventMapper.selectList(null);
+    public ApiResponse<List<ScheduleEvent>> listAll() {
+        return ApiResponse.success(scheduleEventMapper.selectList(null));
     }
 
     @GetMapping("/latest")
-    public List<ScheduleEvent> getLatest(@RequestParam(defaultValue = "5") int limit) {
+    public ApiResponse<List<ScheduleEvent>> getLatest(@RequestParam(defaultValue = "5") int limit) {
         List<ScheduleEvent> all = scheduleEventMapper.selectList(null);
-        return all.stream().limit(limit).toList();
+        return ApiResponse.success(all.stream().limit(limit).toList());
     }
 
     @GetMapping("/today")
-    public List<ScheduleEvent> getToday() {
-        return scheduleEventMapper.selectList(
+    public ApiResponse<List<ScheduleEvent>> getToday() {
+        return ApiResponse.success(scheduleEventMapper.selectList(
                 new QueryWrapper<ScheduleEvent>().eq("event_date", LocalDate.now())
-        );
+        ));
     }
 
     @GetMapping("/tomorrow")
-    public List<ScheduleEvent> getTomorrow() {
-        return scheduleEventMapper.selectList(
+    public ApiResponse<List<ScheduleEvent>> getTomorrow() {
+        return ApiResponse.success(scheduleEventMapper.selectList(
                 new QueryWrapper<ScheduleEvent>().eq("event_date", LocalDate.now().plusDays(1))
-        );
+        ));
     }
 
     @GetMapping("/date/{date}")
-    public List<ScheduleEvent> getByDate(@PathVariable String date) {
-        return scheduleEventMapper.selectList(
+    public ApiResponse<List<ScheduleEvent>> getByDate(@PathVariable String date) {
+        return ApiResponse.success(scheduleEventMapper.selectList(
                 new QueryWrapper<ScheduleEvent>().eq("event_date", LocalDate.parse(date))
-        );
+        ));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ScheduleEvent> getById(@PathVariable Long id) {
+    public ApiResponse<ScheduleEvent> getById(@PathVariable Long id) {
         ScheduleEvent event = scheduleEventMapper.selectById(id);
         if (event == null) {
-            return ResponseEntity.notFound().build();
+            return ApiResponse.error("日程不存在");
         }
-        return ResponseEntity.ok(event);
+        return ApiResponse.success(event);
     }
 
     @GetMapping("/range")
-    public List<ScheduleEvent> getByDateRange(
+    public ApiResponse<List<ScheduleEvent>> getByDateRange(
             @RequestParam String startDate,
             @RequestParam String endDate) {
-        return scheduleEventMapper.selectList(
+        return ApiResponse.success(scheduleEventMapper.selectList(
                 new QueryWrapper<ScheduleEvent>()
                         .ge("event_date", LocalDate.parse(startDate))
                         .le("event_date", LocalDate.parse(endDate))
-        );
+        ));
     }
 
     /**
@@ -214,7 +215,7 @@ public class ScheduleController {
     }
 
     @PostMapping
-    public ResponseEntity<ScheduleEvent> add(@RequestBody ScheduleEvent event) {
+    public ApiResponse<ScheduleEvent> add(@RequestBody ScheduleEvent event) {
         LocalDateTime now = LocalDateTime.now();
         event.setCreateTime(now);
         event.setUpdateTime(now);
@@ -229,14 +230,14 @@ public class ScheduleController {
         scheduleEventMapper.insert(event);
         syncScheduleFile(event.getEventDate());
         publishScheduleEvent("created", event);
-        return ResponseEntity.ok(event);
+        return ApiResponse.success(event, "日程创建成功");
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ScheduleEvent> update(@PathVariable Long id, @RequestBody ScheduleEvent event) {
+    public ApiResponse<ScheduleEvent> update(@PathVariable Long id, @RequestBody ScheduleEvent event) {
         ScheduleEvent existing = scheduleEventMapper.selectById(id);
         if (existing == null) {
-            return ResponseEntity.notFound().build();
+            return ApiResponse.error("日程不存在");
         }
         LocalDate previousDate = existing.getEventDate();
         event.setId(id);
@@ -251,46 +252,46 @@ public class ScheduleController {
 
         ScheduleEvent updated = scheduleEventMapper.selectById(id);
         publishScheduleEvent("updated", updated);
-        return ResponseEntity.ok(updated);
+        return ApiResponse.success(updated, "日程更新成功");
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> delete(@PathVariable Long id) {
+    public ApiResponse<Void> delete(@PathVariable Long id) {
         ScheduleEvent existing = scheduleEventMapper.selectById(id);
         scheduleEventMapper.deleteById(id);
         if (existing != null) {
             syncScheduleFile(existing.getEventDate());
             publishScheduleEvent("deleted", existing);
         }
-        return ResponseEntity.ok("删除成功");
+        return ApiResponse.success(null, "删除成功");
     }
 
     @PutMapping("/{id}/complete")
-    public ResponseEntity<String> markComplete(@PathVariable Long id) {
+    public ApiResponse<ScheduleEvent> markComplete(@PathVariable Long id) {
         ScheduleEvent event = scheduleEventMapper.selectById(id);
         if (event == null) {
-            return ResponseEntity.notFound().build();
+            return ApiResponse.error("日程不存在");
         }
         event.setStatus("completed");
         event.setUpdateTime(LocalDateTime.now());
         scheduleEventMapper.updateById(event);
         syncScheduleFile(event.getEventDate());
         publishScheduleEvent("completed", event);
-        return ResponseEntity.ok("已标记完成");
+        return ApiResponse.success(event, "已标记完成");
     }
 
     @PutMapping("/{id}/cancel")
-    public ResponseEntity<String> markCancel(@PathVariable Long id) {
+    public ApiResponse<ScheduleEvent> markCancel(@PathVariable Long id) {
         ScheduleEvent event = scheduleEventMapper.selectById(id);
         if (event == null) {
-            return ResponseEntity.notFound().build();
+            return ApiResponse.error("日程不存在");
         }
         event.setStatus("cancelled");
         event.setUpdateTime(LocalDateTime.now());
         scheduleEventMapper.updateById(event);
         syncScheduleFile(event.getEventDate());
         publishScheduleEvent("cancelled", event);
-        return ResponseEntity.ok("已取消");
+        return ApiResponse.success(event, "已取消");
     }
 
     // ==================== 邮件解析接口 ====================
@@ -308,16 +309,16 @@ public class ScheduleController {
      * 从邮件提取日程
      */
     @PostMapping("/parse-email")
-    public ResponseEntity<ScheduleEvent> parseEmail(@RequestBody EmailParseRequest request) {
+    public ApiResponse<ScheduleEvent> parseEmail(@RequestBody EmailParseRequest request) {
         try {
             ScheduleEvent event = extractScheduleFromEmail(request.subject(), request.from(), request.content());
             if (event == null) {
-                return ResponseEntity.badRequest().build();
+                return ApiResponse.error("无法从邮件中提取日程信息");
             }
-            return ResponseEntity.ok(event);
+            return ApiResponse.success(event);
         } catch (Exception e) {
             log.error("解析邮件失败", e);
-            return ResponseEntity.internalServerError().build();
+            return ApiResponse.error("解析邮件失败");
         }
     }
 
@@ -325,11 +326,11 @@ public class ScheduleController {
      * 解析并保存日程
      */
     @PostMapping("/parse-and-save")
-    public ResponseEntity<ScheduleEvent> parseAndSave(@RequestBody EmailParseRequest request) {
+    public ApiResponse<ScheduleEvent> parseAndSave(@RequestBody EmailParseRequest request) {
         try {
             ScheduleEvent event = extractScheduleFromEmail(request.subject(), request.from(), request.content());
             if (event == null) {
-                return ResponseEntity.badRequest().build();
+                return ApiResponse.error("无法从邮件中提取日程信息");
             }
 
             // 设置默认值
@@ -351,10 +352,10 @@ public class ScheduleController {
             syncScheduleFile(event.getEventDate());
             publishScheduleEvent("created_from_email", event);
             log.info("从邮件创建日程: {}", event.getTitle());
-            return ResponseEntity.ok(event);
+            return ApiResponse.success(event, "从邮件创建日程成功");
         } catch (Exception e) {
             log.error("解析并保存日程失败", e);
-            return ResponseEntity.internalServerError().build();
+            return ApiResponse.error("解析并保存日程失败");
         }
     }
 

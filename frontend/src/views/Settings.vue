@@ -585,6 +585,159 @@
             </n-button>
           </div>
         </div>
+
+        <!-- 代理设置 -->
+        <div v-show="activeSection === 'proxy'" class="section-wrapper">
+          <div class="section-header">
+            <h2 class="section-title">
+              <n-icon size="20"><GitBranchIcon /></n-icon>
+              代理设置
+            </h2>
+            <p class="section-desc">配置网络代理，用于 GitHub OAuth 等外部 API 访问</p>
+          </div>
+
+          <div class="settings-grid">
+            <div class="setting-card full-width">
+              <div class="setting-card-header">
+                <n-icon size="24" class="setting-icon"><PowerIcon /></n-icon>
+                <div>
+                  <h3>启用代理</h3>
+                  <p>开启后，GitHub OAuth 请求将通过代理服务器转发</p>
+                </div>
+              </div>
+              <n-switch
+                v-model:value="proxySettings.enabled"
+                checked-value="true"
+                unchecked-value="false"
+                size="large"
+              />
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-card-header">
+                <n-icon size="24" class="setting-icon"><GlobeIcon /></n-icon>
+                <div>
+                  <h3>代理类型</h3>
+                  <p>选择代理协议类型</p>
+                </div>
+              </div>
+              <n-select
+                v-model:value="proxySettings.type"
+                :options="proxyTypeOptions"
+                size="large"
+              />
+            </div>
+
+            <div class="setting-card">
+              <div class="setting-card-header">
+                <n-icon size="24" class="setting-icon"><ServerIcon /></n-icon>
+                <div>
+                  <h3>代理端口</h3>
+                  <p>代理服务的端口号</p>
+                </div>
+              </div>
+              <n-input-number
+                :value="Number(proxySettings.port)"
+                @update:value="(val: number | null) => proxySettings.port = String(val || 7890)"
+                :min="1"
+                :max="65535"
+                size="large"
+                style="width: 100%"
+              />
+            </div>
+
+            <div class="setting-card full-width">
+              <div class="setting-card-header">
+                <n-icon size="24" class="setting-icon"><GlobeIcon /></n-icon>
+                <div>
+                  <h3>代理主机</h3>
+                  <p>代理服务器的 IP 地址或域名</p>
+                </div>
+              </div>
+              <n-input v-model:value="proxySettings.host" placeholder="127.0.0.1" size="large" />
+            </div>
+          </div>
+
+          <div class="proxy-tip">
+            <n-icon size="16"><AnalyticsIcon /></n-icon>
+            <span>提示：常见的本地代理端口有 7890 (Clash)、1080 (SOCKS5)、8080 (HTTP) 等</span>
+          </div>
+
+          <div class="section-actions">
+            <n-button type="primary" size="large" @click="saveProxySettings" :loading="saving">
+              <template #icon><n-icon><SaveIcon /></n-icon></template>
+              保存设置
+            </n-button>
+          </div>
+        </div>
+
+        <!-- 数据备份 -->
+        <div v-show="activeSection === 'backup'" class="section-wrapper">
+          <div class="section-header">
+            <h2 class="section-title">
+              <n-icon size="20"><DownloadIcon /></n-icon>
+              数据备份
+            </h2>
+            <p class="section-desc">导出或导入完整系统数据（数据库 + data/generated 文件）</p>
+          </div>
+
+          <div class="settings-grid">
+            <div class="setting-card full-width">
+              <div class="setting-card-header">
+                <n-icon size="24" class="setting-icon"><DownloadIcon /></n-icon>
+                <div>
+                  <h3>导出全部数据</h3>
+                  <p>生成 ZIP 压缩包，包含数据库全量数据和本地业务文件</p>
+                </div>
+              </div>
+              <n-button type="primary" size="large" @click="exportDataArchive" :loading="exportingData">
+                <template #icon><n-icon><DownloadIcon /></n-icon></template>
+                导出 ZIP
+              </n-button>
+            </div>
+
+            <div class="setting-card full-width">
+              <div class="setting-card-header">
+                <n-icon size="24" class="setting-icon"><CloudUploadIcon /></n-icon>
+                <div>
+                  <h3>导入数据包</h3>
+                  <p>选择 ZIP 包导入，可选择是否覆盖现有数据</p>
+                </div>
+              </div>
+
+              <div class="backup-import-controls">
+                <input
+                  ref="archiveInputRef"
+                  class="zip-file-input"
+                  type="file"
+                  accept=".zip,application/zip"
+                  @change="handleArchiveFileSelected"
+                />
+                <p v-if="selectedArchiveName" class="upload-tip">
+                  已选择：{{ selectedArchiveName }}
+                </p>
+                <div class="backup-import-switch">
+                  <span>覆盖现有数据</span>
+                  <n-switch v-model:value="importReplaceExisting" />
+                </div>
+                <p class="upload-tip">建议先执行导出再导入；导入后会自动刷新系统配置缓存。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-actions">
+            <n-button
+              type="primary"
+              size="large"
+              @click="importDataArchive"
+              :loading="importingData"
+              :disabled="!selectedArchiveFile"
+            >
+              <template #icon><n-icon><CloudUploadIcon /></n-icon></template>
+              导入 ZIP
+            </n-button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -627,8 +780,10 @@ import {
   MailOutline as MailIcon,
   CalendarOutline as CalendarIcon,
   CloudUploadOutline as CloudUploadIcon,
+  DownloadOutline as DownloadIcon,
   PulseOutline as PulseIcon,
-  CloseOutline as CloseIcon
+  CloseOutline as CloseIcon,
+  GitBranchOutline as GitBranchIcon
 } from '@vicons/ionicons5'
 import { embeddingService, searchService, settingsService } from '@/services/api'
 import { useThemeStore } from '@/stores/theme'
@@ -638,6 +793,12 @@ const themeStore = useThemeStore()
 const activeSection = ref('system')
 const saving = ref(false)
 const testing = ref(false)
+const exportingData = ref(false)
+const importingData = ref(false)
+const importReplaceExisting = ref(true)
+const selectedArchiveFile = ref<File | null>(null)
+const selectedArchiveName = ref('')
+const archiveInputRef = ref<HTMLInputElement | null>(null)
 
 // 导航项
 const navItems = [
@@ -646,7 +807,9 @@ const navItems = [
   { key: 'qdrant', label: '向量数据库', icon: ServerIcon },
   { key: 'search', label: '网络搜索', icon: SearchIcon },
   { key: 'schedule', label: '日程管理', icon: CalendarIcon },
-  { key: 'file', label: '文件上传', icon: FolderIcon }
+  { key: 'file', label: '文件上传', icon: FolderIcon },
+  { key: 'proxy', label: '代理设置', icon: GitBranchIcon },
+  { key: 'backup', label: '数据备份', icon: DownloadIcon }
 ]
 
 // 各类设置
@@ -693,11 +856,24 @@ const fileSettings = ref<Record<string, string>>({
   max_file_size: '10MB'
 })
 
+const proxySettings = ref<Record<string, string>>({
+  enabled: 'false',
+  host: '127.0.0.1',
+  port: '7890',
+  type: 'http'
+})
+
 // 搜索引擎选项
 const searchEngineOptions = [
   { label: 'Serper (推荐)', value: 'serper' },
   { label: 'Tavily', value: 'tavily' },
   { label: 'Bing', value: 'bing' }
+]
+
+// 代理类型选项
+const proxyTypeOptions = [
+  { label: 'HTTP', value: 'http' },
+  { label: 'SOCKS5', value: 'socks5' }
 ]
 
 // 加载所有设置
@@ -728,6 +904,9 @@ const loadAllSettings = async () => {
       }
       if (data.file) {
         fileSettings.value = { ...fileSettings.value, ...data.file }
+      }
+      if (data.proxy) {
+        proxySettings.value = { ...proxySettings.value, ...data.proxy }
       }
     }
   } catch (error: any) {
@@ -879,353 +1058,306 @@ const saveFileSettings = async () => {
   }
 }
 
+// 保存代理设置
+const saveProxySettings = async () => {
+  saving.value = true
+  try {
+    await settingsService.updateProxy(proxySettings.value)
+    message.success('代理设置已保存，GitHub 登录将使用新配置')
+  } catch (error) {
+    message.error('保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+const handleArchiveFileSelected = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files && input.files.length > 0 ? input.files[0] : null
+  selectedArchiveFile.value = file
+  selectedArchiveName.value = file ? file.name : ''
+}
+
+const resetArchiveSelection = () => {
+  selectedArchiveFile.value = null
+  selectedArchiveName.value = ''
+  if (archiveInputRef.value) {
+    archiveInputRef.value.value = ''
+  }
+}
+
+const exportDataArchive = async () => {
+  exportingData.value = true
+  try {
+    const blob = await settingsService.exportDataZip()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const now = new Date().toISOString().replace(/[:.]/g, '-')
+    link.href = url
+    link.download = `agent-data-backup-${now}.zip`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+    message.success('导出成功')
+  } catch (error: any) {
+    message.error('导出失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    exportingData.value = false
+  }
+}
+
+const importDataArchive = async () => {
+  if (!selectedArchiveFile.value) {
+    message.warning('请先选择 ZIP 文件')
+    return
+  }
+
+  importingData.value = true
+  try {
+    const res = await settingsService.importDataZip(selectedArchiveFile.value, importReplaceExisting.value)
+    if (res.success) {
+      const summary = res.data as any
+      const tableCount = summary?.db?.importedTables ?? 0
+      const rowCount = summary?.db?.importedRows ?? 0
+      const fileCount = summary?.files ?? 0
+      message.success(`导入成功：${tableCount} 张表，${rowCount} 行数据，${fileCount} 个文件`)
+      await loadAllSettings()
+      resetArchiveSelection()
+    } else {
+      message.error(res.message || '导入失败')
+    }
+  } catch (error: any) {
+    message.error('导入失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    importingData.value = false
+  }
+}
+
 onMounted(() => {
   loadAllSettings()
 })
 </script>
 
 <style scoped>
-.settings-page {
-  min-height: 100%;
-}
+.settings-page { min-height: 100%; }
 
 /* 页面头部 */
 .page-header {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light, #fb923c) 100%);
-  padding: 32px;
-  border-radius: 16px;
-  margin-bottom: 24px;
-  position: relative;
-  overflow: hidden;
+  background: var(--gradient-warm);
+  padding: 28px;
+  border-radius: var(--radius-xl);
+  margin-bottom: 20px;
 }
 
-.page-header::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -20%;
-  width: 400px;
-  height: 400px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-}
-
-.header-content {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  position: relative;
-  z-index: 1;
-}
+.header-content { display: flex; align-items: center; gap: 16px; }
 
 .header-icon {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
 }
 
-.header-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: white;
-  margin: 0;
-}
-
-.header-subtitle {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 4px 0 0;
-}
+.header-title { font-size: 24px; font-weight: 700; color: white; margin: 0; }
+.header-subtitle { font-size: 14px; color: rgba(255, 255, 255, 0.85); margin: 4px 0 0; }
 
 /* 设置容器 */
 .settings-container {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 24px;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
 }
 
 /* 左侧导航 */
-.settings-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.settings-nav { display: flex; flex-direction: column; gap: 4px; }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
 }
 
-.nav-item:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.nav-item.active {
-  background: var(--primary-color);
-  color: white;
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
-}
+.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-item.active { background: var(--primary-color); color: white; }
 
 /* 右侧内容 */
-.settings-content {
-  min-height: 600px;
-}
+.settings-content { min-height: 500px; }
 
-.section-wrapper {
-  animation: fadeIn 0.3s ease;
-}
+.section-wrapper { animation: fadeIn 0.25s ease; }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.section-header {
-  margin-bottom: 24px;
-}
+.section-header { margin-bottom: 20px; }
 
 .section-title {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 20px;
+  gap: 8px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 }
 
-.section-title .n-icon {
-  color: var(--primary-color);
-}
-
-.section-desc {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 0;
-}
+.section-title .n-icon { color: var(--primary-color); }
+.section-desc { font-size: 13px; color: var(--text-secondary); margin: 0; }
 
 /* 设置网格 */
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  gap: 14px;
 }
 
 /* 设置卡片 */
 .setting-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 20px;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-lg);
+  padding: 18px;
 }
 
-.setting-card:hover {
-  border-color: var(--primary-color);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-}
-
-.setting-card.full-width {
-  grid-column: span 2;
-}
+.setting-card:hover { border-color: var(--primary-color); }
+.setting-card.full-width { grid-column: span 2; }
 
 .setting-card-header {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
-.setting-icon {
-  color: var(--primary-color);
-  flex-shrink: 0;
-}
+.setting-icon { color: var(--primary-color); flex-shrink: 0; }
 
 .setting-card-header h3 {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 4px;
 }
 
-.setting-card-header p {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 0;
-  line-height: 1.4;
-}
+.setting-card-header p { font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.4; }
 
 /* 主题选项 */
-.theme-options {
-  display: flex;
-  gap: 12px;
-}
+.theme-options { display: flex; gap: 10px; }
 
 .theme-option {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
+  gap: 6px;
+  padding: 10px;
   border: 2px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.theme-option:hover {
-  border-color: var(--primary-color);
-}
-
-.theme-option.active {
-  border-color: var(--primary-color);
-  background: rgba(249, 115, 22, 0.1);
-}
+.theme-option:hover { border-color: var(--primary-color); }
+.theme-option.active { border-color: var(--primary-color); background: var(--bg-active); }
 
 .theme-preview {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
   border: 1px solid var(--border-color);
 }
 
-.theme-preview.light {
-  background: linear-gradient(135deg, #ffffff 50%, #f5f5f5 50%);
-}
-
-.theme-preview.dark {
-  background: linear-gradient(135deg, #1c1917 50%, #292524 50%);
-}
-
-.theme-preview.auto {
-  background: linear-gradient(135deg, #ffffff 50%, #1c1917 50%);
-}
-
-.theme-option span {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
+.theme-preview.light { background: linear-gradient(135deg, #fff 50%, #f5f5f5 50%); }
+.theme-preview.dark { background: linear-gradient(135deg, #1c1917 50%, #292524 50%); }
+.theme-preview.auto { background: linear-gradient(135deg, #fff 50%, #1c1917 50%); }
+.theme-option span { font-size: 12px; color: var(--text-secondary); }
 
 /* Logo上传 */
-.logo-upload-area {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.logo-preview {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: var(--bg-hover);
-  border-radius: 12px;
-}
-
-.logo-preview img {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-  border-radius: 8px;
-}
-
-.logo-preview .remove-btn {
-  color: var(--text-secondary);
-}
-
-.logo-preview .remove-btn:hover {
-  color: var(--primary-color);
-}
+.logo-upload-area { display: flex; flex-direction: column; gap: 10px; }
+.logo-preview { display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg-hover); border-radius: var(--radius-md); }
+.logo-preview img { width: 40px; height: 40px; object-fit: contain; border-radius: 6px; }
+.logo-preview .remove-btn { color: var(--text-secondary); }
+.logo-preview .remove-btn:hover { color: var(--primary-color); }
 
 .upload-btn {
   width: 100%;
-  height: 48px;
+  height: 44px;
   border: 2px dashed var(--border-color);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
-  transition: all 0.2s ease;
 }
 
-.upload-btn:hover {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
+.upload-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
+.upload-tip { font-size: 12px; color: var(--text-muted); margin: 0; }
+
+.backup-import-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.upload-tip {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin: 0;
+.zip-file-input {
+  width: 100%;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+}
+
+.backup-import-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
 }
 
 /* 滑块 */
-.slider-wrapper {
-  padding: 8px 0;
-}
-
-.slider-labels {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
+.slider-wrapper { padding: 6px 0; }
+.slider-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
 
 /* 操作按钮 */
 .section-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 24px;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
   border-top: 1px solid var(--border-color);
 }
 
 /* 响应式 */
 @media (max-width: 900px) {
-  .settings-container {
-    grid-template-columns: 1fr;
-  }
+  .settings-container { grid-template-columns: 1fr; }
+  .settings-nav { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .nav-item { flex: 1; min-width: 100px; justify-content: center; }
+  .settings-grid { grid-template-columns: 1fr; }
+  .setting-card.full-width { grid-column: span 1; }
+}
 
-  .settings-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .nav-item {
-    flex: 1;
-    min-width: 120px;
-    justify-content: center;
-  }
-
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .setting-card.full-width {
-    grid-column: span 1;
-  }
+/* 代理提示 */
+.proxy-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-md);
+  margin-top: 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 </style>

@@ -10,6 +10,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -25,21 +26,26 @@ import java.util.List;
 public class FaceAuthService {
 
     private static final int TARGET_SIZE = 32;
-    private static final double DEFAULT_THRESHOLD = 0.85D;
-    private static final double MIN_QUALITY_SCORE = 0.10D;
 
     private final UserFaceProfileMapper userFaceProfileMapper;
     private final UserAccountMapper userAccountMapper;
     private final ObjectMapper objectMapper;
+
+    @Value("${app.auth.face.threshold:0.72}")
+    private double similarityThreshold;
+
+    @Value("${app.auth.face.min-quality:0.06}")
+    private double minQualityScore;
 
     public FaceStatusResponse register(Long userId, String imageBase64) {
         UserAccount user = userAccountMapper.selectById(userId);
         if (user == null) {
             throw new IllegalArgumentException("用户不存在");
         }
-        List<Double> embedding = extractEmbedding(imageBase64);
-        double quality = evaluateQuality(embedding);
-        if (quality < MIN_QUALITY_SCORE) {
+        FaceVector vector = extractFaceVector(imageBase64);
+        List<Double> embedding = vector.embedding();
+        double quality = vector.quality();
+        if (quality < minQualityScore) {
             throw new IllegalArgumentException("图片质量过低，请使用清晰正脸照片");
         }
 
@@ -102,14 +108,14 @@ public class FaceAuthService {
             throw new IllegalArgumentException("当前账号未绑定可用人脸，请联系管理员");
         }
         List<Double> source = readEmbedding(profile.getEmbedding());
-        List<Double> current = extractEmbedding(imageBase64);
+        List<Double> current = extractFaceVector(imageBase64).embedding();
         return cosineSimilarity(source, current);
     }
 
     public void verifyForLogin(Long userId, String imageBase64) {
         double similarity = verifySimilarity(userId, imageBase64);
-        if (similarity < DEFAULT_THRESHOLD) {
-            throw new IllegalArgumentException("人脸验证失败，请重试");
+        if (similarity < similarityThreshold) {
+            throw new IllegalArgumentException(String.format("人脸验证失败（相似度 %.3f，阈值 %.3f）", similarity, similarityThreshold));
         }
     }
 
@@ -119,7 +125,7 @@ public class FaceAuthService {
                 .last("LIMIT 1"));
     }
 
-    private List<Double> extractEmbedding(String imageBase64) {
+    private FaceVector extractFaceVector(String imageBase64) {
         byte[] bytes = decodeImageBytes(imageBase64);
         BufferedImage raw;
         try {
@@ -131,25 +137,28 @@ public class FaceAuthService {
             throw new IllegalArgumentException("图片内容无效");
         }
 
+        BufferedImage cropped = cropToCenterSquare(raw);
         BufferedImage scaled = new BufferedImage(TARGET_SIZE, TARGET_SIZE, BufferedImage.TYPE_BYTE_GRAY);
         Graphics2D graphics = scaled.createGraphics();
         try {
-            graphics.drawImage(raw, 0, 0, TARGET_SIZE, TARGET_SIZE, null);
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            graphics.drawImage(cropped, 0, 0, TARGET_SIZE, TARGET_SIZE, null);
         } finally {
             graphics.dispose();
         }
 
-        double[] vector = new double[TARGET_SIZE * TARGET_SIZE];
+        double[] rawVector = new double[TARGET_SIZE * TARGET_SIZE];
         int idx = 0;
         for (int y = 0; y < TARGET_SIZE; y++) {
             for (int x = 0; x < TARGET_SIZE; x++) {
                 int rgb = scaled.getRGB(x, y);
                 int gray = rgb & 0xff;
-                vector[idx++] = gray / 255.0D;
+                rawVector[idx++] = gray / 255.0D;
             }
         }
-        normalize(vector);
-        return java.util.Arrays.stream(vector).boxed().toList();
+        double quality = evaluateQuality(rawVector);
+        normalize(rawVector);
+        return new FaceVector(java.util.Arrays.stream(rawVector).boxed().toList(), quality);
     }
 
     private byte[] decodeImageBytes(String imageBase64) {
@@ -184,12 +193,21 @@ public class FaceAuthService {
         }
     }
 
-    private double evaluateQuality(List<Double> embedding) {
-        double mean = embedding.stream().mapToDouble(Double::doubleValue).average().orElse(0.0D);
-        double variance = embedding.stream()
-                .mapToDouble(item -> Math.pow(item - mean, 2))
-                .average()
-                .orElse(0.0D);
+    private double evaluateQuality(double[] vector) {
+        if (vector == null || vector.length == 0) {
+            return 0.0D;
+        }
+        double sum = 0.0D;
+        for (double value : vector) {
+            sum += value;
+        }
+        double mean = sum / vector.length;
+        double variance = 0.0D;
+        for (double value : vector) {
+            double delta = value - mean;
+            variance += delta * delta;
+        }
+        variance = variance / vector.length;
         return Math.sqrt(variance);
     }
 
@@ -226,4 +244,15 @@ public class FaceAuthService {
             vector[i] = vector[i] / norm;
         }
     }
+
+    private BufferedImage cropToCenterSquare(BufferedImage source) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        int size = Math.min(width, height);
+        int x = Math.max(0, (width - size) / 2);
+        int y = Math.max(0, (height - size) / 2);
+        return source.getSubimage(x, y, size, size);
+    }
+
+    private record FaceVector(List<Double> embedding, double quality) {}
 }

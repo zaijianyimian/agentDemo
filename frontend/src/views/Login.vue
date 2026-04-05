@@ -4,15 +4,40 @@
       <section class="form-panel">
         <template v-if="pendingPreAuthToken">
           <h2>人脸二次验证</h2>
-          <p class="face-tip">已通过账号验证，请上传清晰正脸图片完成登录。</p>
+          <p class="face-tip">已通过账号验证，请使用摄像头拍摄正脸照片完成登录。</p>
           <n-form label-placement="top">
             <n-form-item label="预认证有效期">
               <n-input :value="`${pendingPreAuthExpiresIn}s`" disabled />
             </n-form-item>
             <n-form-item label="人脸图片">
-              <div class="face-upload">
-                <input type="file" accept="image/*" @change="onFaceImageChange" />
-                <span>{{ faceImageName || '请选择图片后提交验证' }}</span>
+              <div class="face-capture">
+                <div class="camera-preview" v-if="cameraActive">
+                  <video ref="videoRef" autoplay playsinline class="video-element"></video>
+                  <canvas ref="canvasRef" style="display: none;"></canvas>
+                </div>
+                <div class="capture-actions" v-if="cameraActive">
+                  <n-button type="primary" @click="capturePhoto" :loading="capturing">
+                    拍照
+                  </n-button>
+                  <n-button @click="stopCamera">取消</n-button>
+                </div>
+                <div v-if="!cameraActive && !faceImageBase64" class="start-camera">
+                  <n-button type="primary" @click="startCamera">
+                    <template #icon><n-icon><CameraIcon /></n-icon></template>
+                    打开摄像头
+                  </n-button>
+                  <div class="or-divider">或</div>
+                  <div class="file-upload">
+                    <input type="file" accept="image/*" @change="onFaceImageChange" />
+                    <span>选择本地图片</span>
+                  </div>
+                </div>
+                <div v-if="faceImageBase64" class="preview-section">
+                  <img :src="faceImageBase64" class="face-preview" alt="人脸预览" />
+                  <div class="preview-actions">
+                    <n-button size="small" @click="retakePhoto">重新拍摄</n-button>
+                  </div>
+                </div>
               </div>
             </n-form-item>
             <n-button type="primary" block :loading="faceVerifyLoading" @click="submitFaceLoginVerify">验证并登录</n-button>
@@ -59,37 +84,55 @@
             </n-tab-pane>
           </n-tabs>
 
-          <div class="slider-captcha">
-            <div class="slider-captcha__head">
-              <span>拼图滑块验证</span>
-              <n-button quaternary size="tiny" :loading="captchaLoading" @click="resetSliderCaptcha">重置</n-button>
-            </div>
-            <div class="puzzle-board" :class="{ 'puzzle-board--passed': sliderPassed }">
-              <div class="puzzle-board__image" :style="{ backgroundImage: `url(${puzzleBackgroundImage})` }">
-                <div class="puzzle-board__piece" :style="pieceStyle">
-                  <img :src="puzzlePieceImage" alt="captcha-piece" />
-                </div>
-              </div>
-              <div
-                ref="captchaTrackRef"
-                class="puzzle-slider"
-                :class="{ 'puzzle-slider--passed': sliderPassed, 'puzzle-slider--dragging': isDragging, 'puzzle-slider--busy': captchaVerifying || captchaLoading }"
-                @mousedown="startDrag"
-                @touchstart.prevent="startDragTouch"
-              >
-                <div class="puzzle-slider__fill" :style="{ width: `${sliderCaptchaValue}%` }"></div>
-                <div class="puzzle-slider__thumb" :style="{ left: `${sliderCaptchaValue}%` }"></div>
-                <span class="puzzle-slider__label">{{ sliderPassed ? '验证通过' : '拖动滑块完成拼图' }}</span>
-              </div>
-            </div>
-            <div class="slider-captcha__tip" :class="{ ok: sliderPassed }">
-              {{ sliderPassed ? '验证通过' : captchaLoading ? '正在加载验证码...' : '将拼图块拖动到缺口位置后松开' }}
-            </div>
-          </div>
-
           <n-button class="github-btn" block @click="loginWithGithub">
             使用 GitHub 登录
           </n-button>
+
+          <n-divider />
+
+          <!-- 代理配置 -->
+          <n-collapse class="proxy-collapse">
+            <n-collapse-item title="代理设置" name="proxy">
+              <template #header-extra>
+                <n-icon><SettingsIcon /></n-icon>
+              </template>
+              <n-form label-placement="left" label-width="80">
+                <n-form-item label="启用代理">
+                  <n-switch
+                    :value="proxySettings.enabled === 'true'"
+                    @update:value="proxySettings.enabled = $event ? 'true' : 'false'"
+                  />
+                </n-form-item>
+                <n-form-item label="代理类型">
+                  <n-select
+                    v-model:value="proxySettings.type"
+                    :options="proxyTypeOptions"
+                    :disabled="proxySettings.enabled !== 'true'"
+                  />
+                </n-form-item>
+                <n-form-item label="代理主机">
+                  <n-input
+                    v-model:value="proxySettings.host"
+                    placeholder="127.0.0.1"
+                    :disabled="proxySettings.enabled !== 'true'"
+                  />
+                </n-form-item>
+                <n-form-item label="代理端口">
+                  <n-input-number
+                    :value="Number(proxySettings.port)"
+                    @update:value="proxySettings.port = String($event || 7890)"
+                    :min="1"
+                    :max="65535"
+                    :disabled="proxySettings.enabled !== 'true'"
+                    style="width: 100%"
+                  />
+                </n-form-item>
+                <n-button type="primary" block @click="saveProxySettings" :loading="savingProxy">
+                  保存代理设置
+                </n-button>
+              </n-form>
+            </n-collapse-item>
+          </n-collapse>
 
           <n-divider />
 
@@ -120,34 +163,6 @@
               />
             </n-form-item>
 
-            <div class="slider-captcha">
-              <div class="slider-captcha__head">
-                <span>拼图滑块验证</span>
-                <n-button quaternary size="tiny" :loading="captchaLoading" @click="resetSliderCaptcha">重置</n-button>
-              </div>
-              <div class="puzzle-board" :class="{ 'puzzle-board--passed': sliderPassed }">
-                <div class="puzzle-board__image" :style="{ backgroundImage: `url(${puzzleBackgroundImage})` }">
-                  <div class="puzzle-board__piece" :style="pieceStyle">
-                    <img :src="puzzlePieceImage" alt="captcha-piece" />
-                  </div>
-                </div>
-                <div
-                  ref="captchaTrackRef"
-                  class="puzzle-slider"
-                  :class="{ 'puzzle-slider--passed': sliderPassed, 'puzzle-slider--dragging': isDragging, 'puzzle-slider--busy': captchaVerifying || captchaLoading }"
-                  @mousedown="startDrag"
-                  @touchstart.prevent="startDragTouch"
-                >
-                  <div class="puzzle-slider__fill" :style="{ width: `${sliderCaptchaValue}%` }"></div>
-                  <div class="puzzle-slider__thumb" :style="{ left: `${sliderCaptchaValue}%` }"></div>
-                  <span class="puzzle-slider__label">{{ sliderPassed ? '验证通过' : '拖动滑块完成拼图' }}</span>
-                </div>
-              </div>
-              <div class="slider-captcha__tip" :class="{ ok: sliderPassed }">
-                {{ sliderPassed ? '验证通过' : captchaLoading ? '正在加载验证码...' : '将拼图块拖动到缺口位置后松开' }}
-              </div>
-            </div>
-
             <n-button type="warning" block :loading="registerLoading" @click="submitRegister">注册并发送确认邮件</n-button>
           </n-form>
 
@@ -171,12 +186,19 @@ import {
   NDivider,
   NForm,
   NFormItem,
+  NIcon,
   NInput,
+  NInputNumber,
+  NSelect,
+  NSwitch,
   NTabPane,
   NTabs,
+  NCollapse,
+  NCollapseItem,
   useMessage
 } from 'naive-ui'
-import { authService } from '@/services/api'
+import { CameraOutline as CameraIcon, SettingsOutline as SettingsIcon } from '@vicons/ionicons5'
+import { authService, settingsService } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -196,34 +218,35 @@ let timer: number | null = null
 const passwordForm = ref({ username: '', password: '' })
 const emailForm = ref({ email: '', code: '' })
 const registerForm = ref({ username: '', email: '', password: '', displayName: '' })
-const captchaTrackRef = ref<HTMLElement | null>(null)
-const sliderCaptchaValue = ref(0)
-const sliderPassed = ref(false)
-const isDragging = ref(false)
-const captchaLoading = ref(false)
-const captchaVerifying = ref(false)
-const captchaId = ref('')
-const captchaTicket = ref('')
 const pendingPreAuthToken = ref('')
 const pendingPreAuthExpiresIn = ref(0)
 const faceImageBase64 = ref('')
 const faceImageName = ref('')
-const puzzleYPercent = ref(50)
-const puzzlePieceWidth = ref(44)
-const puzzlePieceHeight = ref(44)
-const puzzleBackgroundImage = ref('')
-const puzzlePieceImage = ref('')
-const sliderMaxPercent = 100
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const pieceStyle = computed(() => ({
-  left: `${sliderCaptchaValue.value}%`,
-  top: `${puzzleYPercent.value}%`,
-  width: `${puzzlePieceWidth.value}px`,
-  height: `${puzzlePieceHeight.value}px`
-}))
+
+// 代理设置
+const proxySettings = ref<Record<string, string>>({
+  enabled: 'false',
+  host: '127.0.0.1',
+  port: '7890',
+  type: 'http'
+})
+const proxyTypeOptions = [
+  { label: 'HTTP', value: 'http' },
+  { label: 'SOCKS5', value: 'socks5' }
+]
+const savingProxy = ref(false)
+
+// 摄像头相关
+const videoRef = ref<HTMLVideoElement | null>(null)
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+const cameraActive = ref(false)
+const capturing = ref(false)
+let mediaStream: MediaStream | null = null
+
 const canSendCode = computed(() => {
   const email = emailForm.value.email.trim()
-  return emailPattern.test(email) && !sendingCode.value && codeCountdown.value === 0 && !captchaLoading.value
+  return emailPattern.test(email) && !sendingCode.value && codeCountdown.value === 0
 })
 
 const startCountdown = (seconds = 120) => {
@@ -243,99 +266,6 @@ const startCountdown = (seconds = 120) => {
     }
     codeCountdown.value -= 1
   }, 1000)
-}
-
-const resetSliderCaptcha = async () => {
-  sliderCaptchaValue.value = 0
-  sliderPassed.value = false
-  captchaTicket.value = ''
-  captchaId.value = ''
-
-  captchaLoading.value = true
-  try {
-    const res = await authService.getPuzzleCaptcha()
-    if (!res.success || !res.data) {
-      throw new Error(res.message || '加载验证码失败')
-    }
-    captchaId.value = res.data.captchaId
-    puzzleBackgroundImage.value = res.data.backgroundImage
-    puzzlePieceImage.value = res.data.pieceImage
-    puzzlePieceWidth.value = res.data.pieceWidth || 44
-    puzzlePieceHeight.value = res.data.pieceHeight || 44
-    puzzleYPercent.value = 50
-  } catch (e: any) {
-    message.error(e?.message || '加载验证码失败')
-  } finally {
-    captchaLoading.value = false
-  }
-}
-
-const updateSliderByClientX = (clientX: number) => {
-  const track = captchaTrackRef.value
-  if (!track || sliderPassed.value) return
-  const rect = track.getBoundingClientRect()
-  if (rect.width <= 0) return
-  const percent = ((clientX - rect.left - 20) / Math.max(rect.width - 40, 1)) * 100
-  sliderCaptchaValue.value = Math.min(sliderMaxPercent, Math.max(0, Number(percent.toFixed(2))))
-}
-
-const finishDrag = async () => {
-  if (!isDragging.value) return
-  isDragging.value = false
-  if (!captchaId.value || captchaLoading.value || captchaVerifying.value) {
-    sliderCaptchaValue.value = 0
-    return
-  }
-
-  captchaVerifying.value = true
-  try {
-    const res = await authService.verifyPuzzleCaptcha({
-      captchaId: captchaId.value,
-      sliderPercent: sliderCaptchaValue.value
-    })
-    if (!res.success || !res.data?.passed || !res.data.ticket) {
-      throw new Error(res.data?.message || res.message || '拼图未对齐，请重试')
-    }
-    sliderPassed.value = true
-    captchaTicket.value = res.data.ticket
-    message.success('验证通过')
-    return
-  } catch (e: any) {
-    message.warning(e?.message || '拼图未对齐，请重试')
-    await resetSliderCaptcha()
-  } finally {
-    captchaVerifying.value = false
-  }
-}
-
-const onMouseMove = (event: MouseEvent) => {
-  if (!isDragging.value) return
-  updateSliderByClientX(event.clientX)
-}
-
-const onTouchMove = (event: TouchEvent) => {
-  if (!isDragging.value || event.touches.length === 0) return
-  updateSliderByClientX(event.touches[0].clientX)
-}
-
-const startDrag = (event: MouseEvent) => {
-  if (sliderPassed.value || captchaLoading.value || captchaVerifying.value) return
-  isDragging.value = true
-  updateSliderByClientX(event.clientX)
-}
-
-const startDragTouch = (event: TouchEvent) => {
-  if (sliderPassed.value || captchaLoading.value || captchaVerifying.value || event.touches.length === 0) return
-  isDragging.value = true
-  updateSliderByClientX(event.touches[0].clientX)
-}
-
-const verifySliderCaptcha = () => {
-  if (!sliderPassed.value || !captchaTicket.value) {
-    message.warning('请先完成滑块验证')
-    return false
-  }
-  return true
 }
 
 const goAfterLogin = async () => {
@@ -372,6 +302,95 @@ const onFaceImageChange = async (event: Event) => {
   }
 }
 
+// 摄像头功能
+const startCamera = async () => {
+  // 检查浏览器是否支持
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    message.error('您的浏览器不支持摄像头功能，请使用现代浏览器（Chrome/Firefox/Edge）')
+    return
+  }
+
+  // 检查是否是安全上下文
+  const isSecureContext = window.isSecureContext || location.protocol === 'https:' ||
+                          location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+  if (!isSecureContext) {
+    message.error('摄像头功能需要 HTTPS 安全连接，请使用 https:// 访问或使用 localhost')
+    return
+  }
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: 640, height: 480 }
+    })
+    cameraActive.value = true
+    // 等待 DOM 更新后设置 video 元素
+    await new Promise(resolve => setTimeout(resolve, 100))
+    if (videoRef.value && mediaStream) {
+      videoRef.value.srcObject = mediaStream
+    }
+  } catch (error: any) {
+    console.error('Camera error:', error)
+    // 根据错误类型给出具体提示
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      message.error('摄像头权限被拒绝，请在浏览器地址栏左侧点击允许摄像头访问')
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      message.error('未检测到摄像头设备，请确保设备已连接摄像头')
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      message.error('摄像头可能被其他应用占用，请关闭其他使用摄像头的应用后重试')
+    } else if (error.name === 'OverconstrainedError') {
+      message.error('摄像头不支持所需分辨率，请尝试使用本地图片')
+    } else if (error.name === 'NotSupportedError') {
+      message.error('浏览器不支持摄像头功能，请使用本地图片')
+    } else {
+      message.error(`无法访问摄像头: ${error.message || '未知错误'}，请使用本地图片`)
+    }
+  }
+}
+
+const stopCamera = () => {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop())
+    mediaStream = null
+  }
+  cameraActive.value = false
+}
+
+const capturePhoto = async () => {
+  if (!videoRef.value || !canvasRef.value) return
+
+  capturing.value = true
+  try {
+    const video = videoRef.value
+    const canvas = canvasRef.value
+    const sourceWidth = video.videoWidth || 640
+    const sourceHeight = video.videoHeight || 480
+    const square = Math.min(sourceWidth, sourceHeight)
+    const sourceX = Math.floor((sourceWidth - square) / 2)
+    const sourceY = Math.floor((sourceHeight - square) / 2)
+
+    canvas.width = 320
+    canvas.height = 320
+
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.drawImage(video, sourceX, sourceY, square, square, 0, 0, canvas.width, canvas.height)
+      faceImageBase64.value = canvas.toDataURL('image/jpeg', 0.95)
+      stopCamera()
+    }
+  } catch (error) {
+    message.error('拍照失败，请重试')
+    console.error('Capture error:', error)
+  } finally {
+    capturing.value = false
+  }
+}
+
+const retakePhoto = () => {
+  faceImageBase64.value = ''
+  faceImageName.value = ''
+  startCamera()
+}
+
 const enterFaceSecondFactor = (payload: { preAuthToken?: string; preAuthExpiresIn?: number }) => {
   pendingPreAuthToken.value = payload.preAuthToken || ''
   pendingPreAuthExpiresIn.value = payload.preAuthExpiresIn || 0
@@ -380,6 +399,7 @@ const enterFaceSecondFactor = (payload: { preAuthToken?: string; preAuthExpiresI
 }
 
 const cancelFaceLogin = () => {
+  stopCamera()
   pendingPreAuthToken.value = ''
   pendingPreAuthExpiresIn.value = 0
   faceImageBase64.value = ''
@@ -429,13 +449,10 @@ const sendCode = async () => {
     message.warning(`请在 ${codeCountdown.value}s 后重试`)
     return
   }
-  if (!verifySliderCaptcha()) {
-    return
-  }
 
   sendingCode.value = true
   try {
-    const res = await authService.sendEmailCode({ email, captchaTicket: captchaTicket.value })
+    const res = await authService.sendEmailCode({ email })
     if (res.success) {
       message.success(res.data?.message || '验证码已发送')
       startCountdown(res.data?.cooldownSeconds || 120)
@@ -446,7 +463,6 @@ const sendCode = async () => {
     message.error(e?.response?.data?.message || '验证码发送失败')
   } finally {
     sendingCode.value = false
-    await resetSliderCaptcha()
   }
 }
 
@@ -455,13 +471,10 @@ const submitPasswordLogin = async () => {
     message.warning('请填写完整登录信息')
     return
   }
-  if (!verifySliderCaptcha()) {
-    return
-  }
 
   loginLoading.value = true
   try {
-    const authResult = await authStore.loginByPassword(passwordForm.value.username, passwordForm.value.password, captchaTicket.value)
+    const authResult = await authStore.loginByPassword(passwordForm.value.username, passwordForm.value.password)
     if (authResult.requiresSecondFactor) {
       enterFaceSecondFactor(authResult)
       message.info('请完成人脸二次验证')
@@ -473,7 +486,6 @@ const submitPasswordLogin = async () => {
     message.error(e?.message || '登录失败')
   } finally {
     loginLoading.value = false
-    await resetSliderCaptcha()
   }
 }
 
@@ -482,13 +494,10 @@ const submitEmailLogin = async () => {
     message.warning('请填写邮箱和验证码')
     return
   }
-  if (!verifySliderCaptcha()) {
-    return
-  }
 
   loginLoading.value = true
   try {
-    const authResult = await authStore.loginByEmailCode(emailForm.value.email, emailForm.value.code, captchaTicket.value)
+    const authResult = await authStore.loginByEmailCode(emailForm.value.email, emailForm.value.code)
     if (authResult.requiresSecondFactor) {
       enterFaceSecondFactor(authResult)
       message.info('请完成人脸二次验证')
@@ -500,7 +509,6 @@ const submitEmailLogin = async () => {
     message.error(e?.message || '登录失败')
   } finally {
     loginLoading.value = false
-    await resetSliderCaptcha()
   }
 }
 
@@ -509,13 +517,10 @@ const submitRegister = async () => {
     message.warning('请填写完整注册信息')
     return
   }
-  if (!verifySliderCaptcha()) {
-    return
-  }
 
   registerLoading.value = true
   try {
-    const result = await authStore.register({ ...registerForm.value, captchaTicket: captchaTicket.value })
+    const result = await authStore.register({ ...registerForm.value })
     message.success(result?.message || '注册成功，请查收邮箱验证码')
     emailForm.value.email = registerForm.value.email
     tab.value = 'email'
@@ -525,7 +530,6 @@ const submitRegister = async () => {
     message.error(e?.message || '注册失败')
   } finally {
     registerLoading.value = false
-    await resetSliderCaptcha()
   }
 }
 
@@ -542,28 +546,51 @@ const loginWithGithub = async () => {
   }
 }
 
+// 加载代理设置
+const loadProxySettings = async () => {
+  try {
+    const res = await settingsService.getProxy()
+    if (res.success && res.data) {
+      proxySettings.value = { ...proxySettings.value, ...res.data }
+    }
+  } catch (e) {
+    // 忽略错误，可能未登录
+  }
+}
+
+// 保存代理设置
+const saveProxySettings = async () => {
+  savingProxy.value = true
+  try {
+    await settingsService.updateProxy(proxySettings.value)
+    message.success('代理设置已保存')
+  } catch (e: any) {
+    if (e?.response?.status === 401 || e?.response?.status === 403) {
+      message.error('请先使用账号登录后再修改代理设置')
+    } else {
+      message.error(e?.message || '保存失败')
+    }
+  } finally {
+    savingProxy.value = false
+  }
+}
+
 onMounted(() => {
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', finishDrag)
-  window.addEventListener('touchmove', onTouchMove, { passive: false })
-  window.addEventListener('touchend', finishDrag)
   const preAuthToken = String(route.query.preAuthToken || '')
   if (preAuthToken) {
     pendingPreAuthToken.value = preAuthToken
     pendingPreAuthExpiresIn.value = Number(route.query.preAuthExpiresIn || 0)
   }
-  void resetSliderCaptcha()
+  // 加载代理设置
+  loadProxySettings()
 })
 
 onUnmounted(() => {
-  window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup', finishDrag)
-  window.removeEventListener('touchmove', onTouchMove)
-  window.removeEventListener('touchend', finishDrag)
   if (timer) {
     window.clearInterval(timer)
     timer = null
   }
+  stopCamera()
 })
 </script>
 
@@ -615,6 +642,77 @@ onUnmounted(() => {
   margin-bottom: 12px;
 }
 
+.face-capture {
+  width: 100%;
+}
+
+.camera-preview {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.video-element {
+  width: 100%;
+  display: block;
+  transform: scaleX(-1);
+}
+
+.capture-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  justify-content: center;
+}
+
+.start-camera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  border: 1px dashed rgba(245, 158, 11, 0.45);
+  border-radius: 10px;
+  background: #fffaf1;
+}
+
+.or-divider {
+  color: #9a3412;
+  font-size: 0.9rem;
+}
+
+.file-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #7c2d12;
+}
+
+.file-upload input {
+  cursor: pointer;
+}
+
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.face-preview {
+  width: 100%;
+  max-width: 300px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.preview-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .face-upload {
   width: 100%;
   border: 1px dashed rgba(245, 158, 11, 0.45);
@@ -631,125 +729,16 @@ onUnmounted(() => {
   border-color: rgba(124, 45, 18, 0.2);
 }
 
-.slider-captcha {
-  border: 1px solid rgba(251, 146, 60, 0.24);
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: 6px;
-  margin-bottom: 14px;
-  background: #fffaf1;
-}
-
-.slider-captcha__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  color: #9a3412;
-  font-size: 12px;
-}
-
-.slider-captcha__tip {
+.proxy-collapse {
   margin-top: 8px;
-  font-size: 12px;
-  color: #9a3412;
 }
 
-.slider-captcha__tip.ok {
-  color: #059669;
+.proxy-collapse :deep(.n-collapse-item__header-main) {
+  color: #7c2d12;
+  font-weight: 500;
 }
 
-.puzzle-board {
-  border-radius: 12px;
-  border: 1px solid #f4dcc0;
-  overflow: hidden;
-}
-
-.puzzle-board__image {
-  position: relative;
-  height: 160px;
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
-  background-position: center center;
-  overflow: hidden;
-}
-
-.puzzle-board__piece {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.28);
-  z-index: 2;
-}
-
-.puzzle-board__piece img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: contain;
-}
-
-.puzzle-slider {
-  position: relative;
-  height: 42px;
-  border-top: 1px solid #f6d7b0;
-  background: #fff;
-  overflow: hidden;
-  user-select: none;
-  touch-action: none;
-}
-
-.puzzle-slider--busy {
-  pointer-events: none;
-  opacity: 0.72;
-}
-
-.puzzle-slider__fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.2), rgba(251, 146, 60, 0.3));
-}
-
-.puzzle-slider__thumb {
-  position: absolute;
-  top: 4px;
-  width: 34px;
-  height: 34px;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  border: 1px solid rgba(245, 158, 11, 0.9);
-  background: radial-gradient(circle at 30% 30%, #fffdf7, #ffd99b);
-  box-shadow: 0 4px 12px rgba(194, 65, 12, 0.26);
-  z-index: 2;
-}
-
-.puzzle-slider__label {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  color: #9a3412;
-  pointer-events: none;
-}
-
-.puzzle-slider--dragging .puzzle-slider__thumb {
-  transform: translateX(-50%) scale(1.04);
-}
-
-.puzzle-board--passed .puzzle-board__piece {
-  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
-}
-
-.puzzle-slider--passed .puzzle-slider__fill {
-  background: linear-gradient(90deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.32));
-}
-
-.puzzle-slider--passed .puzzle-slider__thumb {
-  border-color: #059669;
-  background: radial-gradient(circle at 30% 30%, #f0fff8, #baf4d8);
-}
-
-.puzzle-slider--passed .puzzle-slider__label {
-  color: #059669;
+.proxy-collapse :deep(.n-collapse-item__content-wrapper) {
+  padding-top: 8px;
 }
 </style>

@@ -39,6 +39,9 @@
               {{ config.enabled ? '已启用' : '已禁用' }}
             </n-tag>
             <n-tag v-if="config.sslEnabled" type="info" size="small">SSL</n-tag>
+            <n-tag v-if="config.authType && config.authType !== 'password'" type="warning" size="small">
+              {{ config.authType === 'oauth2_refresh_token' ? 'OAuth2-Refresh' : 'OAuth2-Access' }}
+            </n-tag>
             <n-tag :type="connectionStatus[config.id]?.success ? 'success' : (connectionStatus[config.id] ? 'error' : 'default')" size="small">
               {{ connectionStatus[config.id]?.message || '未测试' }}
             </n-tag>
@@ -87,8 +90,47 @@
         <n-form-item label="邮箱地址" path="email">
           <n-input v-model:value="formData.email" placeholder="your@email.com" />
         </n-form-item>
-        <n-form-item label="密码/授权码" path="password">
+        <n-form-item label="认证方式" path="authType">
+          <n-select v-model:value="formData.authType" :options="authTypeOptions" />
+        </n-form-item>
+        <n-form-item v-if="formData.authType === 'password'" label="密码/授权码" path="password">
           <n-input v-model:value="formData.password" type="password" placeholder="输入密码或授权码" />
+        </n-form-item>
+        <n-form-item v-if="formData.authType === 'oauth2_access_token'" label="Access Token" path="oauthAccessToken">
+          <n-input
+            v-model:value="formData.oauthAccessToken"
+            type="password"
+            placeholder="OAuth2 access_token（短期令牌）"
+          />
+        </n-form-item>
+        <n-form-item v-if="formData.authType === 'oauth2_refresh_token'" label="Client ID" path="oauthClientId">
+          <n-input v-model:value="formData.oauthClientId" placeholder="OAuth2 client_id" />
+        </n-form-item>
+        <n-form-item v-if="formData.authType === 'oauth2_refresh_token'" label="Client Secret" path="oauthClientSecret">
+          <n-input
+            v-model:value="formData.oauthClientSecret"
+            type="password"
+            placeholder="OAuth2 client_secret（编辑时可留空以保持不变）"
+          />
+        </n-form-item>
+        <n-form-item v-if="formData.authType === 'oauth2_refresh_token'" label="Refresh Token" path="oauthRefreshToken">
+          <n-input
+            v-model:value="formData.oauthRefreshToken"
+            type="password"
+            placeholder="OAuth2 refresh_token（编辑时可留空以保持不变）"
+          />
+        </n-form-item>
+        <n-form-item v-if="formData.authType === 'oauth2_refresh_token'" label="Token端点" path="oauthTokenEndpoint">
+          <n-input
+            v-model:value="formData.oauthTokenEndpoint"
+            placeholder="可选，留空自动按 Gmail/Outlook 推断"
+          />
+        </n-form-item>
+        <n-form-item v-if="formData.authType === 'oauth2_refresh_token'" label="Scope" path="oauthScope">
+          <n-input
+            v-model:value="formData.oauthScope"
+            placeholder="可选，留空使用默认scope"
+          />
         </n-form-item>
         <n-form-item label="IMAP服务器" path="host">
           <n-input v-model:value="formData.host" placeholder="imap.example.com" />
@@ -155,6 +197,7 @@ import {
   NFormItem,
   NInput,
   NInputNumber,
+  NSelect,
   NDataTable,
   NEmpty,
   NResult,
@@ -181,6 +224,13 @@ const editingConfig = ref<EmailConfig | null>(null)
 const formData = ref({
   email: '',
   password: '',
+  authType: 'password' as 'password' | 'oauth2_access_token' | 'oauth2_refresh_token',
+  oauthClientId: '',
+  oauthClientSecret: '',
+  oauthRefreshToken: '',
+  oauthAccessToken: '',
+  oauthTokenEndpoint: '',
+  oauthScope: '',
   host: '',
   port: 993,
   sslEnabled: true,
@@ -212,6 +262,12 @@ const templateColumns = [
   { title: 'SSL', key: 'ssl', render: (row: any) => row.ssl ? '是' : '否' }
 ]
 
+const authTypeOptions = [
+  { label: '密码/授权码', value: 'password' },
+  { label: 'OAuth2 Access Token', value: 'oauth2_access_token' },
+  { label: 'OAuth2 Refresh Token', value: 'oauth2_refresh_token' }
+]
+
 const parseConfigList = (payload: any): EmailConfig[] => {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.data)) return payload.data
@@ -226,6 +282,13 @@ const normalizeConfigPayload = (payload: Partial<EmailConfig>): Partial<EmailCon
   password: payload.password == null ? payload.password : trimText(payload.password),
   host: payload.host == null ? payload.host : trimText(payload.host),
   protocol: payload.protocol == null ? payload.protocol : trimText(payload.protocol).toLowerCase(),
+  authType: payload.authType == null ? 'password' : trimText(payload.authType) as any,
+  oauthClientId: payload.oauthClientId == null ? payload.oauthClientId : trimText(payload.oauthClientId),
+  oauthClientSecret: payload.oauthClientSecret == null ? payload.oauthClientSecret : trimText(payload.oauthClientSecret),
+  oauthRefreshToken: payload.oauthRefreshToken == null ? payload.oauthRefreshToken : trimText(payload.oauthRefreshToken),
+  oauthAccessToken: payload.oauthAccessToken == null ? payload.oauthAccessToken : trimText(payload.oauthAccessToken),
+  oauthTokenEndpoint: payload.oauthTokenEndpoint == null ? payload.oauthTokenEndpoint : trimText(payload.oauthTokenEndpoint),
+  oauthScope: payload.oauthScope == null ? payload.oauthScope : trimText(payload.oauthScope),
   folder: payload.folder == null ? payload.folder : trimText(payload.folder),
   remark: payload.remark == null ? payload.remark : trimText(payload.remark)
 })
@@ -250,7 +313,13 @@ const parseResultPayload = <T extends Record<string, any>>(payload: any): T | nu
 const loadConfigs = async () => {
   try {
     const res = await emailService.listConfigs()
-    configs.value = parseConfigList(res).map(item => normalizeConfigPayload(item) as EmailConfig)
+    configs.value = parseConfigList(res).map(item => {
+      const config = normalizeConfigPayload(item) as EmailConfig
+      if (!config.authType) {
+        config.authType = 'password'
+      }
+      return config
+    })
     // 加载监听状态
     const statusRes = await emailService.getListenerStatus()
     const statusPayload = parseObjectPayload(statusRes)
@@ -304,8 +373,20 @@ const testConnection = async (config: EmailConfig) => {
 // 测试新配置（未保存的）
 const testNewConfig = async () => {
   formData.value = normalizeConfigPayload(formData.value) as typeof formData.value
-  if (!formData.value.email || !formData.value.password || !formData.value.host) {
-    message.warning('请填写完整的邮箱配置')
+  if (!formData.value.email || !formData.value.host) {
+    message.warning('请填写邮箱地址和服务器')
+    return
+  }
+  if (formData.value.authType === 'password' && !formData.value.password) {
+    message.warning('请填写密码或授权码')
+    return
+  }
+  if (formData.value.authType === 'oauth2_access_token' && !formData.value.oauthAccessToken) {
+    message.warning('请填写 OAuth2 access token')
+    return
+  }
+  if (formData.value.authType === 'oauth2_refresh_token' && (!formData.value.oauthClientId || !formData.value.oauthRefreshToken)) {
+    message.warning('请填写 OAuth2 client_id 和 refresh_token')
     return
   }
   testingNew.value = true
@@ -313,6 +394,13 @@ const testNewConfig = async () => {
     const res = await emailService.testNewConfig(normalizeConfigPayload({
       email: formData.value.email,
       password: formData.value.password,
+      authType: formData.value.authType,
+      oauthClientId: formData.value.oauthClientId,
+      oauthClientSecret: formData.value.oauthClientSecret,
+      oauthRefreshToken: formData.value.oauthRefreshToken,
+      oauthAccessToken: formData.value.oauthAccessToken,
+      oauthTokenEndpoint: formData.value.oauthTokenEndpoint,
+      oauthScope: formData.value.oauthScope,
       host: formData.value.host,
       port: formData.value.port,
       sslEnabled: formData.value.sslEnabled,
@@ -430,7 +518,8 @@ const toggleListener = async (config: EmailConfig) => {
       message.success('已开始监听')
     }
   } catch (error) {
-    message.error('操作失败')
+    const err = error as any
+    message.error(err?.response?.data || err?.response?.data?.message || '操作失败')
   }
 }
 
@@ -440,6 +529,13 @@ const editConfig = (config: EmailConfig) => {
   formData.value = {
     email: trimText(config.email),
     password: '',
+    authType: (config.authType || 'password') as 'password' | 'oauth2_access_token' | 'oauth2_refresh_token',
+    oauthClientId: trimText(config.oauthClientId),
+    oauthClientSecret: '',
+    oauthRefreshToken: '',
+    oauthAccessToken: '',
+    oauthTokenEndpoint: trimText(config.oauthTokenEndpoint),
+    oauthScope: trimText(config.oauthScope),
     host: trimText(config.host),
     port: config.port,
     sslEnabled: config.sslEnabled,
@@ -464,7 +560,8 @@ const saveConfig = async () => {
     showAddModal.value = false
     loadConfigs()
   } catch (error) {
-    message.error('保存失败')
+    const err = error as any
+    message.error(err?.response?.data || err?.response?.data?.message || '保存失败')
   }
 }
 

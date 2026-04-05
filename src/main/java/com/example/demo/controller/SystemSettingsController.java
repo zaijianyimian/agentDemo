@@ -1,10 +1,17 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.ApiResponse;
+import com.example.demo.service.DataArchiveService;
 import com.example.demo.service.SystemSettingsService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.net.URLEncoder;
 import java.util.Map;
 
 /**
@@ -16,9 +23,12 @@ import java.util.Map;
 public class SystemSettingsController {
 
     private final SystemSettingsService settingsService;
+    private final DataArchiveService dataArchiveService;
 
-    public SystemSettingsController(SystemSettingsService settingsService) {
+    public SystemSettingsController(SystemSettingsService settingsService,
+                                    DataArchiveService dataArchiveService) {
         this.settingsService = settingsService;
+        this.dataArchiveService = dataArchiveService;
     }
 
     /**
@@ -205,5 +215,52 @@ public class SystemSettingsController {
     public ApiResponse<Void> updateModelSettings(@RequestBody Map<String, String> settings) {
         settingsService.setSettings("model", settings);
         return ApiResponse.success(null);
+    }
+
+    /**
+     * 获取代理配置
+     */
+    @GetMapping("/proxy")
+    public ApiResponse<Map<String, String>> getProxySettings() {
+        return ApiResponse.success(settingsService.getProxySettings());
+    }
+
+    /**
+     * 更新代理配置
+     */
+    @PutMapping("/proxy")
+    public ApiResponse<Void> updateProxySettings(@RequestBody Map<String, String> settings) {
+        settingsService.setProxySettings(settings);
+        return ApiResponse.success(null);
+    }
+
+    /**
+     * 导出全量数据（ZIP）
+     */
+    @GetMapping("/data/export")
+    public ResponseEntity<byte[]> exportAllDataZip() {
+        byte[] archive = dataArchiveService.exportAllDataAsZip();
+        String filename = dataArchiveService.buildArchiveFileName();
+        String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + encoded)
+                .body(archive);
+    }
+
+    /**
+     * 导入全量数据（ZIP）
+     */
+    @PostMapping(value = "/data/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<Map<String, Object>> importAllDataZip(@RequestParam("file") MultipartFile file,
+                                                             @RequestParam(defaultValue = "true") boolean replaceExisting) {
+        try {
+            Map<String, Object> result = dataArchiveService.importAllDataFromZip(file, replaceExisting);
+            return ApiResponse.success(result, "数据导入成功");
+        } catch (Exception e) {
+            log.error("导入数据失败", e);
+            return ApiResponse.error("导入失败: " + e.getMessage());
+        }
     }
 }

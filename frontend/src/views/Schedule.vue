@@ -230,7 +230,6 @@ import {
   MailOutline as MailIcon
 } from '@vicons/ionicons5'
 import { scheduleService } from '@/services/api'
-import { fetchWithAuth } from '@/services/auth-fetch'
 import type { ScheduleEvent } from '@/types'
 import dayjs from 'dayjs'
 
@@ -310,7 +309,7 @@ const completeCurrentEvent = async () => {
 const loadSchedules = async () => {
   try {
     const res = await scheduleService.list()
-    schedules.value = res || []
+    schedules.value = res.data || []
   } catch (error) {
     message.error('加载失败')
   }
@@ -365,25 +364,20 @@ const aiAddSchedule = async () => {
 
   aiLoading.value = true
   try {
-    const res = await fetchWithAuth('/api/schedule/parse-and-save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        subject: aiInput.value,
-        from: 'user',
-        content: aiInput.value
-      })
+    const res = await scheduleService.parseAndSave({
+      subject: aiInput.value,
+      from: 'user',
+      content: aiInput.value
     })
 
-    if (!res.ok) {
-      throw new Error('解析失败')
+    if (res.success && res.data) {
+      message.success(`已创建日程: ${res.data.title}`)
+      showAiAddModal.value = false
+      aiInput.value = ''
+      loadSchedules()
+    } else {
+      message.error(res.message || '无法从描述中提取日程信息')
     }
-
-    const event = await res.json()
-    message.success(`已创建日程: ${event.title}`)
-    showAiAddModal.value = false
-    aiInput.value = ''
-    loadSchedules()
   } catch (error) {
     message.error('无法从描述中提取日程信息')
   } finally {

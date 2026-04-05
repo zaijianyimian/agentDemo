@@ -8,6 +8,10 @@ build/
 ### 不上传的文件 ###
 .claude
 application.yaml
+src/main/resources/application.yaml
+src/main/resources/application-local.yaml
+src/main/resources/application-*.yaml
+!src/main/resources/application.example.yaml
 
 ### STS ###
 .apt_generated
@@ -44,6 +48,9 @@ out/
 data/
 logs/
 generated/
+frontend/dist/
+frontend/node_modules/
+frontend/.vite/
 
 ### 系统文件 ###
 .DS_Store

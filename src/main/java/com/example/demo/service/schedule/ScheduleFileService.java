@@ -15,6 +15,7 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * 日程文件服务
@@ -30,6 +31,7 @@ public class ScheduleFileService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final Pattern SCHEDULE_FILE_NAME_PATTERN = Pattern.compile("^schedule-\\d{4}-\\d{2}-\\d{2}\\.md$");
 
     @PostConstruct
     public void init() {
@@ -220,7 +222,14 @@ public class ScheduleFileService {
      */
     public String readScheduleFileByName(String fileName) {
         try {
-            Path filePath = Paths.get(scheduleProperties.getStoragePath(), fileName);
+            if (fileName == null || !SCHEDULE_FILE_NAME_PATTERN.matcher(fileName).matches()) {
+                throw new IllegalArgumentException("非法日程文件名");
+            }
+            Path baseDir = Paths.get(scheduleProperties.getStoragePath()).toAbsolutePath().normalize();
+            Path filePath = baseDir.resolve(fileName).normalize();
+            if (!filePath.startsWith(baseDir)) {
+                throw new IllegalArgumentException("非法日程文件路径");
+            }
 
             if (Files.exists(filePath)) {
                 return Files.readString(filePath);
@@ -237,7 +246,11 @@ public class ScheduleFileService {
      */
     public String readScheduleFileByPath(String filePathStr) {
         try {
-            Path filePath = Paths.get(filePathStr);
+            Path baseDir = Paths.get(scheduleProperties.getStoragePath()).toAbsolutePath().normalize();
+            Path filePath = Paths.get(filePathStr).toAbsolutePath().normalize();
+            if (!filePath.startsWith(baseDir)) {
+                throw new IllegalArgumentException("非法日程文件路径");
+            }
 
             if (Files.exists(filePath)) {
                 return Files.readString(filePath);

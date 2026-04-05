@@ -94,7 +94,11 @@ public class FileController {
     @GetMapping("/image/{filename}")
     public ResponseEntity<byte[]> getImage(@PathVariable String filename) {
         try {
-            Path filePath = Paths.get(uploadDir, filename);
+            Path baseDir = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path filePath = baseDir.resolve(filename).normalize();
+            if (!filePath.startsWith(baseDir) || !Files.isRegularFile(filePath)) {
+                return ResponseEntity.notFound().build();
+            }
             if (!Files.exists(filePath)) {
                 return ResponseEntity.notFound().build();
             }

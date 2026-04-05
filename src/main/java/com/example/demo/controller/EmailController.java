@@ -3,6 +3,7 @@ package com.example.demo.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.entity.EmailConfig;
 import com.example.demo.mapper.EmailConfigMapper;
+import com.example.demo.service.email.EmailAuthConfigService;
 import com.example.demo.service.email.EmailListenerService;
 import jakarta.annotation.Resource;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,9 @@ public class EmailController {
     @Resource
     private EmailListenerService emailListenerService;
 
+    @Resource
+    private EmailAuthConfigService emailAuthConfigService;
+
     // ==================== 邮箱配置管理 ====================
 
     /**
@@ -32,7 +36,10 @@ public class EmailController {
     @GetMapping("/config/list")
     public List<EmailConfig> listConfigs() {
         List<EmailConfig> list = emailConfigMapper.selectList(null);
-        list.forEach(this::normalizeConfig);
+        list.forEach(config -> {
+            normalizeConfig(config);
+            emailAuthConfigService.decodeTransientFields(config);
+        });
         return list;
     }
 
@@ -44,7 +51,10 @@ public class EmailController {
         List<EmailConfig> list = emailConfigMapper.selectList(
                 new LambdaQueryWrapper<EmailConfig>().eq(EmailConfig::getEnabled, true)
         );
-        list.forEach(this::normalizeConfig);
+        list.forEach(config -> {
+            normalizeConfig(config);
+            emailAuthConfigService.decodeTransientFields(config);
+        });
         return list;
     }
 
@@ -55,6 +65,7 @@ public class EmailController {
     public EmailConfig getConfig(@PathVariable Long id) {
         EmailConfig config = emailConfigMapper.selectById(id);
         normalizeConfig(config);
+        emailAuthConfigService.decodeTransientFields(config);
         return config;
     }
 
@@ -64,6 +75,22 @@ public class EmailController {
     @PostMapping("/config")
     public ResponseEntity<String> addConfig(@RequestBody EmailConfig config) {
         normalizeConfig(config);
+        if (config == null) {
+            return ResponseEntity.badRequest().body("请求体不能为空");
+        }
+        if (isBlank(config.getEmail()) || isBlank(config.getHost())) {
+            return ResponseEntity.badRequest().body("邮箱地址和服务器不能为空");
+        }
+        String authType = config.getAuthType();
+        boolean oauthMode = EmailAuthConfigService.AUTH_TYPE_OAUTH2_REFRESH_TOKEN.equalsIgnoreCase(authType)
+                || EmailAuthConfigService.AUTH_TYPE_OAUTH2_ACCESS_TOKEN.equalsIgnoreCase(authType);
+        if (!oauthMode && isBlank(config.getPassword())) {
+            return ResponseEntity.badRequest().body("密码/授权码不能为空");
+        }
+        String authValidationError = validateAuthConfig(config, null);
+        if (authValidationError != null) {
+            return ResponseEntity.badRequest().body(authValidationError);
+        }
         // 设置默认值
         if (config.getProtocol() == null) {
             config.setProtocol("imap");
@@ -83,6 +110,7 @@ public class EmailController {
         if (config.getPollInterval() == null) {
             config.setPollInterval(30);
         }
+        emailAuthConfigService.prepareForPersist(config, null);
 
         emailConfigMapper.insert(config);
         return ResponseEntity.ok("添加成功");
@@ -93,7 +121,46 @@ public class EmailController {
      */
     @PutMapping("/config")
     public ResponseEntity<String> updateConfig(@RequestBody EmailConfig config) {
+        if (config == null || config.getId() == null) {
+            return ResponseEntity.badRequest().body("邮箱配置ID不能为空");
+        }
+        EmailConfig existing = emailConfigMapper.selectById(config.getId());
+        if (existing == null) {
+            return ResponseEntity.badRequest().body("邮箱配置不存在");
+        }
         normalizeConfig(config);
+        if (isBlank(config.getEmail()) || isBlank(config.getHost())) {
+            return ResponseEntity.badRequest().body("邮箱地址和服务器不能为空");
+        }
+        String authType = config.getAuthType();
+        boolean oauthMode = EmailAuthConfigService.AUTH_TYPE_OAUTH2_REFRESH_TOKEN.equalsIgnoreCase(authType)
+                || EmailAuthConfigService.AUTH_TYPE_OAUTH2_ACCESS_TOKEN.equalsIgnoreCase(authType);
+        if (!oauthMode && isBlank(config.getPassword())) {
+            config.setPassword(existing.getPassword());
+        }
+        if (config.getProtocol() == null) {
+            config.setProtocol(existing.getProtocol());
+        }
+        if (config.getPort() == null) {
+            config.setPort(existing.getPort());
+        }
+        if (config.getSslEnabled() == null) {
+            config.setSslEnabled(existing.getSslEnabled());
+        }
+        if (config.getFolder() == null) {
+            config.setFolder(existing.getFolder());
+        }
+        if (config.getPollInterval() == null) {
+            config.setPollInterval(existing.getPollInterval());
+        }
+        if (config.getEnabled() == null) {
+            config.setEnabled(existing.getEnabled());
+        }
+        String authValidationError = validateAuthConfig(config, existing);
+        if (authValidationError != null) {
+            return ResponseEntity.badRequest().body(authValidationError);
+        }
+        emailAuthConfigService.prepareForPersist(config, existing);
         emailConfigMapper.updateById(config);
         return ResponseEntity.ok("更新成功");
     }
@@ -122,6 +189,11 @@ public class EmailController {
             return ResponseEntity.badRequest().body("邮箱配置不存在");
         }
         normalizeConfig(config);
+        emailAuthConfigService.decodeTransientFields(config);
+        EmailListenerService.EmailTestResult testResult = emailListenerService.testConnection(config);
+        if (!testResult.isSuccess()) {
+            return ResponseEntity.badRequest().body(testResult.getMessage());
+        }
 
         // 更新启用状态
         config.setEnabled(true);
@@ -142,6 +214,7 @@ public class EmailController {
             return ResponseEntity.badRequest().body("邮箱配置不存在");
         }
         normalizeConfig(config);
+        emailAuthConfigService.decodeTransientFields(config);
 
         // 更新启用状态
         config.setEnabled(false);
@@ -184,6 +257,7 @@ public class EmailController {
             ));
         }
         normalizeConfig(config);
+        emailAuthConfigService.decodeTransientFields(config);
 
         EmailListenerService.EmailTestResult result = emailListenerService.testConnection(config);
         return ResponseEntity.ok(Map.of(
@@ -208,6 +282,7 @@ public class EmailController {
             ));
         }
         normalizeConfig(config);
+        emailAuthConfigService.decodeTransientFields(config);
         EmailListenerService.NetworkCheckResult result = emailListenerService.checkNetworkConnectivity(
                 config.getHost(),
                 config.getPort() == null ? 993 : config.getPort(),
@@ -228,6 +303,7 @@ public class EmailController {
     @PostMapping("/config/network-check")
     public ResponseEntity<Map<String, Object>> checkNewConfigNetwork(@RequestBody EmailConfig config) {
         normalizeConfig(config);
+        emailAuthConfigService.decodeTransientFields(config);
         EmailListenerService.NetworkCheckResult result = emailListenerService.checkNetworkConnectivity(
                 config.getHost(),
                 config.getPort() == null ? 993 : config.getPort(),
@@ -248,6 +324,7 @@ public class EmailController {
     @PostMapping("/config/test")
     public ResponseEntity<Map<String, Object>> testNewConfig(@RequestBody EmailConfig config) {
         normalizeConfig(config);
+        emailAuthConfigService.decodeTransientFields(config);
         EmailListenerService.EmailTestResult result = emailListenerService.testConnection(config);
         return ResponseEntity.ok(Map.of(
                 "success", result.isSuccess(),
@@ -303,5 +380,67 @@ public class EmailController {
         if (config.getRemark() != null) {
             config.setRemark(config.getRemark().trim());
         }
+        if (config.getAuthType() != null) {
+            config.setAuthType(config.getAuthType().trim());
+        }
+        if (config.getOauthClientId() != null) {
+            config.setOauthClientId(config.getOauthClientId().trim());
+        }
+        if (config.getOauthClientSecret() != null) {
+            config.setOauthClientSecret(config.getOauthClientSecret().trim());
+        }
+        if (config.getOauthRefreshToken() != null) {
+            config.setOauthRefreshToken(config.getOauthRefreshToken().trim());
+        }
+        if (config.getOauthAccessToken() != null) {
+            config.setOauthAccessToken(config.getOauthAccessToken().trim());
+        }
+        if (config.getOauthTokenEndpoint() != null) {
+            config.setOauthTokenEndpoint(config.getOauthTokenEndpoint().trim());
+        }
+        if (config.getOauthScope() != null) {
+            config.setOauthScope(config.getOauthScope().trim());
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private String validateAuthConfig(EmailConfig incoming, EmailConfig existing) {
+        String authType = incoming == null ? null : incoming.getAuthType();
+        if (EmailAuthConfigService.AUTH_TYPE_OAUTH2_ACCESS_TOKEN.equalsIgnoreCase(authType)) {
+            String accessToken = firstNonBlank(
+                    incoming == null ? null : incoming.getOauthAccessToken(),
+                    existing == null ? null : existing.getOauthAccessToken()
+            );
+            if (isBlank(accessToken)) {
+                return "OAuth2 Access Token 模式下 access token 不能为空";
+            }
+        }
+        if (EmailAuthConfigService.AUTH_TYPE_OAUTH2_REFRESH_TOKEN.equalsIgnoreCase(authType)) {
+            String clientId = firstNonBlank(
+                    incoming == null ? null : incoming.getOauthClientId(),
+                    existing == null ? null : existing.getOauthClientId()
+            );
+            String refreshToken = firstNonBlank(
+                    incoming == null ? null : incoming.getOauthRefreshToken(),
+                    existing == null ? null : existing.getOauthRefreshToken()
+            );
+            if (isBlank(clientId)) {
+                return "OAuth2 Refresh Token 模式下 clientId 不能为空";
+            }
+            if (isBlank(refreshToken)) {
+                return "OAuth2 Refresh Token 模式下 refresh token 不能为空";
+            }
+        }
+        return null;
+    }
+
+    private String firstNonBlank(String preferred, String fallback) {
+        if (!isBlank(preferred)) {
+            return preferred;
+        }
+        return isBlank(fallback) ? null : fallback;
     }
 }

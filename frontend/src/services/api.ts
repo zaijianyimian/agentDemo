@@ -31,8 +31,6 @@ import type {
   AuthTokenResponse,
   AuthUserProfile,
   EmailCodeSendResponse,
-  PuzzleCaptchaResponse,
-  PuzzleCaptchaVerifyResponse,
   GithubAuthorizeResponse,
   GithubExchangeResponse,
   FaceStatusResponse,
@@ -61,7 +59,6 @@ api.interceptors.request.use(config => {
     requestUrl.startsWith('/auth/register') ||
     requestUrl.startsWith('/auth/login/') ||
     requestUrl.startsWith('/auth/token/refresh') ||
-    requestUrl.startsWith('/auth/captcha/') ||
     requestUrl.startsWith('/auth/face/verify-login') ||
     requestUrl.startsWith('/auth/oauth/github/')
 
@@ -92,7 +89,6 @@ api.interceptors.response.use(
       requestUrl.startsWith('/auth/token/refresh') ||
       requestUrl.startsWith('/auth/register') ||
       requestUrl.startsWith('/auth/login/') ||
-      requestUrl.startsWith('/auth/captcha/') ||
       requestUrl.startsWith('/auth/face/verify-login')
 
     if (
@@ -185,72 +181,72 @@ export const fileService = {
 
 // 日程服务
 export const scheduleService = {
-  list: async (): Promise<ScheduleEvent[]> => {
+  list: async (): Promise<ApiResponse<ScheduleEvent[]>> => {
     const response = await api.get('/schedule/list')
     return response.data
   },
 
-  today: async (): Promise<ScheduleEvent[]> => {
+  today: async (): Promise<ApiResponse<ScheduleEvent[]>> => {
     const response = await api.get('/schedule/today')
     return response.data
   },
 
-  tomorrow: async (): Promise<ScheduleEvent[]> => {
+  tomorrow: async (): Promise<ApiResponse<ScheduleEvent[]>> => {
     const response = await api.get('/schedule/tomorrow')
     return response.data
   },
 
-  getByDate: async (date: string): Promise<ScheduleEvent[]> => {
+  getByDate: async (date: string): Promise<ApiResponse<ScheduleEvent[]>> => {
     const response = await api.get(`/schedule/date/${date}`)
     return response.data
   },
 
-  latest: async (limit = 5): Promise<ScheduleEvent[]> => {
+  latest: async (limit = 5): Promise<ApiResponse<ScheduleEvent[]>> => {
     const response = await api.get('/schedule/latest', { params: { limit } })
     return response.data
   },
 
-  range: async (startDate: string, endDate: string): Promise<ScheduleEvent[]> => {
+  range: async (startDate: string, endDate: string): Promise<ApiResponse<ScheduleEvent[]>> => {
     const response = await api.get('/schedule/range', { params: { startDate, endDate } })
     return response.data
   },
 
-  get: async (id: number): Promise<ScheduleEvent> => {
+  get: async (id: number): Promise<ApiResponse<ScheduleEvent>> => {
     const response = await api.get(`/schedule/${id}`)
     return response.data
   },
 
-  create: async (data: Partial<ScheduleEvent>): Promise<ScheduleEvent> => {
+  create: async (data: Partial<ScheduleEvent>): Promise<ApiResponse<ScheduleEvent>> => {
     const response = await api.post('/schedule', data)
     return response.data
   },
 
-  update: async (id: number, data: Partial<ScheduleEvent>): Promise<ScheduleEvent> => {
+  update: async (id: number, data: Partial<ScheduleEvent>): Promise<ApiResponse<ScheduleEvent>> => {
     const response = await api.put(`/schedule/${id}`, data)
     return response.data
   },
 
-  delete: async (id: number): Promise<void> => {
+  delete: async (id: number): Promise<ApiResponse<void>> => {
     const response = await api.delete(`/schedule/${id}`)
     return response.data
   },
 
-  complete: async (id: number): Promise<void> => {
+  complete: async (id: number): Promise<ApiResponse<ScheduleEvent>> => {
     const response = await api.put(`/schedule/${id}/complete`)
     return response.data
   },
 
-  cancel: async (id: number): Promise<void> => {
+  cancel: async (id: number): Promise<ApiResponse<ScheduleEvent>> => {
     const response = await api.put(`/schedule/${id}/cancel`)
     return response.data
   },
 
-  parseEmail: async (payload: { subject: string; from: string; content: string }): Promise<ScheduleEvent> => {
+  parseEmail: async (payload: { subject: string; from: string; content: string }): Promise<ApiResponse<ScheduleEvent>> => {
     const response = await api.post('/schedule/parse-email', payload)
     return response.data
   },
 
-  parseAndSave: async (payload: { subject: string; from: string; content: string }): Promise<ScheduleEvent> => {
+  parseAndSave: async (payload: { subject: string; from: string; content: string }): Promise<ApiResponse<ScheduleEvent>> => {
     const response = await api.post('/schedule/parse-and-save', payload)
     return response.data
   },
@@ -1075,6 +1071,33 @@ export const settingsService = {
     return response.data
   },
 
+  getProxy: async (): Promise<ApiResponse<Record<string, any>>> => {
+    const response = await api.get('/settings/proxy')
+    return response.data
+  },
+
+  updateProxy: async (payload: Record<string, any>): Promise<ApiResponse<any>> => {
+    const response = await api.put('/settings/proxy', payload)
+    return response.data
+  },
+
+  exportDataZip: async (): Promise<Blob> => {
+    const response = await api.get('/settings/data/export', {
+      responseType: 'blob'
+    })
+    return response.data
+  },
+
+  importDataZip: async (file: File, replaceExisting = true): Promise<ApiResponse<Record<string, any>>> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post('/settings/data/import', formData, {
+      params: { replaceExisting },
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
+  },
+
   uploadImage: async (file: File): Promise<ApiResponse<string>> => {
     const formData = new FormData()
     formData.append('file', file)
@@ -1169,32 +1192,22 @@ export const chatActionService = {
 }
 
 export const authService = {
-  getPuzzleCaptcha: async (): Promise<ApiResponse<PuzzleCaptchaResponse>> => {
-    const response = await api.get('/auth/captcha/puzzle')
-    return response.data
-  },
-
-  verifyPuzzleCaptcha: async (payload: { captchaId: string; sliderPercent: number }): Promise<ApiResponse<PuzzleCaptchaVerifyResponse>> => {
-    const response = await api.post('/auth/captcha/puzzle/verify', payload)
-    return response.data
-  },
-
-  register: async (payload: { username: string; email: string; password: string; captchaTicket: string; displayName?: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
+  register: async (payload: { username: string; email: string; password: string; displayName?: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
     const response = await api.post('/auth/register', payload)
     return response.data
   },
 
-  loginByPassword: async (payload: { username: string; password: string; captchaTicket: string }): Promise<ApiResponse<AuthTokenResponse>> => {
+  loginByPassword: async (payload: { username: string; password: string }): Promise<ApiResponse<AuthTokenResponse>> => {
     const response = await api.post('/auth/login/password', payload)
     return response.data
   },
 
-  sendEmailCode: async (payload: { email: string; captchaTicket: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
+  sendEmailCode: async (payload: { email: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
     const response = await api.post('/auth/login/email/send-code', payload)
     return response.data
   },
 
-  loginByEmailCode: async (payload: { email: string; code: string; captchaTicket: string }): Promise<ApiResponse<AuthTokenResponse>> => {
+  loginByEmailCode: async (payload: { email: string; code: string }): Promise<ApiResponse<AuthTokenResponse>> => {
     const response = await api.post('/auth/login/email', payload)
     return response.data
   },

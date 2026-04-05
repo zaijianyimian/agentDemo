@@ -1,8 +1,10 @@
 package com.example.demo.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,7 +33,53 @@ public class EmailConfig {
     /**
      * 邮箱授权码/密码
      */
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
+
+    /**
+     * 认证方式: password / oauth2_access_token / oauth2_refresh_token
+     */
+    @TableField(exist = false)
+    private String authType;
+
+    /**
+     * OAuth2 客户端ID
+     */
+    @TableField(exist = false)
+    private String oauthClientId;
+
+    /**
+     * OAuth2 客户端密钥
+     */
+    @TableField(exist = false)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String oauthClientSecret;
+
+    /**
+     * OAuth2 刷新令牌
+     */
+    @TableField(exist = false)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String oauthRefreshToken;
+
+    /**
+     * OAuth2 访问令牌（短期，可选）
+     */
+    @TableField(exist = false)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String oauthAccessToken;
+
+    /**
+     * OAuth2 token 端点（可选）
+     */
+    @TableField(exist = false)
+    private String oauthTokenEndpoint;
+
+    /**
+     * OAuth2 scope（可选）
+     */
+    @TableField(exist = false)
+    private String oauthScope;
 
     /**
      * 邮箱服务器主机
@@ -101,6 +149,34 @@ public class EmailConfig {
 
     public void setFolder(String folder) {
         this.folder = trim(folder);
+    }
+
+    public void setAuthType(String authType) {
+        this.authType = trim(authType);
+    }
+
+    public void setOauthClientId(String oauthClientId) {
+        this.oauthClientId = trim(oauthClientId);
+    }
+
+    public void setOauthClientSecret(String oauthClientSecret) {
+        this.oauthClientSecret = trim(oauthClientSecret);
+    }
+
+    public void setOauthRefreshToken(String oauthRefreshToken) {
+        this.oauthRefreshToken = trim(oauthRefreshToken);
+    }
+
+    public void setOauthAccessToken(String oauthAccessToken) {
+        this.oauthAccessToken = trim(oauthAccessToken);
+    }
+
+    public void setOauthTokenEndpoint(String oauthTokenEndpoint) {
+        this.oauthTokenEndpoint = trim(oauthTokenEndpoint);
+    }
+
+    public void setOauthScope(String oauthScope) {
+        this.oauthScope = trim(oauthScope);
     }
 
     public void setRemark(String remark) {

@@ -42,19 +42,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const loginByPassword = async (username: string, password: string, captchaTicket: string): Promise<AuthTokenResponse> => {
-    return await withAuthResponse(authService.loginByPassword({ username, password, captchaTicket }), '登录失败')
+  const loginByPassword = async (username: string, password: string): Promise<AuthTokenResponse> => {
+    return await withAuthResponse(authService.loginByPassword({ username, password }), '登录失败')
   }
 
-  const loginByEmailCode = async (email: string, code: string, captchaTicket: string): Promise<AuthTokenResponse> => {
-    return await withAuthResponse(authService.loginByEmailCode({ email, code, captchaTicket }), '登录失败')
+  const loginByEmailCode = async (email: string, code: string): Promise<AuthTokenResponse> => {
+    return await withAuthResponse(authService.loginByEmailCode({ email, code }), '登录失败')
   }
 
   const verifyFaceLogin = async (preAuthToken: string, imageBase64: string): Promise<AuthTokenResponse> => {
     return await withAuthResponse(authService.verifyFaceLogin({ preAuthToken, imageBase64 }), '人脸验证失败')
   }
 
-  const register = async (payload: { username: string; email: string; password: string; captchaTicket: string; displayName?: string }) => {
+  const register = async (payload: { username: string; email: string; password: string; displayName?: string }) => {
     const res = await authService.register(payload)
     if (!res.success) {
       throw new Error(res.message || '注册失败')

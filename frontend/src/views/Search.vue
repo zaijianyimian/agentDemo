@@ -172,6 +172,7 @@ import { SearchOutline as SearchIcon } from '@vicons/ionicons5'
 import { searchService } from '@/services/api'
 import { fetchWithAuth } from '@/services/auth-fetch'
 import type { SearchResult } from '@/types'
+import { sanitizeHtml } from '@/utils/sanitize-html'
 import { marked } from 'marked'
 import hljs from 'highlight.js/lib/core'
 import javascript from 'highlight.js/lib/languages/javascript'
@@ -207,7 +208,12 @@ marked.setOptions({
 
 // 渲染 Markdown
 const renderMarkdown = (text: string) => {
-  return marked.parse(text) as string
+  if (!text) return ''
+  try {
+    return sanitizeHtml(marked.parse(text) as string)
+  } catch {
+    return sanitizeHtml(text)
+  }
 }
 
 const message = useMessage()

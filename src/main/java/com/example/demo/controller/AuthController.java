@@ -15,14 +15,10 @@ import com.example.demo.dto.auth.GithubAuthorizeResponse;
 import com.example.demo.dto.auth.GithubExchangeRequest;
 import com.example.demo.dto.auth.GithubExchangeResponse;
 import com.example.demo.dto.auth.PasswordLoginRequest;
-import com.example.demo.dto.auth.PuzzleCaptchaResponse;
-import com.example.demo.dto.auth.PuzzleCaptchaVerifyRequest;
-import com.example.demo.dto.auth.PuzzleCaptchaVerifyResponse;
 import com.example.demo.dto.auth.RefreshTokenRequest;
 import com.example.demo.dto.auth.RegisterRequest;
 import com.example.demo.service.auth.AuthService;
 import com.example.demo.service.auth.GithubOAuthService;
-import com.example.demo.service.auth.PuzzleCaptchaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -36,17 +32,6 @@ public class AuthController {
 
     private final AuthService authService;
     private final GithubOAuthService githubOAuthService;
-    private final PuzzleCaptchaService puzzleCaptchaService;
-
-    @GetMapping("/captcha/puzzle")
-    public ApiResponse<PuzzleCaptchaResponse> getPuzzleCaptcha() {
-        return ApiResponse.success(puzzleCaptchaService.createPuzzleCaptcha());
-    }
-
-    @PostMapping("/captcha/puzzle/verify")
-    public ApiResponse<PuzzleCaptchaVerifyResponse> verifyPuzzleCaptcha(@Valid @RequestBody PuzzleCaptchaVerifyRequest request) {
-        return ApiResponse.success(puzzleCaptchaService.verifyPuzzleCaptcha(request.getCaptchaId(), request.getSliderPercent()));
-    }
 
     @PostMapping("/register")
     public ApiResponse<EmailCodeSendResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -55,12 +40,12 @@ public class AuthController {
 
     @PostMapping("/login/password")
     public ApiResponse<AuthTokenResponse> loginByPassword(@Valid @RequestBody PasswordLoginRequest request) {
-        return ApiResponse.success(authService.loginByPassword(request.getUsername(), request.getPassword(), request.getCaptchaTicket()));
+        return ApiResponse.success(authService.loginByPassword(request.getUsername(), request.getPassword()));
     }
 
     @PostMapping("/login/email/send-code")
     public ApiResponse<EmailCodeSendResponse> sendEmailCode(@Valid @RequestBody EmailCodeSendRequest request) {
-        int cooldown = authService.sendLoginCode(request.getEmail(), request.getCaptchaTicket());
+        int cooldown = authService.sendLoginCode(request.getEmail());
         return ApiResponse.success(EmailCodeSendResponse.builder()
                 .cooldownSeconds(cooldown)
                 .message("验证码已发送，请注意查收")
@@ -69,7 +54,7 @@ public class AuthController {
 
     @PostMapping("/login/email")
     public ApiResponse<AuthTokenResponse> loginByEmailCode(@Valid @RequestBody EmailCodeLoginRequest request) {
-        return ApiResponse.success(authService.loginByEmailCode(request.getEmail(), request.getCode(), request.getCaptchaTicket()));
+        return ApiResponse.success(authService.loginByEmailCode(request.getEmail(), request.getCode()));
     }
 
     @PostMapping("/token/refresh")
@@ -124,7 +109,7 @@ public class AuthController {
 
     @PutMapping("/face/required")
     public ApiResponse<FaceStatusResponse> toggleFaceRequired(JwtAuthenticationToken authentication,
-                                                              @RequestBody FaceRequiredRequest request) {
+                                                              @Valid @RequestBody FaceRequiredRequest request) {
         Long userId = authService.extractUserIdFromJwt(authentication.getToken());
         boolean required = Boolean.TRUE.equals(request.getRequired());
         return ApiResponse.success(authService.updateFaceRequired(userId, required),

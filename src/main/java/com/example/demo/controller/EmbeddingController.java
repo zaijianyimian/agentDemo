@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.ContentAnalysis;
 import com.example.demo.service.chat.ContentAnalysisService;
 import dev.langchain4j.data.embedding.Embedding;
@@ -7,6 +8,8 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 /**
  * 向量化与分析控制器
@@ -45,5 +48,23 @@ public class EmbeddingController {
     @GetMapping("/analyze")
     public ContentAnalysis analyzeContent(@RequestParam("content") String content) {
         return contentAnalysisService.analyze(content);
+    }
+
+    /**
+     * 测试向量模型连接
+     */
+    @GetMapping("/embedding/test")
+    public ApiResponse<Map<String, Object>> testEmbedding() {
+        try {
+            Response<Embedding> response = embeddingModel.embed("test");
+            float[] vector = response.content().vector();
+            return ApiResponse.success(Map.of(
+                    "success", true,
+                    "dimensions", vector.length,
+                    "message", "向量模型工作正常"
+            ));
+        } catch (Exception e) {
+            return ApiResponse.error("测试失败: " + e.getMessage());
+        }
     }
 }

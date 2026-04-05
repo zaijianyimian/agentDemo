@@ -177,6 +177,7 @@ import {
 } from '@vicons/ionicons5'
 import type { Note } from '@/types'
 import { noteService } from '@/services/api'
+import { sanitizeHtml } from '@/utils/sanitize-html'
 import dayjs from 'dayjs'
 import { marked } from 'marked'
 
@@ -207,9 +208,9 @@ const sortedNotes = computed(() => {
 const renderMarkdown = (content: string): string => {
   if (!content) return ''
   try {
-    return marked.parse(content) as string
+    return sanitizeHtml(marked.parse(content) as string)
   } catch {
-    return content
+    return sanitizeHtml(content)
   }
 }
 

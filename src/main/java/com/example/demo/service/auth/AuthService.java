@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -23,14 +24,12 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
     private final EmailCodeService emailCodeService;
-    private final PuzzleCaptchaService puzzleCaptchaService;
     private final UserAccountCacheService userAccountCacheService;
     private final FaceAuthService faceAuthService;
     private final PreAuthTokenService preAuthTokenService;
 
+    @Transactional(rollbackFor = Exception.class)
     public EmailCodeSendResponse register(RegisterRequest request) {
-        puzzleCaptchaService.consumeTicket(request.getCaptchaTicket());
-
         String username = normalize(request.getUsername());
         String email = normalizeEmail(request.getEmail());
 
@@ -63,8 +62,7 @@ public class AuthService {
                 .build();
     }
 
-    public AuthTokenResponse loginByPassword(String usernameOrEmail, String password, String captchaTicket) {
-        puzzleCaptchaService.consumeTicket(captchaTicket);
+    public AuthTokenResponse loginByPassword(String usernameOrEmail, String password) {
         UserAccount user = requireActiveUser(findByUsernameOrEmail(usernameOrEmail));
         if (!Boolean.TRUE.equals(user.getEmailVerified())) {
             throw new IllegalArgumentException("邮箱未验证，请先使用邮箱验证码登录完成确认");
@@ -76,14 +74,12 @@ public class AuthService {
         return issueTokensOrChallenge(user);
     }
 
-    public int sendLoginCode(String email, String captchaTicket) {
-        puzzleCaptchaService.consumeTicket(captchaTicket);
+    public int sendLoginCode(String email) {
         UserAccount user = requireActiveUser(findByEmail(email));
         return emailCodeService.sendLoginCode(user.getEmail());
     }
 
-    public AuthTokenResponse loginByEmailCode(String email, String code, String captchaTicket) {
-        puzzleCaptchaService.consumeTicket(captchaTicket);
+    public AuthTokenResponse loginByEmailCode(String email, String code) {
         UserAccount user = requireActiveUser(findByEmail(email));
 
         boolean ok = emailCodeService.verifyAndConsumeAuthCode(user.getEmail(), code);

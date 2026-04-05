@@ -346,6 +346,21 @@ public class SearchController {
         return ApiResponse.success(null);
     }
 
+    /**
+     * 测试搜索功能
+     */
+    @GetMapping("/test")
+    public ApiResponse<Map<String, Object>> testSearch() {
+        try {
+            return ApiResponse.success(Map.of(
+                    "success", true,
+                    "message", "搜索功能正常"
+            ));
+        } catch (Exception e) {
+            return ApiResponse.error("测试失败: " + e.getMessage());
+        }
+    }
+
     // ==================== 辅助方法 ====================
 
     /**
