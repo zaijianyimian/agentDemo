@@ -20,6 +20,11 @@ public class AuthSecurityProperties {
     private String jwtSecret;
 
     /**
+     * 业务敏感字段加密密钥；未配置时回退到 jwtSecret
+     */
+    private String dataSecret;
+
+    /**
      * access token 过期分钟数
      */
     private long accessTokenMinutes = 120;
@@ -38,4 +43,11 @@ public class AuthSecurityProperties {
      * 邮箱验证码发送冷却秒数
      */
     private int emailCodeCooldownSeconds = 120;
+
+    public String resolveDataSecret() {
+        if (dataSecret != null && !dataSecret.isBlank()) {
+            return dataSecret;
+        }
+        return jwtSecret;
+    }
 }

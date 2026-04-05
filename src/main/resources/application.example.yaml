@@ -99,6 +99,7 @@ app:
   security:
     issuer: agent-demo
     jwt-secret: ${JWT_SECRET:replace_with_a_32_plus_byte_secret}
+    data-secret: ${DATA_SECRET:${JWT_SECRET:replace_with_a_32_plus_byte_secret}}
     access-token-minutes: 120
     refresh-token-days: 7
     email-code-ttl-seconds: 600

@@ -82,6 +82,30 @@ public class EmailConfig {
     private String oauthScope;
 
     /**
+     * 是否已保存密码/授权码
+     */
+    @TableField(exist = false)
+    private Boolean passwordConfigured;
+
+    /**
+     * 是否已保存 OAuth2 client secret
+     */
+    @TableField(exist = false)
+    private Boolean oauthClientSecretConfigured;
+
+    /**
+     * 是否已保存 OAuth2 refresh token
+     */
+    @TableField(exist = false)
+    private Boolean oauthRefreshTokenConfigured;
+
+    /**
+     * 是否已保存 OAuth2 access token
+     */
+    @TableField(exist = false)
+    private Boolean oauthAccessTokenConfigured;
+
+    /**
      * 邮箱服务器主机
      */
     private String host;

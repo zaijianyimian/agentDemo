@@ -1,10 +1,10 @@
 package com.example.demo.service.email;
 
 import com.example.demo.entity.EmailConfig;
+import com.example.demo.service.security.SensitiveValueCryptoService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -15,10 +15,9 @@ import java.util.Map;
  * 邮箱认证配置编解码服务
  *
  * 为保持向后兼容，不新增数据库字段：
- * - 普通密码模式仍直接使用 email_config.password + remark(纯文本备注)
- * - OAuth2 扩展配置编码到 remark(JSON) 中
+ * - password 字段继续存储邮箱密码/授权码，但改为加密保存
+ * - remark 字段仍承载备注与 OAuth2 扩展配置，但敏感值改为加密保存
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailAuthConfigService {
@@ -28,19 +27,28 @@ public class EmailAuthConfigService {
     public static final String AUTH_TYPE_OAUTH2_REFRESH_TOKEN = "oauth2_refresh_token";
 
     private final ObjectMapper objectMapper;
+    private final SensitiveValueCryptoService cryptoService;
 
     public void decodeTransientFields(EmailConfig config) {
         if (config == null) {
             return;
         }
+
+        String decryptedPassword = trim(cryptoService.decryptIfNeeded(config.getPassword()));
+        config.setPassword(decryptedPassword);
+        config.setPasswordConfigured(StringUtils.hasText(decryptedPassword));
+
         String rawRemark = trim(config.getRemark());
         if (!StringUtils.hasText(rawRemark)) {
             config.setAuthType(AUTH_TYPE_PASSWORD);
+            clearOauthFields(config);
             return;
         }
 
         if (!looksLikeJson(rawRemark)) {
             config.setAuthType(AUTH_TYPE_PASSWORD);
+            clearOauthFields(config);
+            config.setRemark(rawRemark);
             return;
         }
 
@@ -48,19 +56,28 @@ public class EmailAuthConfigService {
             Map<String, Object> meta = objectMapper.readValue(rawRemark, new TypeReference<>() {});
             if (!containsAuthMeta(meta)) {
                 config.setAuthType(AUTH_TYPE_PASSWORD);
+                clearOauthFields(config);
+                config.setRemark(rawRemark);
                 return;
             }
+
             config.setAuthType(normalizeAuthType(asText(meta.get("authType"))));
             config.setOauthClientId(asText(meta.get("oauthClientId")));
-            config.setOauthClientSecret(asText(meta.get("oauthClientSecret")));
-            config.setOauthRefreshToken(asText(meta.get("oauthRefreshToken")));
-            config.setOauthAccessToken(asText(meta.get("oauthAccessToken")));
+            config.setOauthClientSecret(trim(cryptoService.decryptIfNeeded(asText(meta.get("oauthClientSecret")))));
+            config.setOauthRefreshToken(trim(cryptoService.decryptIfNeeded(asText(meta.get("oauthRefreshToken")))));
+            config.setOauthAccessToken(trim(cryptoService.decryptIfNeeded(asText(meta.get("oauthAccessToken")))));
             config.setOauthTokenEndpoint(asText(meta.get("oauthTokenEndpoint")));
             config.setOauthScope(asText(meta.get("oauthScope")));
             config.setRemark(asText(meta.get("note")));
-        } catch (Exception e) {
+
+            config.setOauthClientSecretConfigured(meta.containsKey("oauthClientSecret"));
+            config.setOauthRefreshTokenConfigured(meta.containsKey("oauthRefreshToken"));
+            config.setOauthAccessTokenConfigured(meta.containsKey("oauthAccessToken"));
+        } catch (Exception ignored) {
             // remark 可能是历史文本或用户自定义 JSON，这里不报错，按普通密码模式处理
             config.setAuthType(AUTH_TYPE_PASSWORD);
+            clearOauthFields(config);
+            config.setRemark(rawRemark);
         }
     }
 
@@ -80,8 +97,25 @@ public class EmailAuthConfigService {
         ));
         incoming.setAuthType(authType);
 
+        if (AUTH_TYPE_PASSWORD.equals(authType)) {
+            String password = firstNonBlank(
+                    incoming.getPassword(),
+                    existing == null ? null : existing.getPassword()
+            );
+            if (StringUtils.hasText(password)) {
+                incoming.setPassword(cryptoService.encryptIfNeeded(password));
+            } else {
+                incoming.setPassword(null);
+            }
+            incoming.setRemark(trim(incoming.getRemark()));
+            clearOauthFields(incoming);
+            return;
+        }
+
+        incoming.setPassword(null);
+
         // OAuth 模式下，未提交的新值自动沿用旧值，避免编辑时误清空
-        if (!AUTH_TYPE_PASSWORD.equals(authType) && existing != null) {
+        if (existing != null) {
             incoming.setOauthClientId(firstNonBlank(incoming.getOauthClientId(), existing.getOauthClientId()));
             incoming.setOauthClientSecret(firstNonBlank(incoming.getOauthClientSecret(), existing.getOauthClientSecret()));
             incoming.setOauthRefreshToken(firstNonBlank(incoming.getOauthRefreshToken(), existing.getOauthRefreshToken()));
@@ -91,22 +125,13 @@ public class EmailAuthConfigService {
         }
 
         String note = trim(incoming.getRemark());
-        if (AUTH_TYPE_PASSWORD.equals(authType)
-                && !StringUtils.hasText(incoming.getOauthClientId())
-                && !StringUtils.hasText(incoming.getOauthRefreshToken())
-                && !StringUtils.hasText(incoming.getOauthAccessToken())) {
-            // 纯密码模式下保留历史行为：remark 存储为纯文本备注
-            incoming.setRemark(note);
-            return;
-        }
-
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("authType", authType);
         putIfHasText(meta, "note", note);
         putIfHasText(meta, "oauthClientId", incoming.getOauthClientId());
-        putIfHasText(meta, "oauthClientSecret", incoming.getOauthClientSecret());
-        putIfHasText(meta, "oauthRefreshToken", incoming.getOauthRefreshToken());
-        putIfHasText(meta, "oauthAccessToken", incoming.getOauthAccessToken());
+        putIfHasText(meta, "oauthClientSecret", encryptSensitive(incoming.getOauthClientSecret()));
+        putIfHasText(meta, "oauthRefreshToken", encryptSensitive(incoming.getOauthRefreshToken()));
+        putIfHasText(meta, "oauthAccessToken", encryptSensitive(incoming.getOauthAccessToken()));
         putIfHasText(meta, "oauthTokenEndpoint", incoming.getOauthTokenEndpoint());
         putIfHasText(meta, "oauthScope", incoming.getOauthScope());
 
@@ -115,6 +140,36 @@ public class EmailAuthConfigService {
         } catch (Exception e) {
             throw new IllegalStateException("保存邮箱认证扩展配置失败", e);
         }
+    }
+
+    public void sanitizeForResponse(EmailConfig config) {
+        if (config == null) {
+            return;
+        }
+        decodeTransientFields(config);
+        config.setPassword(null);
+        config.setOauthClientSecret(null);
+        config.setOauthRefreshToken(null);
+        config.setOauthAccessToken(null);
+    }
+
+    private String encryptSensitive(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return cryptoService.encryptIfNeeded(value.trim());
+    }
+
+    private void clearOauthFields(EmailConfig config) {
+        config.setOauthClientId(null);
+        config.setOauthClientSecret(null);
+        config.setOauthRefreshToken(null);
+        config.setOauthAccessToken(null);
+        config.setOauthTokenEndpoint(null);
+        config.setOauthScope(null);
+        config.setOauthClientSecretConfigured(false);
+        config.setOauthRefreshTokenConfigured(false);
+        config.setOauthAccessTokenConfigured(false);
     }
 
     private boolean looksLikeJson(String text) {
@@ -129,7 +184,8 @@ public class EmailAuthConfigService {
         return meta.containsKey("authType")
                 || meta.containsKey("oauthRefreshToken")
                 || meta.containsKey("oauthAccessToken")
-                || meta.containsKey("oauthClientId");
+                || meta.containsKey("oauthClientId")
+                || meta.containsKey("oauthClientSecret");
     }
 
     private void putIfHasText(Map<String, Object> data, String key, String value) {

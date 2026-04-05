@@ -24,7 +24,7 @@ SET @has_face_auth_enabled = (
 SET @sql_face_auth_enabled = IF(
     @has_face_auth_enabled = 0,
     'ALTER TABLE `user_account`
-       ADD COLUMN `face_auth_enabled` TINYINT(1) DEFAULT 0 COMMENT ''是否开启人脸二次验证'' AFTER `email_verified`',
+       ADD COLUMN `face_auth_enabled` TINYINT(1) DEFAULT 0 COMMENT ''是否要求登录时进行人脸二次验证'' AFTER `email_verified`',
     'SELECT ''user_account.face_auth_enabled exists, skip add'' AS msg'
 );
 PREPARE stmt_face_auth_enabled FROM @sql_face_auth_enabled;
@@ -51,4 +51,3 @@ CREATE TABLE IF NOT EXISTS `user_face_profile` (
     INDEX `idx_user_face_profile_enabled` (`enabled`),
     CONSTRAINT `fk_user_face_profile_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户人脸认证向量表';
-

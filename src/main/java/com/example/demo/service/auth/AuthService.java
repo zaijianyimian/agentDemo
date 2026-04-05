@@ -70,7 +70,6 @@ public class AuthService {
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new IllegalArgumentException("用户名或密码错误");
         }
-        markLoginSuccess(user);
         return issueTokensOrChallenge(user);
     }
 
@@ -88,7 +87,8 @@ public class AuthService {
         }
 
         user.setEmailVerified(true);
-        markLoginSuccess(user);
+        userAccountMapper.updateById(user);
+        userAccountCacheService.evictUser(user);
         return issueTokensOrChallenge(user);
     }
 
@@ -173,6 +173,7 @@ public class AuthService {
                     .user(toProfile(activeUser))
                     .build();
         }
+        markLoginSuccess(activeUser);
         return issueTokens(activeUser);
     }
 
@@ -180,6 +181,7 @@ public class AuthService {
         PreAuthTokenService.PreAuthSession session = preAuthTokenService.consume(preAuthToken);
         UserAccount user = requireActiveUser(userAccountCacheService.findById(session.getUserId()));
         faceAuthService.verifyForLogin(user.getId(), imageBase64);
+        markLoginSuccess(user);
         return issueTokens(user);
     }
 

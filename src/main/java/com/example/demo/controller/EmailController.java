@@ -38,7 +38,7 @@ public class EmailController {
         List<EmailConfig> list = emailConfigMapper.selectList(null);
         list.forEach(config -> {
             normalizeConfig(config);
-            emailAuthConfigService.decodeTransientFields(config);
+            emailAuthConfigService.sanitizeForResponse(config);
         });
         return list;
     }
@@ -53,7 +53,7 @@ public class EmailController {
         );
         list.forEach(config -> {
             normalizeConfig(config);
-            emailAuthConfigService.decodeTransientFields(config);
+            emailAuthConfigService.sanitizeForResponse(config);
         });
         return list;
     }
@@ -65,7 +65,7 @@ public class EmailController {
     public EmailConfig getConfig(@PathVariable Long id) {
         EmailConfig config = emailConfigMapper.selectById(id);
         normalizeConfig(config);
-        emailAuthConfigService.decodeTransientFields(config);
+        emailAuthConfigService.sanitizeForResponse(config);
         return config;
     }
 
@@ -128,6 +128,8 @@ public class EmailController {
         if (existing == null) {
             return ResponseEntity.badRequest().body("邮箱配置不存在");
         }
+        normalizeConfig(existing);
+        emailAuthConfigService.decodeTransientFields(existing);
         normalizeConfig(config);
         if (isBlank(config.getEmail()) || isBlank(config.getHost())) {
             return ResponseEntity.badRequest().body("邮箱地址和服务器不能为空");

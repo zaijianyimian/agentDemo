@@ -38,11 +38,15 @@ export interface EmailConfig {
   id: number
   email: string
   password: string
+  passwordConfigured?: boolean
   authType?: 'password' | 'oauth2_access_token' | 'oauth2_refresh_token'
   oauthClientId?: string
   oauthClientSecret?: string
+  oauthClientSecretConfigured?: boolean
   oauthRefreshToken?: string
+  oauthRefreshTokenConfigured?: boolean
   oauthAccessToken?: string
+  oauthAccessTokenConfigured?: boolean
   oauthTokenEndpoint?: string
   oauthScope?: string
   host: string

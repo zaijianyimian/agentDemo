@@ -1,111 +1,100 @@
 # AI Agent Demo
 
-一个基于 **Spring Boot 3 + LangChain4j + Vue 3** 的全栈 AI Agent 项目，覆盖聊天、记忆、搜索、RAG、工具编排、技能系统、邮件监听、日程管理、定时任务、报告生成与受控自治等能力。
+一个基于 Spring Boot 3、LangChain4j、MyBatis-Plus、Vue 3 和 Naive UI 的单用户 AI 工作台项目。当前代码覆盖认证、多模型管理、聊天与记忆、联网搜索、知识库 RAG、文件/笔记/代码片段管理、MCP 工具与技能、邮件监听、日程与定时任务、统一收件箱、报告生成以及受控自治扫描等能力。
 
-## 最新更新（2026-03-31）
-
-- 登录/注册接入后端拼图验证码（challenge + verify + 一次性 ticket）
-- 登录支持“密码/邮箱后人脸二次验证”链路（preAuthToken + 人脸向量比对）
-- 新增 MCP 工具自动同步（定时拉取、手动触发、幂等增量、失联下线保护）
-- 技能支持 `findskills` 远程自动加载（可开关）
-- 接入 Caffeine 缓存，减少用户、模型、技能、系统设置读库压力
+> 状态快照（2026-04-05）
+>
+> - 前端 `frontend` 目录执行 `npm run build` 通过。
+> - 后端执行 `.\gradlew.bat test` 失败，当前代码缺少 `src/main/java/com/example/demo/service/DataArchiveService.java`，导致 [`SystemSettingsController.java`](/D:/javaproject/agentDemo/src/main/java/com/example/demo/controller/SystemSettingsController.java) 无法编译。
+> - 本 README 与 [`API.md`](/D:/javaproject/agentDemo/API.md) 已按当前源码重新整理，不再沿用旧的“已验证通过”结论。
 
 ## 项目定位
 
-本项目面向“个人 AI 工作台”场景：
-- 后端提供多模块 API、模型管理、工具执行与任务调度。
-- 前端提供统一控制台，集中管理模型、知识库、任务、技能、收件箱与报告。
-- 运行时数据落盘到本地目录，便于自托管和二次开发。
+这个项目更接近“个人 AI 控制台”而不是单一聊天应用：
+
+- 后端提供统一 API、模型切换、向量检索、工具执行、邮件监听、任务调度和自治扫描。
+- 前端提供 20 个业务页面，集中管理模型、工具、技能、文件、知识库、收件箱和自治结果。
+- 运行数据默认落盘到 `data/`、`generated/` 和 `logs/`，适合本地自托管与二次开发。
 
 ## 技术栈
 
 ### 后端
+
 - Java 17
 - Spring Boot 3.5.12
+- Spring Security + JWT Resource Server
 - LangChain4j 1.12.2-beta22
 - MyBatis-Plus 3.5.10.1
 - MySQL 8+
 - Qdrant Client 1.17.0
-- WebFlux (SSE 流式响应)
-- Druid 数据源
+- WebFlux / SSE
+- Druid
+- Caffeine
 
 ### 前端
-- Vue 3 + TypeScript
-- Vite
+
+- Vue 3.5
+- TypeScript 5.7
+- Vite 6
 - Naive UI
 - Pinia
 - Vue Router
 - Axios
 
-## 目录结构
+## 当前代码结构
 
 ```text
 agentDemo/
 ├─ src/main/java/com/example/demo
-│  ├─ config/          # Spring/AI/Qdrant/MCP/线程池等配置
-│  ├─ controller/      # REST API 控制器
-│  ├─ service/         # 业务实现（按领域分包）
-│  ├─ mapper/          # MyBatis-Plus Mapper
-│  ├─ entity/          # 数据实体
-│  ├─ dto/             # 接口返回与传输对象
-│  └─ memory/          # 记忆提取相关模型
+│  ├─ config/            # 安全、缓存、LangChain4j、Qdrant、WebMvc 等配置
+│  ├─ controller/        # 24 个 REST/SSE 控制器
+│  ├─ service/           # 按业务域分包的服务实现
+│  ├─ mapper/            # MyBatis-Plus Mapper
+│  ├─ entity/            # 数据实体
+│  ├─ dto/               # 请求/响应 DTO
+│  └─ memory/            # 记忆提取模型
 ├─ src/main/resources
-│  ├─ application.yaml
+│  ├─ application.example.yaml
 │  ├─ skills.yaml
 │  └─ sql/
 │     ├─ agent.sql
 │     ├─ migration_20260331_face_auth_non_destructive.sql
 │     ├─ search_history.sql
 │     └─ system_settings.sql
-├─ frontend/           # Vue 前端工程
-├─ data/               # 运行时数据（文档/日程等）
-├─ generated/          # 生成产物目录（自治报告/草稿等）
-└─ logs/               # 运行日志
+├─ frontend/
+│  ├─ src/views/         # 20 个页面
+│  ├─ src/router/        # 路由与登录守卫
+│  ├─ src/services/      # 前端 API 封装
+│  └─ src/stores/        # Pinia 状态
+├─ data/                 # 文档、笔记、知识库、日程、上传图片等运行数据
+├─ generated/            # 自治与报告产物
+├─ logs/                 # 日志
+├─ API.md
+└─ TECHNICAL_DOC.md
 ```
 
-## 后端模块概览
+## 功能概览
 
-控制器分组（`src/main/java/com/example/demo/controller`）：
-- `/api/auth`
-- `/api/chat`、`/api/chat/history`、`/api/chat/action`
-- `/api/model`
-- `/api/memory`
-- `/api/search`
-- `/api/knowledge`
-- `/api/mcp/tools`、`/api/mcp/agent`
-- `/api/skill`
-- `/api/file`
-- `/api/note`
-- `/api/snippet`
-- `/api/schedule`
-- `/api/email`
-- `/api/task`
-- `/api/report`
-- `/api/inbox`
-- `/api/personal`
-- `/api/autonomy`
-- `/api/settings`
-- `/api/embedding`、`/api/embedding/full`、`/api/analyze`
+### 后端模块
 
-服务分组（`src/main/java/com/example/demo/service`）：
-- `auth`：注册登录、JWT、邮箱验证码、GitHub OAuth
-- `chat`：对话、会话历史、聊天动作
-- `memory`：记忆提取与向量检索
-- `search`：联网搜索、历史、兴趣分析
-- `knowledge`：知识库与 RAG
-- `mcp` / `tool` / `skill`：工具注册、技能绑定、执行
-- `email` / `schedule` / `task`：邮件监听、日程、计划任务
-- `report` / `inbox` / `autonomy`：报告、统一收件箱、项目自治
-- `personal`：单用户效率洞察、模板任务、备份导入导出
+- `auth`：用户名/邮箱登录、JWT 刷新、GitHub OAuth、人脸二次验证。
+- `chat`：普通聊天、SSE 流式聊天、结构化响应、会话历史、聊天动作。
+- `memory`：从最近对话抽取记忆并写入向量库。
+- `search`：Serper / Tavily / Bing 搜索、历史记录、兴趣画像。
+- `knowledge`：知识库 CRUD、文档上传、分块、向量化、RAG 检索。
+- `file` / `note` / `code`：文件分析、笔记文件化存储、代码片段与代码生成。
+- `mcp` / `skill`：MCP 工具注册、执行、自动同步，技能加载、绑定与执行。
+- `email` / `schedule` / `task`：邮箱配置、监听、网络检查，日程流推送，定时任务调度。
+- `inbox` / `report` / `autonomy` / `personal`：统一收件箱、日报周报、自治扫描与草稿、个人备份与模板任务。
 
-## 前端页面（20 个路由）
+### 前端页面
 
-当前路由定义在 `frontend/src/router/index.ts`：
+当前路由定义在 [`frontend/src/router/index.ts`](/D:/javaproject/agentDemo/frontend/src/router/index.ts)，共 20 个页面：
 
 | 路由 | 页面 |
-|---|---|
+| --- | --- |
+| `/login` | 登录 |
 | `/oauth/github/callback` | GitHub 登录回调 |
-| `/login` | 登录页 |
 | `/` | Dashboard |
 | `/inbox` | 统一收件箱 |
 | `/autonomy` | 自治中心 |
@@ -125,16 +114,29 @@ agentDemo/
 | `/settings` | 系统设置 |
 | `/personal` | 单用户中心 |
 
+## 已知差异与风险
+
+- 当前工作区缺少 `DataArchiveService`，后端无法编译；修复该文件或同步删除 [`SystemSettingsController.java`](/D:/javaproject/agentDemo/src/main/java/com/example/demo/controller/SystemSettingsController.java) 中相关依赖前，后端不能启动。
+- [`SecurityConfig.java`](/D:/javaproject/agentDemo/src/main/java/com/example/demo/config/SecurityConfig.java) 仍保留 `/api/auth/captcha/puzzle` 与 `/api/auth/captcha/puzzle/verify` 白名单，但 [`AuthController.java`](/D:/javaproject/agentDemo/src/main/java/com/example/demo/controller/AuthController.java) 已没有对应实现。
+- 会话聊天当前始终使用“当前启用模型”。前端历史代码曾透传 `model` 参数，但后端实现不会按请求切换模型。
+- 部分控制器直接返回字符串、列表或 `ResponseEntity`，并没有统一走 `ApiResponse<T>`；接口联调应以控制器签名为准。
+- 文本提取并不覆盖所有上传类型。`file` 与 `knowledge` 模块会接受 `pdf/doc/docx`，但当前真正提取文本的只有 `txt` 和 `md`。
+
 ## 快速开始
 
-### 1) 环境要求
+### 1. 环境要求
+
 - JDK 17+
 - MySQL 8+
 - Node.js 18+
-- Qdrant（REST 6333，gRPC 6334）
-- 可选：Ollama（本地 embedding）
+- Qdrant
+  - REST 端口通常为 `6333`
+  - gRPC / 客户端端口当前配置示例为 `6334`
+- 可选：Ollama（embedding）
+- 可选：Serper / Tavily / Bing 搜索 API Key
+- 可选：SMTP / IMAP 邮箱账号
 
-### 2) 初始化数据库
+### 2. 初始化数据库
 
 先创建数据库：
 
@@ -142,43 +144,65 @@ agentDemo/
 CREATE DATABASE agent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-再执行脚本：
-- `src/main/resources/sql/agent.sql`
-- `src/main/resources/sql/migration_20260331_face_auth_non_destructive.sql`
-- `src/main/resources/sql/search_history.sql`
-- `src/main/resources/sql/system_settings.sql`
+然后依次执行：
 
-### 3) 配置后端
+- [`src/main/resources/sql/agent.sql`](/D:/javaproject/agentDemo/src/main/resources/sql/agent.sql)
+- [`src/main/resources/sql/migration_20260331_face_auth_non_destructive.sql`](/D:/javaproject/agentDemo/src/main/resources/sql/migration_20260331_face_auth_non_destructive.sql)
+- [`src/main/resources/sql/search_history.sql`](/D:/javaproject/agentDemo/src/main/resources/sql/search_history.sql)
+- [`src/main/resources/sql/system_settings.sql`](/D:/javaproject/agentDemo/src/main/resources/sql/system_settings.sql)
 
-编辑 `src/main/resources/application.yaml`，至少确认：
+### 3. 配置后端
+
+仓库提供的是 [`application.example.yaml`](/D:/javaproject/agentDemo/src/main/resources/application.example.yaml)。如果本地还没有 `application.yaml`，先复制一份再修改。
+
+至少需要确认这些配置段：
+
 - `spring.datasource.*`
 - `langchain4j.open-ai.chat-model.*`
+- `langchain4j.ollama.embedding-model.*`
 - `app.qdrant.*`
+- `app.memory.*`
 - `app.search.*`
 - `app.mail.*`
-- `app.security.*`（JWT 与登录安全配置）
-- `app.mcp.auto-sync.*`（MCP 自动同步）
-- `app.skills.*`（技能 YAML 与 findskills 自动加载）
+- `app.schedule.*`
+- `app.file.*`
+- `app.security.*`
+- `app.mcp.auto-sync.*`
+- `app.skills.*`
+- `app.autonomy.*`
 
-注意：仓库中的配置可能包含本地敏感值，部署前请替换为你自己的配置。
+安全相关说明：
 
-### 4) 启动后端
+- `app.security.jwt-secret` 至少 32 字节。
+- `app.security.data-secret` 默认跟随 `JWT_SECRET`，用于敏感字段加密。
+- GitHub OAuth 需要配置 `app.security.github.*`。
 
-Windows:
+### 4. 修复当前后端编译阻塞
+
+在启动后端前，先处理当前代码中的编译问题：
+
+- 恢复 `src/main/java/com/example/demo/service/DataArchiveService.java`，或
+- 移除 [`SystemSettingsController.java`](/D:/javaproject/agentDemo/src/main/java/com/example/demo/controller/SystemSettingsController.java) 中对该服务的依赖与相关导入导出接口。
+
+当前源码状态下，直接执行 `.\gradlew.bat test` 会失败。
+
+### 5. 启动后端
+
+Windows：
 
 ```bash
 gradlew.bat bootRun
 ```
 
-Linux/macOS:
+Linux / macOS：
 
 ```bash
 ./gradlew bootRun
 ```
 
-后端默认地址：`http://localhost:8000`
+默认地址：`http://localhost:8000`
 
-### 5) 启动前端
+### 6. 启动前端
 
 ```bash
 cd frontend
@@ -186,102 +210,53 @@ npm install
 npm run dev
 ```
 
-前端默认地址：`http://localhost:3000`
+默认地址：`http://localhost:3000`
 
-Vite 代理会将 `/api` 转发到 `http://localhost:8000`（已配置 SSE 相关头）。
+[`frontend/vite.config.ts`](/D:/javaproject/agentDemo/frontend/vite.config.ts) 已配置 `/api` 代理，并对 `/stream` 请求补充了 SSE 相关头。
 
-### 6) 首次登录
+### 7. Docker
 
-系统已启用鉴权，除登录相关接口外其余 API 默认都需要 Bearer Token。
-- 首次使用可在登录页注册账号，或调用 `POST /api/auth/register`。
-- 登录后前端会自动保存 `accessToken`/`refreshToken` 并在过期时尝试刷新。
-- 如启用 GitHub OAuth，请先在 `app.security.github.*` 中完成配置。
+仓库根目录的 [`Dockerfile`](/D:/javaproject/agentDemo/Dockerfile) 只打包后端服务，不包含前端构建产物。若要容器化完整系统，需要另外处理前端静态资源部署。
 
-## 常用命令
+## 鉴权与接口约定
 
-后端：
+- 除以下公开接口外，其余接口默认都需要 Bearer Token：
+  - `POST /api/auth/register`
+  - `POST /api/auth/login/password`
+  - `POST /api/auth/login/email/send-code`
+  - `POST /api/auth/login/email`
+  - `POST /api/auth/token/refresh`
+  - `POST /api/auth/face/verify-login`
+  - `GET /api/auth/oauth/github/authorize`
+  - `POST /api/auth/oauth/github/exchange`
+  - `GET /api/settings/proxy`
+- 登录成功可能直接返回 `accessToken` / `refreshToken`，也可能返回 `requiresSecondFactor=true` 和 `preAuthToken`，此时需要继续调用人脸二验接口。
+- SSE 接口包括聊天、搜索、日程和 MCP Agent；不同接口的事件格式并不完全统一，详见 [`API.md`](/D:/javaproject/agentDemo/API.md)。
+- 常规控制器常用 `ApiResponse<T>`，但邮件、工具、技能、文件、聊天等模块存在直接返回字符串、原始列表或 `ResponseEntity` 的实现。
 
-```bash
-# 测试
-./gradlew test
+## 运行时目录
 
-# 构建
-./gradlew build
-```
+- `data/documents`：文件上传与分析文档
+- `data/knowledge`：知识库原始文件
+- `data/notes`：笔记 Markdown 文件
+- `data/schedules`：按日期落盘的日程文件
+- `data/uploads`：图片上传目录（Logo 等）
+- `generated/autonomy`：自治扫描、验证、草稿产物
+- `generated/reports`：日报周报 Markdown 文件
+- `logs`：日志文件
 
-前端：
+## 开发与验证
 
-```bash
-cd frontend
+### 已执行
 
-# 开发
-npm run dev
+- `frontend`: `npm run build` 通过
 
-# 生产构建
-npm run build
+### 未通过
 
-# 预览
-npm run preview
-```
+- 根目录: `.\gradlew.bat test`
+  - 失败原因：缺少 `DataArchiveService`
 
-## 关键配置说明
+## 文档入口
 
-`application.yaml` 中的核心配置段：
-- `app.memory`：向量记忆检索参数
-- `app.qdrant`：向量库连接
-- `app.search`：联网搜索引擎及 key
-- `app.schedule`：日程存储和提醒策略
-- `app.file`：文档上传目录与类型
-- `app.autonomy`：项目自治扫描、验证与产物输出
-- `app.security`：JWT、刷新令牌、邮箱验证码与 GitHub OAuth
-- `app.mcp.auto-sync`：MCP 工具自动同步（URL、token、cron、缺失下线策略）
-- `app.skills`：技能配置路径、自动加载、findskills 远程加载
-
-### MCP 自动同步示例
-
-```yaml
-app:
-  mcp:
-    auto-sync:
-      enabled: true
-      url: "https://your-domain.example.com/mcp/tools"
-      token: "your-bearer-token"
-      cron: "0 */5 * * * ?"
-      connect-timeout-seconds: 5
-      read-timeout-seconds: 15
-      sync-enabled-state: true
-      disable-missing: true
-      missing-threshold: 2
-```
-
-### findskills 自动加载示例
-
-```yaml
-app:
-  skills:
-    config-path: skills.yaml
-    auto-load: true
-    findskills-enabled: true
-    findskills-url: "https://your-domain.example.com/findskills.json"
-    findskills-timeout-seconds: 10
-```
-
-## 运行数据目录
-
-- `data/documents`：文档上传与处理数据
-- `data/schedules`：日程文件
-- `generated/autonomy`：自治扫描/验证/草稿产物
-- `logs`：运行日志
-
-## 开发建议
-
-- 大改前先执行 `./gradlew test` 与 `npm run build`。
-- 接口定义可参考 `API.md`（比 README 更细）。
-- 新增模块时优先沿用现有分层：`controller -> service -> mapper -> entity/dto`。
-- 对外配置优先放 `application.yaml` + `properties` 类，避免硬编码。
-
-## 当前状态说明
-
-- 后端测试可通过（`./gradlew test`）。
-- 前端可正常构建（`npm run build`）。
-- 项目包含较多本地运行数据与产物目录，提交前建议清理无关文件。
+- 接口清单与请求体参考：[`API.md`](/D:/javaproject/agentDemo/API.md)
+- 较详细的历史技术说明：[`TECHNICAL_DOC.md`](/D:/javaproject/agentDemo/TECHNICAL_DOC.md)

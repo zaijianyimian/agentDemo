@@ -434,8 +434,8 @@ const saveFaceProfile = async () => {
     }
     faceStatus.value = res.data
     faceRequired.value = res.data.required
-    message.success('人脸绑定成功')
-    appendAction('绑定人脸二次验证')
+    message.success('人脸模板已更新，可按需开启登录二次验证')
+    appendAction('绑定人脸模板')
   } catch (e: any) {
     message.error(e?.message || '绑定失败')
   } finally {

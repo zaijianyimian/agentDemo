@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS `ai_model_config` (
 CREATE TABLE IF NOT EXISTS `email_config` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `email` VARCHAR(100) NOT NULL COMMENT '邮箱地址',
-    `password` VARCHAR(255) NOT NULL COMMENT '邮箱授权码/密码',
+    `password` VARCHAR(255) NOT NULL COMMENT '邮箱授权码/密码(加密存储)',
     `host` VARCHAR(100) NOT NULL COMMENT '邮箱服务器主机',
     `protocol` VARCHAR(20) DEFAULT 'imap' COMMENT '协议类型: imap, pop3',
     `port` INT DEFAULT 993 COMMENT '端口号',
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS `user_account` (
     `role` VARCHAR(30) DEFAULT 'USER' COMMENT '角色',
     `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
     `email_verified` TINYINT(1) DEFAULT 0 COMMENT '邮箱是否已验证',
-    `face_auth_enabled` TINYINT(1) DEFAULT 0 COMMENT '是否开启人脸二次验证',
+    `face_auth_enabled` TINYINT(1) DEFAULT 0 COMMENT '是否要求登录时进行人脸二次验证',
     `token_version` INT NOT NULL DEFAULT 0 COMMENT 'JWT版本号，用于令牌失效',
     `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

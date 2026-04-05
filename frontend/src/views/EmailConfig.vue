@@ -94,13 +94,17 @@
           <n-select v-model:value="formData.authType" :options="authTypeOptions" />
         </n-form-item>
         <n-form-item v-if="formData.authType === 'password'" label="密码/授权码" path="password">
-          <n-input v-model:value="formData.password" type="password" placeholder="输入密码或授权码" />
+          <n-input
+            v-model:value="formData.password"
+            type="password"
+            :placeholder="editingConfig?.passwordConfigured ? '已保存密码/授权码，留空表示保持不变' : '输入密码或授权码'"
+          />
         </n-form-item>
         <n-form-item v-if="formData.authType === 'oauth2_access_token'" label="Access Token" path="oauthAccessToken">
           <n-input
             v-model:value="formData.oauthAccessToken"
             type="password"
-            placeholder="OAuth2 access_token（短期令牌）"
+            :placeholder="editingConfig?.oauthAccessTokenConfigured ? '已保存 access token，留空表示保持不变' : 'OAuth2 access_token（短期令牌）'"
           />
         </n-form-item>
         <n-form-item v-if="formData.authType === 'oauth2_refresh_token'" label="Client ID" path="oauthClientId">
@@ -110,14 +114,14 @@
           <n-input
             v-model:value="formData.oauthClientSecret"
             type="password"
-            placeholder="OAuth2 client_secret（编辑时可留空以保持不变）"
+            :placeholder="editingConfig?.oauthClientSecretConfigured ? '已保存 client_secret，留空表示保持不变' : 'OAuth2 client_secret（编辑时可留空以保持不变）'"
           />
         </n-form-item>
         <n-form-item v-if="formData.authType === 'oauth2_refresh_token'" label="Refresh Token" path="oauthRefreshToken">
           <n-input
             v-model:value="formData.oauthRefreshToken"
             type="password"
-            placeholder="OAuth2 refresh_token（编辑时可留空以保持不变）"
+            :placeholder="editingConfig?.oauthRefreshTokenConfigured ? '已保存 refresh_token，留空表示保持不变' : 'OAuth2 refresh_token（编辑时可留空以保持不变）'"
           />
         </n-form-item>
         <n-form-item v-if="formData.authType === 'oauth2_refresh_token'" label="Token端点" path="oauthTokenEndpoint">

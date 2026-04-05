@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.nio.charset.StandardCharsets;
 import java.net.URLEncoder;
@@ -238,15 +239,15 @@ public class SystemSettingsController {
      * 导出全量数据（ZIP）
      */
     @GetMapping("/data/export")
-    public ResponseEntity<byte[]> exportAllDataZip() {
-        byte[] archive = dataArchiveService.exportAllDataAsZip();
+    public ResponseEntity<StreamingResponseBody> exportAllDataZip() {
         String filename = dataArchiveService.buildArchiveFileName();
         String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+        StreamingResponseBody body = outputStream -> dataArchiveService.writeArchiveTo(outputStream);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + encoded)
-                .body(archive);
+                .body(body);
     }
 
     /**
