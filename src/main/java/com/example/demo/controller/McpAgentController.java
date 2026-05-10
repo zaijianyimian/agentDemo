@@ -6,6 +6,9 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 /**
  * MCP Agent 聊天控制器
  * 提供带工具调用能力的 AI 对话接口
@@ -28,7 +31,7 @@ public class McpAgentController {
      */
     @GetMapping("/chat")
     public String chat(@RequestParam String message) {
-        return mcpAgentService.chat(message);
+        return mcpAgentService.chat(withRuntimeContext(message));
     }
 
     /**
@@ -39,7 +42,7 @@ public class McpAgentController {
      */
     @PostMapping("/chat")
     public String chatPost(@RequestBody ChatRequest request) {
-        return mcpAgentService.chat(request.message());
+        return mcpAgentService.chat(withRuntimeContext(request.message()));
     }
 
     /**
@@ -53,7 +56,7 @@ public class McpAgentController {
     public String chatWithMemory(
             @PathVariable String sessionId,
             @RequestParam String message) {
-        return mcpAgentService.chatWithMemory(sessionId, message);
+        return mcpAgentService.chatWithMemory(sessionId, withRuntimeContext(message));
     }
 
     /**
@@ -64,7 +67,7 @@ public class McpAgentController {
      */
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chatStream(@RequestParam String message) {
-        return mcpAgentStreamingService.chatStream(message);
+        return mcpAgentStreamingService.chatStream(withRuntimeContext(message));
     }
 
     /**
@@ -78,11 +81,24 @@ public class McpAgentController {
     public Flux<String> chatStreamWithMemory(
             @PathVariable String sessionId,
             @RequestParam String message) {
-        return mcpAgentStreamingService.chatStreamWithMemory(sessionId, message);
+        return mcpAgentStreamingService.chatStreamWithMemory(sessionId, withRuntimeContext(message));
     }
 
     /**
      * 聊天请求
      */
     public record ChatRequest(String message) {}
+
+    private String withRuntimeContext(String message) {
+        return """
+                当前服务器时间: %s
+                当用户使用“今天/明天/后天/下周”等相对日期时，请基于这个时间换算为明确日期后再调用工具。
+
+                用户消息:
+                %s
+                """.formatted(
+                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                message
+        );
+    }
 }

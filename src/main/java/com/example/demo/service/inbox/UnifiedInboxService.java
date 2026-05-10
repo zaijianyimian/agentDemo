@@ -75,7 +75,7 @@ public class UnifiedInboxService {
         List<Note> notes = noteMapper.findAllOrderByPinnedAndTime();
         List<SearchHistory> searches = searchHistoryService.getRecentHistory(Math.max(limit, 6));
         List<EmailConfig> emails = emailConfigMapper.selectList(null);
-        Map<Long, String> listenerStatus = emailListenerService.getListenerStatus();
+        Map<Long, Map<String, Object>> listenerStatus = emailListenerService.getListenerStatus();
 
         schedules.stream()
                 .filter(item -> item.getEventTime() != null)
@@ -151,8 +151,8 @@ public class UnifiedInboxService {
                 .forEach(config -> rawItems.add(InboxItem.builder()
                         .category("mail")
                         .title(config.getEmail())
-                        .summary(buildEmailSummary(config, listenerStatus.get(config.getId())))
-                        .status(defaultText(listenerStatus.get(config.getId()), Boolean.TRUE.equals(config.getEnabled()) ? "enabled" : "disabled"))
+                        .summary(buildEmailSummary(config, listenerStatusText(listenerStatus.get(config.getId()))))
+                        .status(defaultText(listenerStatusText(listenerStatus.get(config.getId())), Boolean.TRUE.equals(config.getEnabled()) ? "enabled" : "disabled"))
                         .route("/email")
                         .accent("#fdba74")
                         .time(config.getUpdateTime())
@@ -298,6 +298,21 @@ public class UnifiedInboxService {
         parts.add(defaultText(config.getFolder(), "INBOX"));
         parts.add(defaultText(listener, Boolean.TRUE.equals(config.getEnabled()) ? "enabled" : "disabled"));
         return String.join(" · ", parts.stream().filter(text -> !text.isBlank()).toList());
+    }
+
+    private String listenerStatusText(Map<String, Object> listener) {
+        if (listener == null) {
+            return null;
+        }
+        Object status = listener.get("status");
+        if (status != null) {
+            return String.valueOf(status);
+        }
+        Object connected = listener.get("connected");
+        if (connected instanceof Boolean value) {
+            return value ? "已连接" : "未连接";
+        }
+        return null;
     }
 
     private String defaultText(String value, String defaultValue) {

@@ -89,8 +89,12 @@ public class EmailProcessingService implements EmailListenerService.EmailHandler
             scheduleEventMapper.insert(event);
             log.info("日程已保存: {} - {}", event.getTitle(), event.getEventTime());
 
-            // 写入文件并保存文件路径
-            String filePath = scheduleFileService.saveScheduleToFile(event);
+            // 按日期重写当天日程文件，保持邮件监听、手动创建和 AI 工具创建的文件视图一致
+            String filePath = scheduleFileService.saveScheduleByDate(
+                    event.getEventDate(),
+                    scheduleEventMapper.selectList(new QueryWrapper<ScheduleEvent>()
+                            .eq("event_date", event.getEventDate()))
+            );
             if (filePath != null) {
                 event.setFilePath(filePath);
                 scheduleEventMapper.updateById(event);

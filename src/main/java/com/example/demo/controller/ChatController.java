@@ -7,6 +7,7 @@ import com.example.demo.service.chat.ContentAnalysisService;
 import com.example.demo.service.chat.QwenChatService;
 import com.example.demo.service.chat.ChatWithMemoryService;
 import com.example.demo.service.memory.MemoryApplicationService;
+import com.example.demo.service.mcp.McpAgentService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
@@ -18,6 +19,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -32,6 +35,12 @@ public class ChatController {
 
     @Resource
     private QwenChatService qwenChatService;
+
+    @Resource
+    private McpAgentService mcpAgentService;
+
+    @Resource(name = "mcpAgentStreamingService")
+    private McpAgentService mcpAgentStreamingService;
 
     @Resource
     private ChatWithMemoryService chatWithMemoryService;
@@ -53,7 +62,7 @@ public class ChatController {
      */
     @GetMapping("/complete")
     public String complete(@RequestParam("message") String message) {
-        return qwenChatService.complete(message);
+        return mcpAgentService.chat(withRuntimeContext(message));
     }
 
     /**
@@ -62,7 +71,7 @@ public class ChatController {
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStream(@RequestParam("message") String message) {
-        return qwenChatService.chat(message)
+        return mcpAgentStreamingService.chatStream(withRuntimeContext(message))
                 .map(chunk -> ServerSentEvent.<String>builder()
                         .data(chunk)
                         .build());
@@ -76,7 +85,7 @@ public class ChatController {
     public Flux<ServerSentEvent<String>> chatStreamJson(@RequestParam("message") String message) {
         AtomicReference<StringBuilder> contentBuilder = new AtomicReference<>(new StringBuilder());
 
-        return qwenChatService.chat(message)
+        return mcpAgentStreamingService.chatStream(withRuntimeContext(message))
                 .map(chunk -> {
                     contentBuilder.get().append(chunk);
                     try {
@@ -122,7 +131,7 @@ public class ChatController {
     @GetMapping("/structured")
     public ChatResponse chatStructured(@RequestParam("message") String message) {
         // 1. 获取完整响应
-        String content = qwenChatService.complete(message);
+        String content = mcpAgentService.chat(withRuntimeContext(message));
 
         // 2. 分析内容
         ContentAnalysis analysis = contentAnalysisService.analyze(content);
@@ -312,5 +321,18 @@ public class ChatController {
                 .map(chunk -> ServerSentEvent.<String>builder()
                         .data(chunk)
                         .build());
+    }
+
+    private String withRuntimeContext(String message) {
+        return """
+                当前服务器时间: %s
+                当用户使用“今天/明天/后天/下周”等相对日期时，请基于这个时间换算为明确日期后再调用工具。
+
+                用户消息:
+                %s
+                """.formatted(
+                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                message
+        );
     }
 }
