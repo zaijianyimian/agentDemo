@@ -70,6 +70,12 @@ dependencies {
     // YAML解析
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2'
 
+    // 文档内容提取
+    // PDF 文件处理
+    implementation 'org.apache.pdfbox:pdfbox:2.0.29'
+    // Word 文件处理 (docx)
+    implementation 'org.apache.poi:poi-ooxml:5.2.3'
+
     // 5. 测试
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

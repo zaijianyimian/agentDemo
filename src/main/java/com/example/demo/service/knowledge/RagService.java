@@ -6,6 +6,7 @@ import com.example.demo.mapper.KnowledgeBaseMapper;
 import com.example.demo.mapper.KnowledgeDocumentMapper;
 import com.example.demo.properties.QdrantProperties;
 import com.example.demo.service.SystemSettingsService;
+import com.example.demo.service.file.FileContentExtractor;
 import com.example.demo.service.memory.EmbeddingCacheService;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
@@ -50,20 +51,20 @@ public class RagService {
     private final EmbeddingCacheService embeddingCacheService;
     private final QdrantProperties qdrantProperties;
     private final SystemSettingsService systemSettingsService;
-
-    // 每个知识库的 EmbeddingStore 缓存
-    private final Map<String, EmbeddingStore<TextSegment>> embeddingStoreCache = new HashMap<>();
+    private final FileContentExtractor contentExtractor;
 
     public RagService(KnowledgeBaseMapper knowledgeBaseMapper,
                       KnowledgeDocumentMapper knowledgeDocumentMapper,
                       EmbeddingCacheService embeddingCacheService,
                       QdrantProperties qdrantProperties,
-                      SystemSettingsService systemSettingsService) {
+                      SystemSettingsService systemSettingsService,
+                      FileContentExtractor contentExtractor) {
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.knowledgeDocumentMapper = knowledgeDocumentMapper;
         this.embeddingCacheService = embeddingCacheService;
         this.qdrantProperties = qdrantProperties;
         this.systemSettingsService = systemSettingsService;
+        this.contentExtractor = contentExtractor;
     }
 
     @PostConstruct
@@ -102,9 +103,8 @@ public class RagService {
      * HTTP REST API 使用端口 6333，gRPC 使用端口 6334
      */
     private void createQdrantCollection(String collectionName) {
-        String host = normalizeHttpHost(qdrantProperties.getHost());
-        // HTTP REST API 端口通常是 6333
-        int restPort = 6333;
+        String host = normalizeHttpHost(resolveQdrantHost());
+        int restPort = resolveQdrantRestPort();
 
         try {
             String url = host + ":" + restPort + "/collections/" + collectionName;
@@ -118,7 +118,7 @@ public class RagService {
             String json = """
             {
                 "vectors": {
-                    "size": 768,
+                    "size": 1536,
                     "distance": "Cosine"
                 }
             }
@@ -146,8 +146,8 @@ public class RagService {
      * 删除 Qdrant 集合（HTTP REST API）
      */
     private void deleteQdrantCollection(String collectionName) {
-        String host = normalizeHttpHost(qdrantProperties.getHost());
-        int restPort = 6333;
+        String host = normalizeHttpHost(resolveQdrantHost());
+        int restPort = resolveQdrantRestPort();
 
         try {
             String url = host + ":" + restPort + "/collections/" + collectionName;
@@ -170,13 +170,11 @@ public class RagService {
      * 获取知识库的 EmbeddingStore
      */
     private EmbeddingStore<TextSegment> getEmbeddingStore(String collectionName) {
-        return embeddingStoreCache.computeIfAbsent(collectionName, name ->
-                QdrantEmbeddingStore.builder()
-                        .host(qdrantProperties.getHost())
-                        .port(qdrantProperties.getPort())
-                        .collectionName(name)
-                        .build()
-        );
+        return QdrantEmbeddingStore.builder()
+                .host(normalizeGrpcHost(resolveQdrantHost()))
+                .port(resolveQdrantGrpcPort())
+                .collectionName(collectionName)
+                .build();
     }
 
     /**
@@ -191,6 +189,9 @@ public class RagService {
         // 验证文件
         String originalFilename = file.getOriginalFilename();
         String fileType = getFileExtension(originalFilename);
+        if (!contentExtractor.isSupported(fileType)) {
+            throw new IOException("知识库支持的文档类型: " + String.join(", ", contentExtractor.getSupportedTypes()));
+        }
 
         // 保存文件
         String uniqueFileName = UUID.randomUUID().toString() + "." + fileType;
@@ -322,13 +323,10 @@ public class RagService {
 
     /**
      * 提取文件内容
+     * 使用 FileContentExtractor 支持多种文件类型
      */
     private String extractContent(Path filePath, String fileType) throws IOException {
-        if ("txt".equals(fileType) || "md".equals(fileType)) {
-            return Files.readString(filePath);
-        }
-        log.warn("暂不支持 {} 类型文件提取", fileType);
-        return "";
+        return contentExtractor.extractContent(filePath, fileType);
     }
 
     /**
@@ -451,7 +449,6 @@ public class RagService {
 
         deleteQdrantCollection(kb.getCollectionName());
         knowledgeBaseMapper.deleteById(id);
-        embeddingStoreCache.remove(kb.getCollectionName());
     }
 
     /**
@@ -489,9 +486,29 @@ public class RagService {
             throw new IllegalArgumentException("Qdrant host 未配置");
         }
         if (host.startsWith("http://") || host.startsWith("https://")) {
-            return host;
+            return host.replaceAll(":\\d+$", "");
         }
-        return "http://" + host;
+        return "http://" + host.replaceAll(":\\d+$", "");
+    }
+
+    private String normalizeGrpcHost(String host) {
+        if (host == null || host.isBlank()) {
+            throw new IllegalArgumentException("Qdrant host 未配置");
+        }
+        return host.replaceFirst("^https?://", "").replaceAll(":\\d+$", "");
+    }
+
+    private String resolveQdrantHost() {
+        return systemSettingsService.getSetting("qdrant", "host", qdrantProperties.getHost());
+    }
+
+    private int resolveQdrantGrpcPort() {
+        return systemSettingsService.getIntSetting("qdrant", "port", qdrantProperties.getPort());
+    }
+
+    private int resolveQdrantRestPort() {
+        int grpcPort = resolveQdrantGrpcPort();
+        return systemSettingsService.getIntSetting("qdrant", "rest_port", grpcPort == 6334 ? 6333 : grpcPort);
     }
 
     private KnowledgeDocument findDuplicateOrUnchanged(Long baseId, String fileName, String contentHash) {
