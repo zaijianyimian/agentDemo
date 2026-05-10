@@ -68,6 +68,7 @@ frontend/.vite/
 .DS_Store
 Thumbs.db
 *.log
+*.log.gz
 *.tmp
 
 ### Claude Code 会话记录 ###
