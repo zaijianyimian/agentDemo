@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -26,7 +25,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 
 @Configuration
-@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -42,13 +40,12 @@ public class SecurityConfig {
                                 "/api/auth/login/email/send-code",
                                 "/api/auth/login/email",
                                 "/api/auth/token/refresh",
-                                "/api/auth/captcha/puzzle",
-                                "/api/auth/captcha/puzzle/verify",
                                 "/api/auth/face/verify-login",
                                 "/api/auth/oauth/github/authorize",
-                                "/api/auth/oauth/github/exchange"
+                                "/api/auth/oauth/github/exchange",
+                                "/api/auth/password/reset/send-code",
+                                "/api/auth/password/reset"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/settings/proxy").permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 )

@@ -32,6 +32,10 @@ public class EmailCodeService {
         return sendCode(email, AuthConstants.PURPOSE_REGISTER, "AI Agent 注册确认验证码");
     }
 
+    public int sendResetPasswordCode(String email) {
+        return sendCode(email, AuthConstants.PURPOSE_RESET_PASSWORD, "AI Agent 密码重置验证码");
+    }
+
     private int sendCode(String email, String purpose, String subject) {
         LocalDateTime now = LocalDateTime.now();
         AuthEmailCode latest = findLatestByEmail(email, purpose);
@@ -61,10 +65,12 @@ public class EmailCodeService {
             try {
                 emailSenderService.sendHtml(email, subject, html);
             } catch (Exception ex) {
-                log.warn("验证码邮件发送失败，已记录验证码到日志用于开发调试: email={}, code={}", email, code, ex);
+                // 安全修复：不再在日志中输出验证码
+                log.warn("验证码邮件发送失败: email={}, error={}", email, ex.getMessage());
             }
         } else {
-            log.warn("邮件服务不可用，开发环境验证码: email={}, code={}", email, code);
+            // 安全修复：不再在日志中输出验证码
+            log.warn("邮件服务不可用，无法发送验证码: email={}", email);
         }
 
         return cooldown;
@@ -86,6 +92,19 @@ public class EmailCodeService {
     public boolean verifyAndConsumeAuthCode(String email, String code) {
         LocalDateTime now = LocalDateTime.now();
         AuthEmailCode record = findLatestValidRecord(email, code, AuthConstants.PURPOSE_LOGIN, AuthConstants.PURPOSE_REGISTER);
+
+        if (record == null || record.getExpireTime() == null || now.isAfter(record.getExpireTime())) {
+            return false;
+        }
+
+        record.setUsed(true);
+        emailCodeMapper.updateById(record);
+        return true;
+    }
+
+    public boolean verifyAndConsumeResetCode(String email, String code) {
+        LocalDateTime now = LocalDateTime.now();
+        AuthEmailCode record = findLatestValidRecord(email, code, AuthConstants.PURPOSE_RESET_PASSWORD);
 
         if (record == null || record.getExpireTime() == null || now.isAfter(record.getExpireTime())) {
             return false;

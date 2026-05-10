@@ -9,7 +9,6 @@ import com.example.demo.entity.UserAccount;
 import com.example.demo.mapper.OauthAccountMapper;
 import com.example.demo.mapper.UserAccountMapper;
 import com.example.demo.properties.GithubOAuthProperties;
-import com.example.demo.service.SystemSettingsService;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
@@ -24,7 +23,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.netty.http.client.HttpClient;
-import reactor.netty.transport.ProxyProvider;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -48,7 +46,6 @@ public class GithubOAuthService {
     private final UserAccountMapper userAccountMapper;
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
-    private final SystemSettingsService settingsService;
 
     private WebClient webClient;
 
@@ -57,34 +54,22 @@ public class GithubOAuthService {
                               OauthAccountMapper oauthAccountMapper,
                               UserAccountMapper userAccountMapper,
                               PasswordEncoder passwordEncoder,
-                              AuthService authService,
-                              SystemSettingsService settingsService) {
+                              AuthService authService) {
         this.properties = properties;
         this.oAuthStateService = oAuthStateService;
         this.oauthAccountMapper = oauthAccountMapper;
         this.userAccountMapper = userAccountMapper;
         this.passwordEncoder = passwordEncoder;
         this.authService = authService;
-        this.settingsService = settingsService;
 
-        // 初始化 WebClient（会在每次请求时检查代理设置）
+        // 初始化 WebClient
         this.webClient = createWebClient();
     }
 
     /**
-     * 创建 WebClient，根据代理设置决定是否使用代理
+     * 创建 WebClient
      */
     private WebClient createWebClient() {
-        HttpClient httpClient = createHttpClient();
-        return WebClient.builder()
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .build();
-    }
-
-    /**
-     * 创建 HttpClient，配置超时和代理
-     */
-    private HttpClient createHttpClient() {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 15000)
                 .responseTimeout(Duration.ofSeconds(30))
@@ -92,45 +77,9 @@ public class GithubOAuthService {
                         .addHandlerLast(new ReadTimeoutHandler(30, TimeUnit.SECONDS))
                         .addHandlerLast(new WriteTimeoutHandler(30, TimeUnit.SECONDS)));
 
-        // 检查代理设置并配置 HttpClient 代理
-        // Reactor Netty 需要显式配置代理，不会自动读取 JVM 系统属性
-        try {
-            boolean proxyEnabled = settingsService.isProxyEnabled();
-            if (proxyEnabled) {
-                String proxyHost = settingsService.getProxyHost();
-                int proxyPort = settingsService.getProxyPort();
-                String proxyType = settingsService.getProxyType();
-
-                log.info("GitHub OAuth 使用代理: {}://{}:{}", proxyType, proxyHost, proxyPort);
-
-                // 根据代理类型配置 HttpClient
-                final ProxyProvider.Proxy nettyProxyType = "socks5".equalsIgnoreCase(proxyType)
-                        ? ProxyProvider.Proxy.SOCKS5
-                        : ProxyProvider.Proxy.HTTP;
-
-                httpClient = httpClient.proxy(typeSpec -> typeSpec
-                        .type(nettyProxyType)
-                        .host(proxyHost)
-                        .port(proxyPort)
-                        .connectTimeoutMillis(15000));
-
-                log.info("已配置 Reactor Netty HttpClient 代理: {}:{}", proxyHost, proxyPort);
-            } else {
-                log.info("代理未启用，使用直连");
-            }
-        } catch (Exception e) {
-            log.warn("读取代理设置失败，将使用直连: {}", e.getMessage());
-        }
-
-        return httpClient;
-    }
-
-    /**
-     * 重新创建 WebClient（当代理设置更改时调用）
-     */
-    public void refreshWebClient() {
-        this.webClient = createWebClient();
-        log.info("GitHub OAuth WebClient 已刷新");
+        return WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .build();
     }
 
     public GithubAuthorizeResponse createAuthorizeUrl(String redirectPath) {
@@ -156,9 +105,6 @@ public class GithubOAuthService {
 
     public GithubExchangeResponse exchangeCode(String code, String state) {
         ensureGithubEnabled();
-
-        // 每次调用前重新创建 WebClient 以应用最新的代理设置
-        this.webClient = createWebClient();
 
         String redirectPath = oAuthStateService.consumeRedirectPath(state);
         String accessToken = exchangeToken(code, state);

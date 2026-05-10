@@ -139,6 +139,31 @@ public class AuthService {
         userAccountCacheService.evictUser(user);
     }
 
+    public int sendResetPasswordCode(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        UserAccount user = findByEmail(normalizedEmail);
+        if (user == null) {
+            // 为了安全，不暴露用户是否存在，但也不发送邮件
+            throw new IllegalArgumentException("如果该邮箱已注册，验证码将发送到邮箱");
+        }
+        return emailCodeService.sendResetPasswordCode(normalizedEmail);
+    }
+
+    public void resetPassword(String email, String code, String newPassword) {
+        String normalizedEmail = normalizeEmail(email);
+        UserAccount user = requireActiveUser(findByEmail(normalizedEmail));
+
+        boolean ok = emailCodeService.verifyAndConsumeResetCode(normalizedEmail, code);
+        if (!ok) {
+            throw new IllegalArgumentException("验证码无效或已过期");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        bumpTokenVersion(user);
+        userAccountMapper.updateById(user);
+        userAccountCacheService.evictUser(user);
+    }
+
     public void logout(Long userId) {
         UserAccount user = requireActiveUser(userAccountCacheService.findById(userId));
         bumpTokenVersion(user);

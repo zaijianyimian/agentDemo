@@ -74,15 +74,21 @@ export const useAuthStore = defineStore('auth', () => {
     promise: Promise<{ success: boolean; message?: string; data?: AuthTokenResponse }>,
     fallbackMessage: string
   ): Promise<AuthTokenResponse> => {
-    const res = await promise
-    if (!res.success || !res.data) {
-      throw new Error(res.message || fallbackMessage)
-    }
-    if (res.data.requiresSecondFactor) {
+    try {
+      const res = await promise
+      if (!res.success || !res.data) {
+        throw new Error(res.message || fallbackMessage)
+      }
+      if (res.data.requiresSecondFactor) {
+        return res.data
+      }
+      setSession(res.data)
       return res.data
+    } catch (e: any) {
+      // 从axios错误响应中提取message
+      const errorMessage = e?.response?.data?.message || e?.message || fallbackMessage
+      throw new Error(errorMessage)
     }
-    setSession(res.data)
-    return res.data
   }
 
   return {

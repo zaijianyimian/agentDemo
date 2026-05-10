@@ -435,9 +435,11 @@ public class FaceAuthService {
         List<FaceTemplateSample> samples = new ArrayList<>();
         samples.add(new FaceTemplateSample(currentSample.embedding(), currentSample.quality()));
 
-        FaceTemplate existing = readTemplate(existingEmbedding);
-        if (!existing.legacy()) {
-            samples.addAll(existing.samples());
+        if (existingEmbedding != null && !existingEmbedding.isBlank()) {
+            FaceTemplate existing = readTemplate(existingEmbedding);
+            if (!existing.legacy()) {
+                samples.addAll(existing.samples());
+            }
         }
 
         samples = samples.stream()

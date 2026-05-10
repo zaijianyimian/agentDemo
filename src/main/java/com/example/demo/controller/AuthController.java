@@ -15,6 +15,8 @@ import com.example.demo.dto.auth.GithubAuthorizeResponse;
 import com.example.demo.dto.auth.GithubExchangeRequest;
 import com.example.demo.dto.auth.GithubExchangeResponse;
 import com.example.demo.dto.auth.PasswordLoginRequest;
+import com.example.demo.dto.auth.PasswordResetRequest;
+import com.example.demo.dto.auth.PasswordResetSendRequest;
 import com.example.demo.dto.auth.RefreshTokenRequest;
 import com.example.demo.dto.auth.RegisterRequest;
 import com.example.demo.service.auth.AuthService;
@@ -50,6 +52,21 @@ public class AuthController {
                 .cooldownSeconds(cooldown)
                 .message("验证码已发送，请注意查收")
                 .build());
+    }
+
+    @PostMapping("/password/reset/send-code")
+    public ApiResponse<EmailCodeSendResponse> sendResetPasswordCode(@Valid @RequestBody PasswordResetSendRequest request) {
+        int cooldown = authService.sendResetPasswordCode(request.getEmail());
+        return ApiResponse.success(EmailCodeSendResponse.builder()
+                .cooldownSeconds(cooldown)
+                .message("如果该邮箱已注册，验证码将发送到邮箱")
+                .build());
+    }
+
+    @PostMapping("/password/reset")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        authService.resetPassword(request.getEmail(), request.getCode(), request.getNewPassword());
+        return ApiResponse.success(null, "密码重置成功，请使用新密码登录");
     }
 
     @PostMapping("/login/email")

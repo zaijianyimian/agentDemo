@@ -65,7 +65,7 @@ onMounted(async () => {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #fff3d2 0%, #ffe3a3 30%, #ffcc73 62%, #ffb347 100%);
+  background: var(--gradient-citrus);
 }
 
 .card {
@@ -73,13 +73,13 @@ onMounted(async () => {
   max-width: 560px;
   padding: 28px;
   border-radius: 20px;
-  border: 1px solid rgba(251, 146, 60, 0.35);
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  color: #7c2d12;
+  border: 1px solid var(--border-accent);
+  background: var(--bg-card);
+  color: var(--text-primary);
   display: grid;
   gap: 10px;
   justify-items: center;
   text-align: center;
+  box-shadow: var(--shadow-lg);
 }
 </style>
