@@ -7,6 +7,7 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -18,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * AI 模型管理器
  * 管理多个 ChatModel 实例
+ * 当数据库没有配置模型时，fallback 到 Spring Bean 配置
  */
 @Slf4j
 @Service
@@ -26,13 +28,26 @@ public class ModelManager {
     private final AiModelConfigMapper configMapper;
     private final EncodingService encodingService;
 
+    // Spring Bean fallback models (from AiConfiguration)
+    private final ChatModel fallbackChatModel;
+    private final StreamingChatModel fallbackStreamingModel;
+
+    // Fallback model ID constant
+    public static final Long FALLBACK_MODEL_ID = -1L;
+
     // ChatModel 缓存
     private final Map<Long, ChatModel> chatModelCache = new ConcurrentHashMap<>();
     private final Map<Long, StreamingChatModel> streamingModelCache = new ConcurrentHashMap<>();
 
-    public ModelManager(AiModelConfigMapper configMapper, EncodingService encodingService) {
+    public ModelManager(
+            AiModelConfigMapper configMapper,
+            EncodingService encodingService,
+            @Qualifier("chatModel") ChatModel fallbackChatModel,
+            @Qualifier("streamingChatModel") StreamingChatModel fallbackStreamingModel) {
         this.configMapper = configMapper;
         this.encodingService = encodingService;
+        this.fallbackChatModel = fallbackChatModel;
+        this.fallbackStreamingModel = fallbackStreamingModel;
     }
 
     @PostConstruct
@@ -86,6 +101,11 @@ public class ModelManager {
      * 获取 ChatModel
      */
     public ChatModel getChatModel(Long id) {
+        // Fallback to Spring Bean when using fallback ID
+        if (id.equals(FALLBACK_MODEL_ID)) {
+            return fallbackChatModel;
+        }
+
         return chatModelCache.computeIfAbsent(id, key -> {
             AiModelConfig config = configMapper.selectById(id);
             if (config == null || !Boolean.TRUE.equals(config.getEnabled())) {
@@ -99,6 +119,11 @@ public class ModelManager {
      * 获取 StreamingChatModel
      */
     public StreamingChatModel getStreamingChatModel(Long id) {
+        // Fallback to Spring Bean when using fallback ID
+        if (id.equals(FALLBACK_MODEL_ID)) {
+            return fallbackStreamingModel;
+        }
+
         return streamingModelCache.computeIfAbsent(id, key -> {
             AiModelConfig config = configMapper.selectById(id);
             if (config == null || !Boolean.TRUE.equals(config.getEnabled())) {
@@ -110,6 +135,7 @@ public class ModelManager {
 
     /**
      * 获取默认模型ID
+     * 如果数据库没有配置，返回 FALLBACK_MODEL_ID 使用 Spring Bean 配置
      */
     public Long getDefaultModelId() {
         AiModelConfig defaultConfig = configMapper.selectDefault();
@@ -123,7 +149,17 @@ public class ModelManager {
             return enabledConfigs.get(0).getId();
         }
 
-        throw new IllegalStateException("没有可用的 AI 模型");
+        // Fallback to Spring Bean configuration
+        log.info("No AI models configured in database, using Spring Bean fallback");
+        return FALLBACK_MODEL_ID;
+    }
+
+    /**
+     * 检查是否有数据库配置的模型
+     */
+    public boolean hasDatabaseModels() {
+        List<AiModelConfig> enabledConfigs = configMapper.selectEnabled();
+        return !enabledConfigs.isEmpty();
     }
 
     /**

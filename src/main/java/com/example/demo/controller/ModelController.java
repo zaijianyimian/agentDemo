@@ -4,6 +4,8 @@ import com.example.demo.dto.ApiResponse;
 import com.example.demo.entity.AiModelConfig;
 import com.example.demo.mapper.AiModelConfigMapper;
 import com.example.demo.service.ai.EncodingService;
+import com.example.demo.service.ai.ModelFailoverService;
+import com.example.demo.service.ai.ModelFailoverService.HealthStatus;
 import com.example.demo.service.ai.ModelManager;
 import com.example.demo.config.CacheConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -27,13 +29,16 @@ public class ModelController {
     private final AiModelConfigMapper configMapper;
     private final EncodingService encodingService;
     private final ModelManager modelManager;
+    private final ModelFailoverService failoverService;
 
     public ModelController(AiModelConfigMapper configMapper,
                            EncodingService encodingService,
-                           ModelManager modelManager) {
+                           ModelManager modelManager,
+                           ModelFailoverService failoverService) {
         this.configMapper = configMapper;
         this.encodingService = encodingService;
         this.modelManager = modelManager;
+        this.failoverService = failoverService;
     }
 
     /**
@@ -316,5 +321,87 @@ public class ModelController {
         if (config.getProvider() != null) {
             config.setProvider(config.getProvider().toLowerCase());
         }
+    }
+
+    // ==================== 健康状态相关接口 ====================
+
+    /**
+     * 获取所有模型的健康状态
+     */
+    @GetMapping("/health")
+    public ApiResponse<List<Map<String, Object>>> getHealthStatus() {
+        List<AiModelConfig> configs = configMapper.selectList(null);
+        Map<Long, HealthStatus> healthMap = failoverService.getAllHealthStatus();
+
+        List<Map<String, Object>> result = configs.stream()
+                .map(config -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", config.getId());
+                    map.put("name", config.getName());
+                    map.put("modelName", config.getModelName());
+                    map.put("enabled", config.getEnabled());
+                    map.put("isDefault", config.getIsDefault());
+
+                    HealthStatus status = healthMap.getOrDefault(config.getId(), new HealthStatus());
+                    map.put("failureCount", status.getFailureCount());
+                    map.put("lastFailureTime", status.getLastFailureTime());
+                    map.put("lastSuccessTime", status.getLastSuccessTime());
+                    map.put("isInCooldown", status.isInCooldown());
+                    map.put("isTemporarilyDisabled", status.isTemporarilyDisabled());
+                    map.put("isAvailable", status.isAvailable());
+
+                    return map;
+                })
+                .toList();
+
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * 获取当前首选模型（考虑健康状态）
+     */
+    @GetMapping("/preferred")
+    public ApiResponse<Map<String, Object>> getPreferredModel() {
+        Long preferredId = failoverService.getPreferredModelId();
+        AiModelConfig config = configMapper.selectById(preferredId);
+
+        if (config == null) {
+            return ApiResponse.error("没有可用模型");
+        }
+
+        return ApiResponse.success(toSafeMap(config));
+    }
+
+    /**
+     * 重置模型健康状态（手动恢复）
+     */
+    @PostMapping("/{id}/reset-health")
+    public ApiResponse<String> resetHealthStatus(@PathVariable Long id) {
+        AiModelConfig config = configMapper.selectById(id);
+        if (config == null) {
+            return ApiResponse.error("模型不存在");
+        }
+
+        failoverService.resetHealthStatus(id);
+        return ApiResponse.success("模型健康状态已重置");
+    }
+
+    /**
+     * 获取可用模型列表（按优先级排序）
+     */
+    @GetMapping("/available")
+    public ApiResponse<List<Map<String, Object>>> getAvailableModels() {
+        List<AiModelConfig> availableModels = failoverService.getAvailableModelsSorted();
+
+        List<Map<String, Object>> result = availableModels.stream()
+                .map(config -> {
+                    Map<String, Object> map = toSafeMap(config);
+                    HealthStatus status = failoverService.getHealthStatus(config.getId());
+                    map.put("healthAvailable", status.isAvailable());
+                    return map;
+                })
+                .toList();
+
+        return ApiResponse.success(result);
     }
 }

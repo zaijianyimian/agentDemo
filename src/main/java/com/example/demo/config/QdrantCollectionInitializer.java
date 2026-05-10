@@ -2,6 +2,7 @@ package com.example.demo.config;
 
 import com.example.demo.properties.AppMemoryProperties;
 import com.example.demo.properties.QdrantProperties;
+import com.example.demo.service.SystemSettingsService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,36 +22,40 @@ public class QdrantCollectionInitializer {
 
     private final QdrantProperties qdrantProperties;
     private final AppMemoryProperties appMemoryProperties;
+    private final SystemSettingsService settingsService;
 
     public QdrantCollectionInitializer(QdrantProperties qdrantProperties,
-                                       AppMemoryProperties appMemoryProperties) {
+                                       AppMemoryProperties appMemoryProperties,
+                                       SystemSettingsService settingsService) {
         this.qdrantProperties = qdrantProperties;
         this.appMemoryProperties = appMemoryProperties;
+        this.settingsService = settingsService;
     }
 
     @PostConstruct
     public void init() {
-        String host = qdrantProperties.getHost();
-        int port = qdrantProperties.getPort();
-        String collectionName = appMemoryProperties.getCollectionName();
+        String host = resolveHttpHost();
+        int grpcPort = resolveGrpcPort();
+        int restPort = resolveRestPort();
+        String collectionName = resolveCollectionName();
 
-        log.info("Checking Qdrant collection: {} at {}:{}", collectionName, host, port);
+        log.info("Checking Qdrant collection: {} at {} (grpc={}, rest={})", collectionName, host, grpcPort, restPort);
 
         try {
-            if (!collectionExists(host, port, collectionName)) {
+            if (!collectionExists(host, restPort, collectionName)) {
                 log.info("Collection not found, creating: {}", collectionName);
-                createCollection(host, port, collectionName);
+                createCollection(host, restPort, collectionName);
             } else {
                 log.info("Collection already exists: {}", collectionName);
             }
         } catch (Exception e) {
             log.warn("Qdrant 集合初始化失败 {}..", e.getMessage());
-            log.warn("请确保Qdrant在 {}:{} 上正常运行", host, port);
+            log.warn("请确保Qdrant在 {} 上正常运行，REST 端口为 {}", host, restPort);
         }
     }
 
     private boolean collectionExists(String host, int port, String collectionName) throws Exception {
-        String url = "http://" + host + ":" + port + "/collections/" + collectionName;
+        String url = host + ":" + port + "/collections/" + collectionName;
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setRequestMethod("GET");
         conn.setConnectTimeout(5000);
@@ -65,7 +70,7 @@ public class QdrantCollectionInitializer {
     }
 
     private void createCollection(String host, int port, String collectionName) throws Exception {
-        String url = "http://" + host + ":" + port + "/collections/" + collectionName;
+        String url = host + ":" + port + "/collections/" + collectionName;
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setRequestMethod("PUT");
         conn.setConnectTimeout(10000);
@@ -77,7 +82,7 @@ public class QdrantCollectionInitializer {
         String json = """
         {
             "vectors": {
-                "size": 768,
+                "size": 1536,
                 "distance": "Cosine"
             }
         }
@@ -97,5 +102,29 @@ public class QdrantCollectionInitializer {
         }
 
         conn.disconnect();
+    }
+
+    private String resolveHttpHost() {
+        String host = settingsService.getSetting("qdrant", "host", qdrantProperties.getHost());
+        if (host == null || host.isBlank()) {
+            return "http://localhost";
+        }
+        if (host.startsWith("http://") || host.startsWith("https://")) {
+            return host.replaceAll(":\\d+$", "");
+        }
+        return "http://" + host.replaceAll(":\\d+$", "");
+    }
+
+    private int resolveGrpcPort() {
+        return settingsService.getIntSetting("qdrant", "port", qdrantProperties.getPort());
+    }
+
+    private int resolveRestPort() {
+        int grpcPort = resolveGrpcPort();
+        return settingsService.getIntSetting("qdrant", "rest_port", grpcPort == 6334 ? 6333 : grpcPort);
+    }
+
+    private String resolveCollectionName() {
+        return settingsService.getSetting("qdrant", "collection_name", appMemoryProperties.getCollectionName());
     }
 }

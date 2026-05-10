@@ -1,23 +1,18 @@
 package com.example.demo.config;
 
-import com.example.demo.properties.AppMemoryProperties;
 import com.example.demo.properties.OllamaEmbeddingProperties;
 import com.example.demo.properties.OpenAiChatProperties;
-import com.example.demo.properties.QdrantProperties;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
-import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
-import dev.langchain4j.store.embedding.EmbeddingStore;
-import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -33,22 +28,9 @@ import java.time.Duration;
 @Configuration
 public class AiConfiguration {
 
-    private final QdrantProperties qdrantProperties;
-    private final AppMemoryProperties appMemoryProperties;
-
-    public AiConfiguration(QdrantProperties qdrantProperties, AppMemoryProperties appMemoryProperties) {
-        this.qdrantProperties = qdrantProperties;
-        this.appMemoryProperties = appMemoryProperties;
-    }
-
     @PostConstruct
     public void init() {
-        String host = qdrantProperties.getHost();
-        int port = qdrantProperties.getPort();
-        String collectionName = appMemoryProperties.getCollectionName();
-
-        log.info("Qdrant configured at {}:{}, collection: {}", host, port, collectionName);
-        log.info("Note: Ensure Qdrant collection '{}' exists before storing embeddings", collectionName);
+        log.info("AI models initialized");
     }
 
     @Bean("embeddingModel")
@@ -127,12 +109,4 @@ public class AiConfiguration {
                 .build();
     }
 
-    @Bean
-    public EmbeddingStore<TextSegment> embeddingStore(QdrantProperties qdrantProperties, AppMemoryProperties appMemoryProperties){
-        return QdrantEmbeddingStore.builder()
-                .host(qdrantProperties.getHost())
-                .port(qdrantProperties.getPort())
-                .collectionName(appMemoryProperties.getCollectionName())
-                .build();
-    }
 }
