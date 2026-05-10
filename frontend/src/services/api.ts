@@ -60,7 +60,8 @@ api.interceptors.request.use(config => {
     requestUrl.startsWith('/auth/login/') ||
     requestUrl.startsWith('/auth/token/refresh') ||
     requestUrl.startsWith('/auth/face/verify-login') ||
-    requestUrl.startsWith('/auth/oauth/github/')
+    requestUrl.startsWith('/auth/oauth/github/') ||
+    requestUrl.startsWith('/auth/password/reset')
 
   if (shouldSkipAuthHeader) {
     if (config.headers && 'Authorization' in config.headers) {
@@ -976,6 +977,12 @@ export const modelService = {
   providers: async (): Promise<ApiResponse<Array<{ value: string; label: string; baseUrl: string }>>> => {
     const response = await api.get('/model/providers')
     return response.data
+  },
+
+  // 获取可用模型列表（按优先级排序，包含健康状态）
+  available: async (): Promise<ApiResponse<AiModelConfig[]>> => {
+    const response = await api.get('/model/available')
+    return response.data
   }
 }
 
@@ -1068,16 +1075,6 @@ export const settingsService = {
 
   updateFile: async (payload: Record<string, any>): Promise<ApiResponse<any>> => {
     const response = await api.put('/settings/file', payload)
-    return response.data
-  },
-
-  getProxy: async (): Promise<ApiResponse<Record<string, any>>> => {
-    const response = await api.get('/settings/proxy')
-    return response.data
-  },
-
-  updateProxy: async (payload: Record<string, any>): Promise<ApiResponse<any>> => {
-    const response = await api.put('/settings/proxy', payload)
     return response.data
   },
 
@@ -1254,6 +1251,16 @@ export const authService = {
 
   verifyFaceLogin: async (payload: { preAuthToken: string; imageBase64: string }): Promise<ApiResponse<AuthTokenResponse>> => {
     const response = await api.post('/auth/face/verify-login', payload)
+    return response.data
+  },
+
+  sendResetPasswordCode: async (payload: { email: string }): Promise<ApiResponse<EmailCodeSendResponse>> => {
+    const response = await api.post('/auth/password/reset/send-code', payload)
+    return response.data
+  },
+
+  resetPassword: async (payload: { email: string; code: string; newPassword: string }): Promise<ApiResponse<void>> => {
+    const response = await api.post('/auth/password/reset', payload)
     return response.data
   }
 }

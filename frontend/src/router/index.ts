@@ -2,6 +2,16 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { buildLoginRedirectUrl, hasAccessToken } from '@/services/auth-token'
 
+// Route meta type definition
+declare module 'vue-router' {
+  interface RouteMeta {
+    title?: string
+    icon?: string
+    public?: boolean
+    description?: string
+  }
+}
+
 const routes = [
   {
     path: '/oauth/github/callback',
@@ -122,6 +132,12 @@ const routes = [
     name: 'Personal',
     component: () => import('@/views/PersonalCenter.vue'),
     meta: { title: '单用户中心', icon: 'person', description: '单用户效率增强、模板中心与备份恢复。' }
+  },
+  {
+    path: '/chatimport',
+    name: 'ChatImport',
+    component: () => import('@/views/ChatImport.vue'),
+    meta: { title: '聊天导入', icon: 'chatbubbles', description: '导入微信、QQ、Telegram聊天记录并创建虚拟助手。' }
   }
 ]
 

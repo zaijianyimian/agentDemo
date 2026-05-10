@@ -3,12 +3,29 @@
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-content">
-        <div class="header-icon">
-          <n-icon size="28"><SettingsIcon /></n-icon>
+        <div class="header-copy">
+          <div class="header-icon">
+            <n-icon size="28"><SettingsIcon /></n-icon>
+          </div>
+          <div class="header-text">
+            <div class="page-eyebrow">Configuration Matrix</div>
+            <h1 class="header-title">系统设置</h1>
+            <p class="header-subtitle">配置系统参数、模型参数、向量数据库和数据归档入口</p>
+          </div>
         </div>
-        <div class="header-text">
-          <h1 class="header-title">系统设置</h1>
-          <p class="header-subtitle">配置系统参数、模型参数、向量数据库等选项</p>
+        <div class="header-badges">
+          <div class="header-badge">
+            <span>配置区块</span>
+            <strong>{{ navItems.length }}</strong>
+          </div>
+          <div class="header-badge">
+            <span>数据归档</span>
+            <strong>ZIP</strong>
+          </div>
+          <div class="header-badge">
+            <span>配置写入</span>
+            <strong>ACTIVE</strong>
+          </div>
         </div>
       </div>
     </div>
@@ -563,7 +580,7 @@
                   <p>用逗号分隔的文件扩展名</p>
                 </div>
               </div>
-              <n-input v-model:value="fileSettings.allowed_types" placeholder="txt,md,pdf,doc,docx" size="large" />
+              <n-input v-model:value="fileSettings.allowed_types" placeholder="txt,md" size="large" />
             </div>
 
             <div class="setting-card">
@@ -580,91 +597,6 @@
 
           <div class="section-actions">
             <n-button type="primary" size="large" @click="saveFileSettings" :loading="saving">
-              <template #icon><n-icon><SaveIcon /></n-icon></template>
-              保存设置
-            </n-button>
-          </div>
-        </div>
-
-        <!-- 代理设置 -->
-        <div v-show="activeSection === 'proxy'" class="section-wrapper">
-          <div class="section-header">
-            <h2 class="section-title">
-              <n-icon size="20"><GitBranchIcon /></n-icon>
-              代理设置
-            </h2>
-            <p class="section-desc">配置网络代理，用于 GitHub OAuth 等外部 API 访问</p>
-          </div>
-
-          <div class="settings-grid">
-            <div class="setting-card full-width">
-              <div class="setting-card-header">
-                <n-icon size="24" class="setting-icon"><PowerIcon /></n-icon>
-                <div>
-                  <h3>启用代理</h3>
-                  <p>开启后，GitHub OAuth 请求将通过代理服务器转发</p>
-                </div>
-              </div>
-              <n-switch
-                v-model:value="proxySettings.enabled"
-                checked-value="true"
-                unchecked-value="false"
-                size="large"
-              />
-            </div>
-
-            <div class="setting-card">
-              <div class="setting-card-header">
-                <n-icon size="24" class="setting-icon"><GlobeIcon /></n-icon>
-                <div>
-                  <h3>代理类型</h3>
-                  <p>选择代理协议类型</p>
-                </div>
-              </div>
-              <n-select
-                v-model:value="proxySettings.type"
-                :options="proxyTypeOptions"
-                size="large"
-              />
-            </div>
-
-            <div class="setting-card">
-              <div class="setting-card-header">
-                <n-icon size="24" class="setting-icon"><ServerIcon /></n-icon>
-                <div>
-                  <h3>代理端口</h3>
-                  <p>代理服务的端口号</p>
-                </div>
-              </div>
-              <n-input-number
-                :value="Number(proxySettings.port)"
-                @update:value="(val: number | null) => proxySettings.port = String(val || 7890)"
-                :min="1"
-                :max="65535"
-                size="large"
-                style="width: 100%"
-              />
-            </div>
-
-            <div class="setting-card full-width">
-              <div class="setting-card-header">
-                <n-icon size="24" class="setting-icon"><GlobeIcon /></n-icon>
-                <div>
-                  <h3>代理主机</h3>
-                  <p>代理服务器的 IP 地址或域名</p>
-                </div>
-              </div>
-              <n-input v-model:value="proxySettings.host" placeholder="127.0.0.1" size="large" />
-            </div>
-          </div>
-
-          <div class="proxy-tip">
-            <n-icon size="16"><AnalyticsIcon /></n-icon>
-            <span>提示：常见的本地代理端口有 7890 (Clash)、1080 (SOCKS5)、8080 (HTTP) 等</span>
-          </div>
-
-          <div class="section-actions">
-            <n-button type="primary" size="large" @click="saveProxySettings" :loading="saving">
               <template #icon><n-icon><SaveIcon /></n-icon></template>
               保存设置
             </n-button>
@@ -782,8 +714,7 @@ import {
   CloudUploadOutline as CloudUploadIcon,
   DownloadOutline as DownloadIcon,
   PulseOutline as PulseIcon,
-  CloseOutline as CloseIcon,
-  GitBranchOutline as GitBranchIcon
+  CloseOutline as CloseIcon
 } from '@vicons/ionicons5'
 import { embeddingService, searchService, settingsService } from '@/services/api'
 import { useThemeStore } from '@/stores/theme'
@@ -808,7 +739,6 @@ const navItems = [
   { key: 'search', label: '网络搜索', icon: SearchIcon },
   { key: 'schedule', label: '日程管理', icon: CalendarIcon },
   { key: 'file', label: '文件上传', icon: FolderIcon },
-  { key: 'proxy', label: '代理设置', icon: GitBranchIcon },
   { key: 'backup', label: '数据备份', icon: DownloadIcon }
 ]
 
@@ -852,15 +782,8 @@ const scheduleSettings = ref<Record<string, string>>({
 
 const fileSettings = ref<Record<string, string>>({
   upload_dir: './data/documents',
-  allowed_types: 'txt,md,pdf,doc,docx',
+  allowed_types: 'txt,md',
   max_file_size: '10MB'
-})
-
-const proxySettings = ref<Record<string, string>>({
-  enabled: 'false',
-  host: '127.0.0.1',
-  port: '7890',
-  type: 'http'
 })
 
 // 搜索引擎选项
@@ -868,12 +791,6 @@ const searchEngineOptions = [
   { label: 'Serper (推荐)', value: 'serper' },
   { label: 'Tavily', value: 'tavily' },
   { label: 'Bing', value: 'bing' }
-]
-
-// 代理类型选项
-const proxyTypeOptions = [
-  { label: 'HTTP', value: 'http' },
-  { label: 'SOCKS5', value: 'socks5' }
 ]
 
 // 加载所有设置
@@ -904,9 +821,6 @@ const loadAllSettings = async () => {
       }
       if (data.file) {
         fileSettings.value = { ...fileSettings.value, ...data.file }
-      }
-      if (data.proxy) {
-        proxySettings.value = { ...proxySettings.value, ...data.proxy }
       }
     }
   } catch (error: any) {
@@ -1058,19 +972,6 @@ const saveFileSettings = async () => {
   }
 }
 
-// 保存代理设置
-const saveProxySettings = async () => {
-  saving.value = true
-  try {
-    await settingsService.updateProxy(proxySettings.value)
-    message.success('代理设置已保存，GitHub 登录将使用新配置')
-  } catch (error) {
-    message.error('保存失败')
-  } finally {
-    saving.value = false
-  }
-}
-
 const handleArchiveFileSelected = (event: Event) => {
   const input = event.target as HTMLInputElement
   const file = input.files && input.files.length > 0 ? input.files[0] : null
@@ -1140,98 +1041,253 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.settings-page { min-height: 100%; }
-
-/* 页面头部 */
-.page-header {
-  background: var(--gradient-warm);
-  padding: 28px;
-  border-radius: var(--radius-xl);
-  margin-bottom: 20px;
+.settings-page {
+  min-height: 100%;
+  display: grid;
+  gap: 24px;
+  padding: 4px;
 }
 
-.header-content { display: flex; align-items: center; gap: 16px; }
+/* Page Header - Warm solid */
+.page-header {
+  position: relative;
+  overflow: hidden;
+  padding: 32px 34px;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.page-header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--gradient-sunset);
+  z-index: 1;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.header-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.header-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
 
 .header-icon {
-  width: 52px;
-  height: 52px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-lg);
+  width: 56px;
+  height: 56px;
+  background: var(--gradient-sunset);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  box-shadow: 0 4px 16px var(--primary-glow);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.header-title { font-size: 24px; font-weight: 700; color: white; margin: 0; }
-.header-subtitle { font-size: 14px; color: rgba(255, 255, 255, 0.85); margin: 4px 0 0; }
+.header-icon:hover {
+  transform: scale(1.08) rotate(-3deg);
+}
 
-/* 设置容器 */
+.header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.header-title {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: clamp(1.8rem, 2.5vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.02;
+}
+
+.header-subtitle {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.header-badges {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  min-width: min(460px, 100%);
+}
+
+.header-badge {
+  padding: 16px 18px;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--warm-50);
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.header-badge:hover {
+  border-color: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.header-badge span {
+  display: block;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.header-badge strong {
+  display: block;
+  margin-top: 10px;
+  color: var(--text-strong);
+  font-size: 1.05rem;
+}
+
 .settings-container {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 250px minmax(0, 1fr);
   gap: 20px;
+  align-items: start;
 }
 
-/* 左侧导航 */
-.settings-nav { display: flex; flex-direction: column; gap: 4px; }
+.settings-nav {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  border: 1px solid transparent;
+  border-radius: 18px;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
   font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: all var(--transition-base);
 }
 
-.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
-.nav-item.active { background: var(--primary-color); color: white; }
+.nav-item span {
+  flex: 1;
+  min-width: 0;
+}
 
-/* 右侧内容 */
-.settings-content { min-height: 500px; }
+.nav-item :deep(.n-badge) {
+  margin-left: auto;
+}
 
-.section-wrapper { animation: fadeIn 0.25s ease; }
+.nav-item:hover {
+  background: var(--bg-menu-item-hover);
+  border-color: var(--border-light);
+  color: var(--text-strong);
+}
+
+.nav-item.active {
+  background: var(--bg-menu-item-active);
+  border-color: var(--border-accent);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-content {
+  min-height: 500px;
+  display: grid;
+}
+
+.section-wrapper {
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.25s ease;
+}
+
+.section-wrapper::before,
+.setting-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--gradient-sunset);
+}
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.section-header { margin-bottom: 20px; }
+.section-header {
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-color);
+}
 
 .section-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
   margin: 0 0 6px;
+  color: var(--text-strong);
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 .section-title .n-icon { color: var(--primary-color); }
-.section-desc { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.section-desc { font-size: 0.86rem; color: var(--text-secondary); margin: 0; }
 
-/* 设置网格 */
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
+  gap: 16px;
 }
 
-/* 设置卡片 */
 .setting-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  border: 2px solid var(--border-light);
   border-radius: var(--radius-lg);
-  padding: 18px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
-.setting-card:hover { border-color: var(--primary-color); }
+.setting-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-sm);
+}
+
 .setting-card.full-width { grid-column: span 2; }
 
 .setting-card-header {
@@ -1241,19 +1297,29 @@ onMounted(() => {
   margin-bottom: 14px;
 }
 
-.setting-icon { color: var(--primary-color); flex-shrink: 0; }
-
-.setting-card-header h3 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 4px;
+.setting-icon {
+  color: var(--primary-color);
+  flex-shrink: 0;
 }
 
-.setting-card-header p { font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.4; }
+.setting-card-header h3 {
+  margin: 0 0 4px;
+  color: var(--text-strong);
+  font-size: 0.96rem;
+  font-weight: 600;
+}
 
-/* 主题选项 */
-.theme-options { display: flex; gap: 10px; }
+.setting-card-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.theme-options {
+  display: flex;
+  gap: 10px;
+}
 
 .theme-option {
   flex: 1;
@@ -1261,10 +1327,11 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 10px;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
   cursor: pointer;
+  transition: all var(--transition-base);
 }
 
 .theme-option:hover { border-color: var(--primary-color); }
@@ -1277,14 +1344,22 @@ onMounted(() => {
   border: 1px solid var(--border-color);
 }
 
-.theme-preview.light { background: linear-gradient(135deg, #fff 50%, #f5f5f5 50%); }
-.theme-preview.dark { background: linear-gradient(135deg, #1c1917 50%, #292524 50%); }
-.theme-preview.auto { background: linear-gradient(135deg, #fff 50%, #1c1917 50%); }
+.theme-preview.light { background: linear-gradient(135deg, #f8fbfd 50%, #dae9f0 50%); }
+.theme-preview.dark { background: linear-gradient(135deg, #081017 50%, #162330 50%); }
+.theme-preview.auto { background: linear-gradient(135deg, #f8fbfd 50%, #081017 50%); }
 .theme-option span { font-size: 12px; color: var(--text-secondary); }
 
-/* Logo上传 */
 .logo-upload-area { display: flex; flex-direction: column; gap: 10px; }
-.logo-preview { display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--bg-hover); border-radius: var(--radius-md); }
+
+.logo-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-md);
+}
+
 .logo-preview img { width: 40px; height: 40px; object-fit: contain; border-radius: 6px; }
 .logo-preview .remove-btn { color: var(--text-secondary); }
 .logo-preview .remove-btn:hover { color: var(--primary-color); }
@@ -1292,14 +1367,29 @@ onMounted(() => {
 .upload-btn {
   width: 100%;
   height: 44px;
-  border: 2px dashed var(--border-color);
-  border-radius: var(--radius-md);
-  background: transparent;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  background: var(--bg-card);
   color: var(--text-secondary);
 }
 
 .upload-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
 .upload-tip { font-size: 12px; color: var(--text-muted); margin: 0; }
+
+.settings-content :deep(.n-input-wrapper),
+.settings-content :deep(.n-base-selection),
+.settings-content :deep(.n-input-number .n-input-wrapper) {
+  background: var(--bg-input);
+}
+
+.settings-content :deep(.n-base-selection),
+.settings-content :deep(.n-input-number) {
+  border-radius: var(--radius-md);
+}
+
+.settings-content :deep(.n-switch) {
+  background: var(--warm-100);
+}
 
 .backup-import-controls {
   display: flex;
@@ -1310,7 +1400,7 @@ onMounted(() => {
 .zip-file-input {
   width: 100%;
   border: 1px dashed var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: 16px;
   padding: 10px 12px;
   color: var(--text-secondary);
   background: var(--bg-card);
@@ -1320,44 +1410,63 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: 16px;
 }
 
-/* 滑块 */
 .slider-wrapper { padding: 6px 0; }
 .slider-labels { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
 
-/* 操作按钮 */
 .section-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 20px;
-  padding-top: 20px;
+  margin-top: 24px;
+  padding-top: 18px;
   border-top: 1px solid var(--border-color);
 }
 
-/* 响应式 */
 @media (max-width: 900px) {
+  .page-header {
+    padding: 22px;
+  }
+
+  .header-content {
+    flex-direction: column;
+  }
+
+  .header-badges {
+    min-width: 0;
+    width: 100%;
+  }
+
   .settings-container { grid-template-columns: 1fr; }
-  .settings-nav { flex-direction: row; flex-wrap: wrap; gap: 6px; }
-  .nav-item { flex: 1; min-width: 100px; justify-content: center; }
+
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .nav-item { flex: 1; min-width: 120px; justify-content: center; }
   .settings-grid { grid-template-columns: 1fr; }
   .setting-card.full-width { grid-column: span 1; }
 }
 
-/* 代理提示 */
-.proxy-tip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--bg-hover);
-  border-radius: var(--radius-md);
-  margin-top: 14px;
-  color: var(--text-secondary);
-  font-size: 13px;
+@media (max-width: 640px) {
+  .header-copy {
+    flex-direction: column;
+  }
+
+  .header-badges {
+    grid-template-columns: 1fr;
+  }
+
+  .section-wrapper {
+    padding: 18px;
+  }
 }
 </style>

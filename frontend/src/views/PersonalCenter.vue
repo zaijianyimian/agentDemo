@@ -67,7 +67,7 @@
         </div>
         <div class="face-capture-section">
           <div class="camera-preview" v-if="cameraActive">
-            <video ref="videoRef" autoplay playsinline class="video-element"></video>
+            <video ref="videoRef" autoplay playsinline muted class="video-element"></video>
             <canvas ref="canvasRef" style="display: none;"></canvas>
           </div>
           <div class="capture-actions" v-if="cameraActive">
@@ -143,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { NButton, NEmpty, NIcon, NSwitch, NUpload, useMessage } from 'naive-ui'
 import { CameraOutline as CameraIcon } from '@vicons/ionicons5'
 import { authService, personalService, settingsService } from '@/services/api'
@@ -336,13 +336,11 @@ const onFaceFileSelect = async (event: Event) => {
 
 // 摄像头功能
 const startCamera = async () => {
-  // 检查浏览器是否支持
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     message.error('您的浏览器不支持摄像头功能，请使用现代浏览器（Chrome/Firefox/Edge）')
     return
   }
 
-  // 检查是否是安全上下文
   const isSecureContext = window.isSecureContext || location.protocol === 'https:' ||
                           location.hostname === 'localhost' || location.hostname === '127.0.0.1'
   if (!isSecureContext) {
@@ -352,16 +350,36 @@ const startCamera = async () => {
 
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: 640, height: 480 }
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
     })
     cameraActive.value = true
-    await new Promise(resolve => setTimeout(resolve, 100))
-    if (videoRef.value && mediaStream) {
-      videoRef.value.srcObject = mediaStream
+    await nextTick()
+
+    // 最多重试 5 次，确保 DOM 挂载
+    let attempts = 0
+    const tryAttach = async () => {
+      const video = videoRef.value
+      if (video && mediaStream) {
+        video.srcObject = mediaStream
+        video.muted = true
+        try {
+          await video.play()
+        } catch {
+          video.onloadedmetadata = () => {
+            video.play().catch(() => {})
+          }
+        }
+      } else if (attempts < 5) {
+        attempts++
+        await new Promise(r => setTimeout(r, 80))
+        await tryAttach()
+      } else {
+        console.warn('videoRef is null after retries')
+      }
     }
+    await tryAttach()
   } catch (error: any) {
     console.error('Camera error:', error)
-    // 根据错误类型给出具体提示
     if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
       message.error('摄像头权限被拒绝，请在浏览器地址栏左侧点击允许摄像头访问')
     } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
@@ -550,21 +568,40 @@ onUnmounted(() => {
 
 .camera-preview {
   width: 100%;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  background: #1a1a1a;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d1f0f 100%);
+  border: 2px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.15), inset 0 0 20px rgba(245, 158, 11, 0.05);
+  position: relative;
+}
+
+.camera-preview::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 2px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.4), rgba(234, 88, 12, 0.2), transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .video-element {
   width: 100%;
   display: block;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
   transform: scaleX(-1);
+  border-radius: 14px;
 }
 
 .capture-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 12px;
+  margin-top: 14px;
   justify-content: center;
 }
 
@@ -572,43 +609,68 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border: 1px dashed var(--border-color);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, .03);
+  gap: 14px;
+  padding: 28px;
+  border: 2px dashed rgba(245, 158, 11, 0.4);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(234, 88, 12, 0.03));
+  transition: all 0.3s ease;
+}
+
+.start-camera:hover {
+  border-color: rgba(245, 158, 11, 0.6);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(234, 88, 12, 0.05));
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.12);
 }
 
 .or-divider {
-  color: var(--text-muted);
+  color: #D97706;
   font-size: 0.85rem;
+  font-weight: 500;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
+.or-divider::before,
+.or-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.35), transparent);
 }
 
 .file-upload {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  gap: 8px;
+  color: #D97706;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .file-upload input {
   cursor: pointer;
+  color: #EA580C;
 }
 
 .preview-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .face-preview {
   width: 100%;
-  max-width: 240px;
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
+  max-width: 260px;
+  border-radius: 16px;
+  border: 2px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 8px 28px rgba(245, 158, 11, 0.18);
 }
 
 .preview-actions {

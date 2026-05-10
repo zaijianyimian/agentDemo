@@ -26,7 +26,16 @@ export const useThemeStore = defineStore('theme', () => {
     } else {
       actualTheme = mode.value
     }
+
+    // Add transition class for smooth theme change
+    document.documentElement.classList.add('theme-transition')
+
     document.documentElement.setAttribute('data-theme', actualTheme)
+
+    // Remove transition class after animation completes
+    setTimeout(() => {
+      document.documentElement.classList.remove('theme-transition')
+    }, 400)
   }
 
   // 监听系统主题变化（用于 auto 模式）

@@ -232,6 +232,7 @@ import {
 import { scheduleService } from '@/services/api'
 import type { ScheduleEvent } from '@/types'
 import dayjs from 'dayjs'
+import { formatDateTime as formatTime } from '@/utils/date-format'
 
 const message = useMessage()
 const viewMode = ref('list')
@@ -338,11 +339,6 @@ const addEvent = async () => {
   }
 }
 
-// 格式化时间
-const formatTime = (time: string) => {
-  return dayjs(time).format('YYYY-MM-DD HH:mm')
-}
-
 // 根据日期获取日程
 const getEventsByDate = (year: number, month: number, date: number) => {
   const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`
@@ -393,51 +389,94 @@ onMounted(() => {
 <style scoped>
 .schedule-page {
   display: grid;
-  gap: 16px;
+  gap: 24px;
+  padding: 4px;
 }
 
-.action-card {
+/* Warm Solid Card Base */
+.action-card,
+.list-card {
+  position: relative;
   background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.action-card::before,
+.list-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-sunset);
+  z-index: 1;
+}
+
+.action-card:hover,
+.list-card:hover {
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-md);
+}
+
+/* Stat Boxes - Warm Solid */
 .stat-box {
-  background: linear-gradient(135deg, var(--bg-card) 0%, #1A2332 100%);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 20px;
+  background: var(--bg-card);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  padding: 24px;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-sunset);
 }
 
 .stat-box.today {
-  border-color: var(--primary-color);
+  border-color: var(--border-accent);
 }
 
 .stat-box.tomorrow {
-  border-color: var(--success);
+  border-left: 3px solid var(--accent-green);
 }
 
 .stat-box.total {
-  border-color: var(--info);
+  border-color: var(--border-accent);
+}
+
+.stat-box:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
 }
 
 .stat-title {
-  font-size: 14px;
-  color: var(--text-secondary);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
 }
 
 .stat-number {
-  font-size: 36px;
+  font-size: 2.5rem;
   font-weight: 700;
-  color: var(--text-primary);
   margin-top: 8px;
-}
-
-.list-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  background: var(--gradient-sunset);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .detail-description {
@@ -447,7 +486,7 @@ onMounted(() => {
   overflow-y: auto;
 }
 
-/* 日历视图样式 */
+/* Calendar View Styles */
 .calendar-view {
   min-height: 500px;
 }
@@ -470,32 +509,45 @@ onMounted(() => {
 
 .calendar-event {
   font-size: 11px;
-  padding: 2px 4px;
-  background: var(--primary-color);
-  color: white;
-  border-radius: 4px;
+  padding: 3px 6px;
+  background: var(--gradient-sunset);
+  color: var(--text-primary);
+  border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
+  transition: all 0.3s ease;
 }
 
 .calendar-event.completed {
-  background: var(--success);
-  opacity: 0.7;
+  background: linear-gradient(135deg, var(--accent-green), #16A34A);
+  opacity: 0.85;
 }
 
 .calendar-event:hover {
-  opacity: 0.8;
+  transform: scale(1.02);
+  box-shadow: var(--shadow-md);
 }
 
-/* AI添加提示 */
+/* AI Add Hint */
 .ai-add-hint {
-  padding: 12px;
+  padding: 16px;
   background: var(--bg-input);
-  border-radius: 8px;
-  margin-bottom: 12px;
-  font-size: 13px;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
   color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+
+/* NCard override */
+:deep(.n-card) {
+  background: transparent;
+}
+
+:deep(.n-card__content) {
+  padding: 24px;
 }
 </style>

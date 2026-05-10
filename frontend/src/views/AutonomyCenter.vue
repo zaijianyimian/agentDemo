@@ -412,8 +412,8 @@ onMounted(async () => {
 .finding-card,
 .verify-card,
 .action-card {
-  border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--border-light);
+  background: var(--bg-card);
 }
 
 .capability-row,
@@ -429,8 +429,9 @@ onMounted(async () => {
 .policy-note {
   margin-top: 14px;
   padding: 16px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.14), rgba(249, 115, 22, 0.08));
+  border-radius: var(--radius-lg);
+  background: var(--warm-50);
+  border: 2px solid var(--border-light);
   color: var(--text-secondary);
 }
 
@@ -450,8 +451,8 @@ onMounted(async () => {
 
 .action-card:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--primary-color) 46%, white 18%);
-  box-shadow: var(--shadow-glow);
+  border-color: var(--primary-light);
+  box-shadow: var(--shadow-md);
 }
 
 .action-card strong,
@@ -503,9 +504,9 @@ onMounted(async () => {
 
 .diff-metric,
 .diff-item {
-  border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 18px;
+  border: 2px solid var(--border-light);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
   padding: 14px 16px;
 }
 
@@ -531,9 +532,9 @@ onMounted(async () => {
 }
 
 .history-card {
-  border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 20px;
+  border: 2px solid var(--border-light);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
   padding: 16px;
   text-align: left;
   cursor: pointer;
@@ -542,8 +543,8 @@ onMounted(async () => {
 
 .history-card:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--primary-color) 46%, white 18%);
-  box-shadow: var(--shadow-glow);
+  border-color: var(--primary-light);
+  box-shadow: var(--shadow-sm);
 }
 
 .history-card__head {
@@ -578,9 +579,10 @@ onMounted(async () => {
   max-height: 280px;
   overflow: auto;
   padding: 14px;
-  border-radius: 16px;
-  background: rgba(20, 16, 11, 0.74);
-  color: #f8e9d4;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 2px solid var(--border-light);
 }
 
 .draft-box {

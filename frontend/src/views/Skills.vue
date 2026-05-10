@@ -134,7 +134,7 @@
         </n-tab-pane>
         <n-tab-pane name="market" tab="技能市场">
           <div class="market-info">
-            <n-icon size="48" color="#FF8C00"><StoreIcon /></n-icon>
+            <n-icon size="48" :style="{ color: 'var(--primary-color)' }"><StoreIcon /></n-icon>
             <h3>skills.sh 技能市场</h3>
             <p>发现和分享AI技能，快速扩展你的Agent能力</p>
             <n-button type="primary" size="large" tag="a" href="https://skills.sh" target="_blank">
@@ -303,11 +303,11 @@ const getCategoryCount = (cat: string) => {
 // 获取分类颜色
 const getCategoryColor = (category: string) => {
   const colors: Record<string, string> = {
-    ai: 'linear-gradient(135deg, #FF6B00, #FFB733)',
-    search: 'linear-gradient(135deg, #00D9FF, #0099CC)',
-    data: 'linear-gradient(135deg, #00D9A5, #00B386)',
-    system: 'linear-gradient(135deg, #FF4757, #FF6B81)',
-    custom: 'linear-gradient(135deg, #8B5CF6, #A78BFA)'
+    ai: 'linear-gradient(135deg, #EA580C, #F59E0B)',
+    search: 'linear-gradient(135deg, #6366F1, #818CF8)',
+    data: 'linear-gradient(135deg, #16A34A, #4ADE80)',
+    system: 'linear-gradient(135deg, #DC2626, #F87171)',
+    custom: 'linear-gradient(135deg, #A855F7, #C084FC)'
   }
   return colors[category] || colors.custom
 }
@@ -330,7 +330,7 @@ const getMoreOptions = () => [
   { label: '导出配置', key: 'export' },
   { label: '复制编码', key: 'copy' },
   { type: 'divider', key: 'd1' },
-  { label: '删除', key: 'delete', props: { style: 'color: #FF4757' } }
+  { label: '删除', key: 'delete', props: { style: 'color: var(--error)' } }
 ]
 
 // 处理更多操作
@@ -536,7 +536,7 @@ onMounted(() => {
 }
 
 .category-item.active {
-  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  background: var(--gradient-sunset);
   color: white;
 }
 
@@ -561,7 +561,7 @@ onMounted(() => {
 
 .skill-card:hover {
   border-color: var(--primary-color);
-  box-shadow: 0 8px 24px rgba(255, 139, 0, 0.12);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 
@@ -633,11 +633,11 @@ onMounted(() => {
 }
 
 .tag.builtin {
-  background: #00D9A5;
+  background: var(--accent-green);
 }
 
 .tag.custom {
-  background: #8B5CF6;
+  background: var(--accent-purple);
 }
 
 .skill-actions {

@@ -83,7 +83,13 @@
             </div>
           </div>
         </div>
-        <n-empty v-else description="收件箱还没有聚合到数据" />
+        <EmptyStateWithGlow v-else-if="!loading">
+          <template #icon>
+            <n-icon size="48"><MailIcon /></n-icon>
+          </template>
+          收件箱还没有聚合到数据
+        </EmptyStateWithGlow>
+        <LoadingSpinner v-else />
       </div>
 
       <div class="surface-panel span-4">
@@ -99,7 +105,12 @@
             <span>{{ warning }}</span>
           </div>
         </div>
-        <n-empty v-else description="当前没有额外提示" />
+        <EmptyStateWithGlow v-else>
+          <template #icon>
+            <n-icon size="48"><AlertIcon /></n-icon>
+          </template>
+          当前没有额外提示
+        </EmptyStateWithGlow>
       </div>
 
       <div class="surface-panel span-12">
@@ -131,7 +142,12 @@
                 <p>{{ item.summary }}</p>
               </button>
             </div>
-            <n-empty v-else size="small" description="暂无内容" />
+            <EmptyStateWithGlow v-else>
+              <template #icon>
+                <n-icon size="32"><component :is="lane.icon" /></n-icon>
+              </template>
+              暂无内容
+            </EmptyStateWithGlow>
           </div>
         </div>
       </div>
@@ -142,7 +158,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NCheckbox, NEmpty, NIcon, NTag, useMessage } from 'naive-ui'
+import { NButton, NCheckbox, NIcon, NTag, useMessage } from 'naive-ui'
 import {
   AlertCircleOutline as AlertIcon,
   CalendarOutline as CalendarIcon,
@@ -154,8 +170,10 @@ import {
 } from '@vicons/ionicons5'
 import type { InboxSummary } from '@/types'
 import { autonomyService, inboxService, noteService, scheduleService, taskService } from '@/services/api'
-import dayjs from 'dayjs'
+import { formatShortDateTime as formatTime } from '@/utils/date-format'
 import { readCachedPayload, writeCachedPayload } from '@/services/user-preferences'
+import EmptyStateWithGlow from '@/components/EmptyStateWithGlow.vue'
+import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const router = useRouter()
 const message = useMessage()
@@ -187,12 +205,13 @@ const metricCards = computed(() => [
 
 const lastUpdated = computed(() => {
   if (!inbox.value.generatedAt) return '尚未刷新'
-  return `更新于 ${dayjs(inbox.value.generatedAt).format('MM-DD HH:mm')}`
+  return `更新于 ${formatTime(inbox.value.generatedAt)}`
 })
 
 const lanes = computed(() => Object.entries(categoryMap).map(([category, config]) => ({
   category,
   label: config.label,
+  icon: config.icon,
   items: inbox.value.items.filter(item => item.category === category).slice(0, 3)
 })))
 const selectedItems = computed(() => inbox.value.items.filter(item => selectedKeys.value.includes(itemKey(item))))
@@ -217,8 +236,6 @@ const loadInbox = async () => {
 }
 
 const categoryLabel = (category: string) => categoryMap[category]?.label || '收件'
-
-const formatTime = (time?: string) => time ? dayjs(time).format('MM-DD HH:mm') : '未记录时间'
 
 const goTo = (path?: string) => {
   if (path) router.push(path)
@@ -330,8 +347,8 @@ onMounted(loadInbox)
 .feed-item,
 .lane-card,
 .warning-item {
-  border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--border-light);
+  background: var(--bg-card);
 }
 
 .metric-card {
@@ -346,11 +363,12 @@ onMounted(loadInbox)
 .metric-card__icon {
   width: 52px;
   height: 52px;
-  border-radius: 18px;
+  border-radius: var(--radius-md);
   display: grid;
   place-items: center;
-  color: #fff7ed;
+  color: white;
   background: linear-gradient(135deg, var(--metric-color, #f59e0b), color-mix(in srgb, var(--metric-color, #f59e0b) 70%, #fde68a 30%));
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .metric-card__copy {
@@ -466,8 +484,8 @@ onMounted(loadInbox)
   margin-bottom: 14px;
   padding: 14px 16px;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--border-light);
+  background: var(--warm-50);
 }
 
 .batch-bar__actions {
@@ -508,9 +526,10 @@ onMounted(loadInbox)
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: rgba(245, 158, 11, 0.12);
+  background: var(--warm-100);
   color: var(--primary-color);
   font-weight: 700;
+  border: 1.5px solid var(--border-light);
 }
 
 .lane-item {

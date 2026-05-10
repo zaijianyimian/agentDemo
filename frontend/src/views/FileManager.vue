@@ -5,14 +5,14 @@
       <n-upload
         :custom-request="handleUpload"
         :show-file-list="false"
-        accept=".txt,.md,.pdf,.doc,.docx"
+        accept=".txt,.md"
         dragdir
       >
         <n-upload-dragger>
           <div class="upload-area">
             <n-icon size="48" class="upload-icon"><CloudUploadIcon /></n-icon>
             <p class="upload-text">点击或拖拽文件到此处上传</p>
-            <p class="upload-hint">支持 txt, md, pdf, doc, docx 格式，最大 10MB</p>
+            <p class="upload-hint">支持 txt、md 格式，最大 10MB</p>
           </div>
         </n-upload-dragger>
       </n-upload>
@@ -100,6 +100,8 @@
 
 <script setup lang="ts">
 import { ref, computed, h, onMounted } from 'vue'
+import { formatFileSize as formatSize } from '@/utils/file-format'
+import { formatDateTime as formatTime } from '@/utils/date-format'
 import {
   NCard,
   NUpload,
@@ -129,7 +131,6 @@ import {
 } from '@vicons/ionicons5'
 import { fileService } from '@/services/api'
 import type { Document } from '@/types'
-import dayjs from 'dayjs'
 
 const message = useMessage()
 const loading = ref(false)
@@ -301,18 +302,6 @@ function getSentimentType(sentiment: string) {
   return 'default'
 }
 
-// 格式化文件大小
-function formatSize(size: number) {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
-}
-
-// 格式化时间
-function formatTime(time: string) {
-  return dayjs(time).format('YYYY-MM-DD HH:mm')
-}
-
 onMounted(() => {
   loadFiles()
 })
@@ -321,55 +310,114 @@ onMounted(() => {
 <style scoped>
 .file-manager {
   display: grid;
-  gap: 16px;
+  gap: 24px;
+  padding: 4px;
 }
 
-.upload-card {
+/* Warm Card Base */
+.upload-card,
+.filter-card,
+.file-list-card {
+  position: relative;
   background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.upload-card::before,
+.filter-card::before,
+.file-list-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--gradient-sunset);
+  z-index: 1;
+}
+
+.upload-card:hover,
+.filter-card:hover,
+.file-list-card:hover {
+  border-color: var(--primary-light);
+  box-shadow: var(--shadow-md);
+}
+
+/* Upload Area */
 .upload-area {
-  padding: 40px;
+  padding: 48px;
   text-align: center;
+  position: relative;
 }
 
 .upload-icon {
   color: var(--primary-color);
   margin-bottom: 16px;
+  filter: drop-shadow(0 0 20px var(--primary-glow));
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.upload-card:hover .upload-icon {
+  transform: scale(1.1) translateY(-4px);
 }
 
 .upload-text {
-  font-size: 16px;
-  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-strong);
   margin-bottom: 8px;
 }
 
 .upload-hint {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
-.filter-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-}
-
-.file-list-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-}
-
+/* File Content */
 .file-content {
   background: var(--bg-input);
-  padding: 16px;
-  border-radius: 8px;
-  font-size: 12px;
+  padding: 20px;
+  border-radius: 16px;
+  font-size: 0.85rem;
   white-space: pre-wrap;
   word-break: break-all;
   color: var(--text-primary);
+  border: 1px solid var(--border-light);
+}
+
+/* NCard override for glass effect */
+:deep(.n-card) {
+  background: transparent;
+}
+
+:deep(.n-card__content) {
+  padding: 24px;
+}
+
+:deep(.n-upload-dragger) {
+  background: var(--bg-card);
+  border: 2px dashed var(--border-accent);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+:deep(.n-upload-dragger:hover) {
+  border-color: var(--primary-light);
+  background: var(--bg-input);
+}
+
+/* Table styling */
+:deep(.n-data-table) {
+  background: transparent;
+}
+
+:deep(.n-data-table-th) {
+  background: var(--bg-input) !important;
+}
+
+:deep(.n-data-table-td) {
+  background: transparent;
 }
 </style>

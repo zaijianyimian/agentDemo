@@ -158,7 +158,7 @@ onMounted(loadHistory)
 .history-card,
 .report-metric {
   border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-card);
 }
 
 .metric-card {
@@ -228,8 +228,8 @@ onMounted(loadHistory)
   margin: 0;
   padding: 18px;
   border-radius: 20px;
-  background: rgba(20, 16, 11, 0.78);
-  color: #f8e9d4;
+  background: var(--bg-input);
+  color: var(--text-primary);
   max-height: 520px;
   overflow: auto;
 }
@@ -239,7 +239,7 @@ onMounted(loadHistory)
 .markdown-content :deep(h3),
 .markdown-content :deep(h4) {
   margin: 16px 0 8px;
-  color: #fff7ed;
+  color: var(--text-primary);
 }
 
 .markdown-content :deep(p) {
@@ -254,13 +254,15 @@ onMounted(loadHistory)
 }
 
 .markdown-content :deep(code) {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--bg-hover);
+  color: var(--text-primary);
   padding: 2px 6px;
   border-radius: 8px;
 }
 
 .markdown-content :deep(pre) {
-  background: rgba(0, 0, 0, 0.28);
+  background: var(--bg-base);
+  border: 1px solid var(--border-light);
   padding: 12px 14px;
   border-radius: 12px;
   overflow-x: auto;

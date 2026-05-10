@@ -74,7 +74,7 @@
               <span class="note-title">{{ note.title }}</span>
             </div>
             <div class="note-meta">
-              <span class="note-time">{{ formatTime(note.updateTime) }}</span>
+              <span class="note-time">{{ formatUpdateTime(note.updateTime) }}</span>
               <n-button text size="tiny" @click.stop="togglePin(note)" class="pin-btn">
                 <n-icon size="14">
                   <PinIcon v-if="!note.isPinned" />
@@ -177,9 +177,9 @@ import {
 } from '@vicons/ionicons5'
 import type { Note } from '@/types'
 import { noteService } from '@/services/api'
-import { sanitizeHtml } from '@/utils/sanitize-html'
-import dayjs from 'dayjs'
-import { marked } from 'marked'
+import { renderMarkdown } from '@/utils/markdown'
+import { formatUpdateTime } from '@/utils/date-format'
+import { formatScore } from '@/utils/file-format'
 
 const message = useMessage()
 const notes = ref<Note[]>([])
@@ -190,12 +190,6 @@ const semanticHits = ref<Array<{ noteId: number; title: string; contentSnippet: 
 const searching = ref(false)
 const reindexing = ref(false)
 
-// 配置 marked
-marked.setOptions({
-  breaks: true,
-  gfm: true
-})
-
 // 按置顶和时间排序
 const sortedNotes = computed(() => {
   return [...notes.value].sort((a, b) => {
@@ -203,16 +197,6 @@ const sortedNotes = computed(() => {
     return new Date(b.updateTime).getTime() - new Date(a.updateTime).getTime()
   })
 })
-
-// 渲染 Markdown
-const renderMarkdown = (content: string): string => {
-  if (!content) return ''
-  try {
-    return sanitizeHtml(marked.parse(content) as string)
-  } catch {
-    return sanitizeHtml(content)
-  }
-}
 
 // 加载笔记列表
 const loadNotes = async () => {
@@ -375,18 +359,6 @@ const deleteCurrentNote = async () => {
   }
 }
 
-// 格式化时间
-const formatTime = (time: string) => {
-  const d = dayjs(time)
-  const now = dayjs()
-  if (now.diff(d, 'day') === 0) return d.format('HH:mm')
-  if (now.diff(d, 'day') === 1) return '昨天'
-  if (now.diff(d, 'day') < 7) return `${now.diff(d, 'day')}天前`
-  return d.format('MM-DD')
-}
-
-const formatScore = (score = 0) => `相似度 ${(score * 100).toFixed(0)}%`
-
 onMounted(() => {
   loadNotes()
 })
@@ -451,20 +423,22 @@ onMounted(() => {
   position: relative;
 }
 
-/* 左侧列表 */
+/* 左侧列表 - Glass Design */
 .notes-sidebar {
-  background: var(--bg-elevated);
-  border-right: 1px solid var(--border-color);
+  background: var(--bg-card);
+  border-right: 2px solid var(--border-light);
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .sidebar-header {
   padding: 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 2px solid var(--border-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
 }
 
 .header-title {
@@ -513,9 +487,9 @@ onMounted(() => {
 }
 
 .semantic-hit {
-  border: 1px solid rgba(245, 158, 11, 0.18);
-  background: rgba(255, 247, 237, 0.56);
-  border-radius: 18px;
+  border: 2px solid var(--border-light);
+  background: var(--warm-50);
+  border-radius: var(--radius-lg);
   padding: 12px 14px;
   text-align: left;
   cursor: pointer;
@@ -524,7 +498,8 @@ onMounted(() => {
 
 .semantic-hit:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 28px rgba(245, 158, 11, 0.12);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-light);
 }
 
 .semantic-hit__head {
@@ -537,7 +512,7 @@ onMounted(() => {
 
 .semantic-hit p {
   margin: 0;
-  color: #7c4a14;
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -564,7 +539,8 @@ onMounted(() => {
 }
 
 .note-item.pinned {
-  background: rgba(249, 115, 22, 0.05);
+  background: var(--warm-50);
+  border-color: var(--primary-light);
 }
 
 .note-header {
@@ -629,18 +605,32 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* 编辑区域 */
+/* 编辑区域 - Warm solid design */
 .note-editor {
   display: flex;
   flex-direction: column;
   flex: 1;
   background: var(--bg-card);
   overflow: hidden;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  margin: 12px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+
+.note-editor::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--gradient-sunset);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
 .editor-header {
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 2px solid var(--border-light);
   display: flex;
   align-items: center;
   gap: 16px;
