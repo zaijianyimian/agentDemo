@@ -237,10 +237,10 @@ public class EmailController {
     }
 
     /**
-     * 获取监听状态
+     * 获取监听状态（多邮箱）
      */
     @GetMapping("/listener/status")
-    public Map<Long, String> getListenerStatus() {
+    public Map<Long, Map<String, Object>> getListenerStatus() {
         return emailListenerService.getListenerStatus();
     }
 

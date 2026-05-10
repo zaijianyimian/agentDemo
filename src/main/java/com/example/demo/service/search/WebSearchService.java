@@ -2,6 +2,7 @@ package com.example.demo.service.search;
 
 import com.example.demo.dto.SearchResult;
 import com.example.demo.properties.SearchProperties;
+import com.example.demo.service.SystemSettingsService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -21,11 +22,15 @@ import java.util.List;
 public class WebSearchService {
 
     private final SearchProperties properties;
+    private final SystemSettingsService settingsService;
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
-    public WebSearchService(SearchProperties properties, ObjectMapper objectMapper) {
+    public WebSearchService(SearchProperties properties,
+                            SystemSettingsService settingsService,
+                            ObjectMapper objectMapper) {
         this.properties = properties;
+        this.settingsService = settingsService;
         this.objectMapper = objectMapper;
         this.webClient = WebClient.builder()
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
@@ -39,7 +44,9 @@ public class WebSearchService {
      * @return 搜索结果列表
      */
     public SearchResult.ListResult search(String query) {
-        if (!properties.getEnabled()) {
+        RuntimeSearchConfig config = resolveConfig();
+
+        if (!config.enabled()) {
             log.warn("搜索功能未启用");
             return SearchResult.ListResult.builder()
                     .query(query)
@@ -48,36 +55,36 @@ public class WebSearchService {
                     .build();
         }
 
-        if (properties.getApiKey() == null || properties.getApiKey().isEmpty()) {
+        if (config.apiKey() == null || config.apiKey().isEmpty()) {
             log.error("搜索API密钥未配置");
-            throw new RuntimeException("搜索API密钥未配置，请在application.yaml中配置app.search.api-key");
+            throw new RuntimeException("搜索API密钥未配置，请在系统设置或 application.yaml 中配置");
         }
 
-        return switch (properties.getEngine().toLowerCase()) {
-            case "serper" -> searchWithSerper(query);
-            case "tavily" -> searchWithTavily(query);
-            case "bing" -> searchWithBing(query);
-            default -> throw new RuntimeException("不支持的搜索引擎: " + properties.getEngine());
+        return switch (config.engine().toLowerCase()) {
+            case "serper" -> searchWithSerper(query, config);
+            case "tavily" -> searchWithTavily(query, config);
+            case "bing" -> searchWithBing(query, config);
+            default -> throw new RuntimeException("不支持的搜索引擎: " + config.engine());
         };
     }
 
     /**
      * 使用 Serper (Google Search API) 搜索
      */
-    private SearchResult.ListResult searchWithSerper(String query) {
+    private SearchResult.ListResult searchWithSerper(String query, RuntimeSearchConfig config) {
         try {
             String requestBody = objectMapper.writeValueAsString(new SerperRequest(query));
 
             String response = webClient.post()
                     .uri("https://google.serper.dev/search")
-                    .header("X-API-KEY", properties.getApiKey())
+                    .header("X-API-KEY", config.apiKey())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(requestBody)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
 
-            return parseSerperResponse(query, response);
+            return parseSerperResponse(query, response, config.maxResults());
         } catch (Exception e) {
             log.error("Serper搜索失败: {}", e.getMessage());
             throw new RuntimeException("搜索失败: " + e.getMessage());
@@ -87,12 +94,12 @@ public class WebSearchService {
     /**
      * 使用 Tavily 搜索
      */
-    private SearchResult.ListResult searchWithTavily(String query) {
+    private SearchResult.ListResult searchWithTavily(String query, RuntimeSearchConfig config) {
         try {
             String requestBody = objectMapper.writeValueAsString(new TavilyRequest(
-                    properties.getApiKey(),
+                    config.apiKey(),
                     query,
-                    properties.getMaxResults()
+                    config.maxResults()
             ));
 
             String response = webClient.post()
@@ -103,7 +110,7 @@ public class WebSearchService {
                     .bodyToMono(String.class)
                     .block();
 
-            return parseTavilyResponse(query, response);
+            return parseTavilyResponse(query, response, config.maxResults());
         } catch (Exception e) {
             log.error("Tavily搜索失败: {}", e.getMessage());
             throw new RuntimeException("搜索失败: " + e.getMessage());
@@ -113,7 +120,7 @@ public class WebSearchService {
     /**
      * 使用 Bing 搜索
      */
-    private SearchResult.ListResult searchWithBing(String query) {
+    private SearchResult.ListResult searchWithBing(String query, RuntimeSearchConfig config) {
         try {
             String response = webClient.get()
                     .uri(uriBuilder -> uriBuilder
@@ -121,14 +128,14 @@ public class WebSearchService {
                             .host("api.bing.microsoft.com")
                             .path("/v7.0/search")
                             .queryParam("q", query)
-                            .queryParam("count", properties.getMaxResults())
+                            .queryParam("count", config.maxResults())
                             .build())
-                    .header("Ocp-Apim-Subscription-Key", properties.getApiKey())
+                    .header("Ocp-Apim-Subscription-Key", config.apiKey())
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
 
-            return parseBingResponse(query, response);
+            return parseBingResponse(query, response, config.maxResults());
         } catch (Exception e) {
             log.error("Bing搜索失败: {}", e.getMessage());
             throw new RuntimeException("搜索失败: " + e.getMessage());
@@ -138,7 +145,7 @@ public class WebSearchService {
     /**
      * 解析 Serper 响应
      */
-    private SearchResult.ListResult parseSerperResponse(String query, String response) {
+    private SearchResult.ListResult parseSerperResponse(String query, String response, int maxResults) {
         try {
             JsonNode root = objectMapper.readTree(response);
             List<SearchResult> results = new ArrayList<>();
@@ -148,7 +155,7 @@ public class WebSearchService {
             if (organic.isArray()) {
                 int count = 0;
                 for (JsonNode item : organic) {
-                    if (count >= properties.getMaxResults()) break;
+                    if (count >= maxResults) break;
                     results.add(SearchResult.builder()
                             .title(item.path("title").asText())
                             .url(item.path("link").asText())
@@ -173,20 +180,25 @@ public class WebSearchService {
     /**
      * 解析 Tavily 响应
      */
-    private SearchResult.ListResult parseTavilyResponse(String query, String response) {
+    private SearchResult.ListResult parseTavilyResponse(String query, String response, int maxResults) {
         try {
             JsonNode root = objectMapper.readTree(response);
             List<SearchResult> results = new ArrayList<>();
 
             JsonNode resultsNode = root.path("results");
             if (resultsNode.isArray()) {
+                int count = 0;
                 for (JsonNode item : resultsNode) {
+                    if (count >= maxResults) {
+                        break;
+                    }
                     results.add(SearchResult.builder()
                             .title(item.path("title").asText())
                             .url(item.path("url").asText())
                             .snippet(item.path("content").asText())
                             .source(extractDomain(item.path("url").asText()))
                             .build());
+                    count++;
                 }
             }
 
@@ -204,20 +216,25 @@ public class WebSearchService {
     /**
      * 解析 Bing 响应
      */
-    private SearchResult.ListResult parseBingResponse(String query, String response) {
+    private SearchResult.ListResult parseBingResponse(String query, String response, int maxResults) {
         try {
             JsonNode root = objectMapper.readTree(response);
             List<SearchResult> results = new ArrayList<>();
 
             JsonNode webPages = root.path("webPages").path("value");
             if (webPages.isArray()) {
+                int count = 0;
                 for (JsonNode item : webPages) {
+                    if (count >= maxResults) {
+                        break;
+                    }
                     results.add(SearchResult.builder()
                             .title(item.path("name").asText())
                             .url(item.path("url").asText())
                             .snippet(item.path("snippet").asText())
                             .source(extractDomain(item.path("url").asText()))
                             .build());
+                    count++;
                 }
             }
 
@@ -249,4 +266,18 @@ public class WebSearchService {
 
     // Tavily 请求体
     private record TavilyRequest(String api_key, String query, int max_results) {}
+
+    private RuntimeSearchConfig resolveConfig() {
+        boolean enabled = settingsService.getBooleanSetting("search", "enabled", Boolean.TRUE.equals(properties.getEnabled()));
+        String engine = settingsService.getSetting("search", "engine", properties.getEngine());
+        String apiKey = settingsService.getSetting("search", "api_key", properties.getApiKey());
+        int maxResults = settingsService.getIntSetting(
+                "search",
+                "max_results",
+                properties.getMaxResults() != null ? properties.getMaxResults() : 3
+        );
+        return new RuntimeSearchConfig(enabled, engine, apiKey, Math.max(1, maxResults));
+    }
+
+    private record RuntimeSearchConfig(boolean enabled, String engine, String apiKey, int maxResults) {}
 }

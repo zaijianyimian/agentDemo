@@ -11,11 +11,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 /**
  * MCP Server 连接管理器
  * 管理与外部 MCP Server 的连接
  * 通过 stdio 协议与 MCP Server 通信
+ *
+ * 安全措施：
+ * - 命令白名单验证
+ * - 参数安全检查
+ * - 防止命令注入
  */
 @Slf4j
 @Service
@@ -43,8 +49,72 @@ public class McpClientManager {
      */
     private final AtomicLong requestIdGenerator = new AtomicLong(1);
 
+    /**
+     * 允许的 MCP Server 命令白名单
+     * 只允许常见的安全命令执行器
+     */
+    private static final List<String> ALLOWED_COMMANDS = List.of(
+            "node", "nodejs", "python", "python3", "uvx", "npx",
+            "java", "go", "ruby"
+    );
+
+    /**
+     * 安全参数正则：只允许字母、数字、下划线、连字符、点、斜杠
+     */
+    private static final Pattern SAFE_ARG_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-\\.\\/@]+$");
+
+    /**
+     * 危险字符黑名单
+     */
+    private static final String[] DANGEROUS_CHARS = {
+            ";", "|", "&", "$", "`", "(", ")", "{", "}", "<", ">",
+            "\n", "\r", "\\", "'", "\"", "~", "!", "*", "?"
+    };
+
     public McpClientManager(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+    }
+
+    /**
+     * 验证命令是否在白名单中
+     */
+    private boolean isCommandAllowed(String command) {
+        if (command == null || command.isEmpty()) {
+            return false;
+        }
+        // 提取命令的基本名称（去掉路径）- 使用 final 变量
+        final String baseCommand;
+        if (command.contains("/")) {
+            baseCommand = command.substring(command.lastIndexOf("/") + 1);
+        } else if (command.contains("\\")) {
+            baseCommand = command.substring(command.lastIndexOf("\\") + 1);
+        } else {
+            baseCommand = command;
+        }
+        // 检查是否在白名单中
+        boolean allowed = ALLOWED_COMMANDS.stream()
+                .anyMatch(allowedCmd -> baseCommand.equalsIgnoreCase(allowedCmd));
+        if (!allowed) {
+            log.warn("命令 '{}' 不在允许的白名单中", command);
+        }
+        return allowed;
+    }
+
+    /**
+     * 验证参数是否安全
+     */
+    private boolean isArgSafe(String arg) {
+        if (arg == null || arg.isEmpty()) {
+            return true;
+        }
+        // 检查危险字符
+        for (String dangerous : DANGEROUS_CHARS) {
+            if (arg.contains(dangerous)) {
+                log.warn("参数包含危险字符 '{}'，已拒绝: {}", dangerous, arg);
+                return false;
+            }
+        }
+        return SAFE_ARG_PATTERN.matcher(arg).matches();
     }
 
     /**
@@ -73,6 +143,23 @@ public class McpClientManager {
      */
     private boolean startServer(String serverName, McpServerConfig serverConfig) {
         try {
+            // 安全检查：验证命令是否在白名单中
+            if (!isCommandAllowed(serverConfig.getCommand())) {
+                log.error("命令 '{}' 不在允许的白名单中，拒绝启动 MCP Server '{}'",
+                        serverConfig.getCommand(), serverName);
+                return false;
+            }
+
+            // 安全检查：验证所有参数
+            if (serverConfig.getArgs() != null) {
+                for (String arg : serverConfig.getArgs()) {
+                    if (!isArgSafe(arg)) {
+                        log.error("参数包含危险字符，拒绝启动 MCP Server '{}': {}", serverName, arg);
+                        return false;
+                    }
+                }
+            }
+
             // 构建进程命令
             List<String> command = new ArrayList<>();
             command.add(serverConfig.getCommand());
@@ -85,7 +172,18 @@ public class McpClientManager {
             // 构建进程环境
             ProcessBuilder pb = new ProcessBuilder(command);
             if (serverConfig.getEnv() != null) {
-                pb.environment().putAll(serverConfig.getEnv());
+                // 安全检查：过滤环境变量中的危险值
+                for (Map.Entry<String, String> entry : serverConfig.getEnv().entrySet()) {
+                    String key = entry.getKey();
+                    String value = entry.getValue();
+                    // 环境变量值不能包含命令注入字符
+                    if (value != null && !value.contains(";") && !value.contains("|")
+                            && !value.contains("&") && !value.contains("`")) {
+                        pb.environment().put(key, value);
+                    } else {
+                        log.warn("环境变量 '{}' 包含危险字符，已跳过", key);
+                    }
+                }
             }
             pb.redirectErrorStream(false);
 

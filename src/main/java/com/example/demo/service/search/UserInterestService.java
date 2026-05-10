@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 用户兴趣分析服务
@@ -96,24 +97,128 @@ public class UserInterestService {
 
     /**
      * 提取搜索关键词
+     * 支持多种分词策略：
+     * 1. 按空格和标点分词（基础分词）
+     * 2. 提取英文单词
+     * 3. 提取中文词汇（基于常见词汇表）
+     * 4. 提取技术术语（如 Java, Python, API 等）
      */
     private List<String> extractKeywords(String query) {
         List<String> keywords = new ArrayList<>();
 
-        // 分词（简单实现，按空格和标点分）
-        String[] parts = query.split("[\\s,，。！？;；：:\"\"''【】\\[\\]()（）]+");
+        if (query == null || query.isEmpty()) {
+            return keywords;
+        }
+
+        // 1. 按空格和标点分词（基础分词）
+        String[] parts = query.split("[\\s,，。！？;；：:\"\"''【】\\[\\]()（）\\t\\n\\r]+");
         for (String part : parts) {
+            part = part.trim();
             if (part.length() >= 2 && part.length() <= 20) {
                 keywords.add(part);
             }
         }
 
-        // 如果没有分出关键词，整体作为一个关键词
-        if (keywords.isEmpty() && query.length() >= 2 && query.length() <= 20) {
-            keywords.add(query);
+        // 2. 提取英文单词（连续字母序列）
+        Pattern englishPattern = Pattern.compile("[a-zA-Z][a-zA-Z0-9_-]{1,19}");
+        Matcher englishMatcher = englishPattern.matcher(query);
+        while (englishMatcher.find()) {
+            String word = englishMatcher.group();
+            if (!keywords.contains(word)) {
+                keywords.add(word);
+            }
         }
 
-        return keywords;
+        // 3. 提取中文词汇（基于常见词汇表和 N-gram）
+        extractChineseKeywords(query, keywords);
+
+        // 4. 提取技术术语（专业关键词）
+        extractTechnicalTerms(query, keywords);
+
+        // 如果没有分出关键词，整体作为一个关键词
+        if (keywords.isEmpty() && query.length() >= 2 && query.length() <= 20) {
+            keywords.add(query.trim());
+        }
+
+        // 去重并限制数量
+        return keywords.stream()
+                .distinct()
+                .limit(10)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 提取中文词汇
+     * 使用 N-gram 方法提取可能的中国词汇
+     */
+    private void extractChineseKeywords(String text, List<String> keywords) {
+        // 中文词汇通常在 2-4 个字之间
+        // 使用简单的 N-gram 方法，结合常见词汇表验证
+
+        // 常见中文词汇表（可扩展）
+        Set<String> commonWords = Set.of(
+                "人工智能", "机器学习", "深度学习", "大数据", "云计算",
+                "软件开发", "前端开发", "后端开发", "数据库", "移动开发",
+                "股票投资", "财经新闻", "商业管理", "市场营销",
+                "健康养生", "运动健身", "医疗保健", "营养饮食",
+                "学习教育", "在线课程", "职业培训", "技能提升",
+                "旅游景点", "酒店预订", "机票出行", "签证攻略",
+                "时事新闻", "热点事件", "政策解读", "国际关系"
+        );
+
+        // 检查是否包含常见词汇
+        for (String word : commonWords) {
+            if (text.contains(word) && !keywords.contains(word)) {
+                keywords.add(word);
+            }
+        }
+
+        // 提取 2-4 字的中文序列（N-gram）
+        Pattern chinesePattern = Pattern.compile("[\\u4e00-\\u9fa5]{2,4}");
+        Matcher chineseMatcher = chinesePattern.matcher(text);
+        while (chineseMatcher.find()) {
+            String word = chineseMatcher.group();
+            if (!keywords.contains(word) && isValidChineseWord(word)) {
+                keywords.add(word);
+            }
+        }
+    }
+
+    /**
+     * 验证是否是有效的中文词汇
+     */
+    private boolean isValidChineseWord(String word) {
+        // 简单验证：长度合理且不包含明显无意义的组合
+        if (word.length() < 2 || word.length() > 4) {
+            return false;
+        }
+
+        // 排除常见的无意义组合（可根据需要扩展）
+        Set<String> invalidPatterns = Set.of("的的", "是是", "在在", "了了", "和和");
+        return !invalidPatterns.contains(word);
+    }
+
+    /**
+     * 提取技术术语
+     */
+    private void extractTechnicalTerms(String text, List<String> keywords) {
+        // 技术术语列表
+        Set<String> techTerms = Set.of(
+                "AI", "API", "SDK", "REST", "JSON", "XML", "HTTP", "HTTPS",
+                "SQL", "NoSQL", "ORM", "MVC", "MVVM", "IOC", "DI",
+                "Java", "Python", "JavaScript", "TypeScript", "Go", "Rust",
+                "React", "Vue", "Angular", "Spring", "Django", "Flask",
+                "MySQL", "PostgreSQL", "MongoDB", "Redis", "Elasticsearch",
+                "Docker", "Kubernetes", "Git", "GitHub", "CI/CD",
+                "WebSocket", "GraphQL", "OAuth", "JWT", "SSO"
+        );
+
+        for (String term : techTerms) {
+            // 大小写不敏感匹配
+            if (text.toLowerCase().contains(term.toLowerCase()) && !keywords.contains(term)) {
+                keywords.add(term);
+            }
+        }
     }
 
     /**

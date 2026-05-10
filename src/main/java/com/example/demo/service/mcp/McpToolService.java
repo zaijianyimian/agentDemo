@@ -7,6 +7,8 @@ import com.example.demo.entity.ToolType;
 import com.example.demo.mapper.McpToolMapper;
 import com.example.demo.service.ToolCacheRefreshEvent;
 import com.example.demo.service.tool.ToolExecutor;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -28,6 +31,7 @@ public class McpToolService {
     private final McpToolMapper mcpToolMapper;
     private final List<ToolExecutor> toolExecutors;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectMapper objectMapper;
 
     /**
      * 工具执行器映射：toolType -> executor
@@ -218,19 +222,173 @@ public class McpToolService {
 
     /**
      * 验证工具配置
+     * 进行多层次验证：基础验证、配置格式验证、必需参数验证
+     *
+     * @param tool 工具配置
+     * @return 验证结果（true 表示有效）
      */
     public boolean validateConfig(McpTool tool) {
+        // 1. 检查执行器是否存在
         ToolExecutor executor = executorMap.get(tool.getToolType());
         if (executor == null) {
+            log.warn("工具验证失败: 不支持的工具类型 {}", tool.getToolType());
             return false;
         }
 
-        // 基本验证：配置不能为空
+        // 2. 基础验证：配置不能为空
         if (tool.getConfig() == null || tool.getConfig().isEmpty()) {
+            log.warn("工具验证失败: 工具 {} 配置为空", tool.getName());
             return false;
         }
 
-        // 可以添加更多验证逻辑
+        // 3. 验证配置 JSON 格式
+        Map<String, Object> configMap;
+        try {
+            configMap = objectMapper.readValue(tool.getConfig(), new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.warn("工具验证失败: 工具 {} 配置 JSON 格式无效 - {}", tool.getName(), e.getMessage());
+            return false;
+        }
+
+        // 4. 根据工具类型验证必需参数
+        ValidationResult result = validateRequiredConfig(tool.getToolType(), configMap);
+        if (!result.isValid()) {
+            log.warn("工具验证失败: 工具 {} 缺少必需参数 - {}", tool.getName(), result.getMessage());
+            return false;
+        }
+
+        // 5. 验证 inputSchema 格式（如果存在）
+        if (tool.getInputSchema() != null && !tool.getInputSchema().isEmpty()) {
+            try {
+                Map<String, Object> schema = objectMapper.readValue(
+                        tool.getInputSchema(), new TypeReference<Map<String, Object>>() {});
+                if (!validateInputSchema(schema)) {
+                    log.warn("工具验证失败: 工具 {} inputSchema 格式无效", tool.getName());
+                    return false;
+                }
+            } catch (Exception e) {
+                log.warn("工具验证失败: 工具 {} inputSchema JSON 格式无效 - {}", tool.getName(), e.getMessage());
+                return false;
+            }
+        }
+
+        // 6. 验证工具名称格式
+        if (!validateToolName(tool.getName())) {
+            log.warn("工具验证失败: 工具名称 {} 格式无效", tool.getName());
+            return false;
+        }
+
+        log.debug("工具验证成功: {}", tool.getName());
         return true;
+    }
+
+    /**
+     * 根据工具类型验证必需配置参数
+     */
+    private ValidationResult validateRequiredConfig(ToolType toolType, Map<String, Object> config) {
+        Set<String> requiredKeys = getRequiredConfigKeys(toolType);
+
+        for (String key : requiredKeys) {
+            if (!config.containsKey(key)) {
+                return ValidationResult.invalid("缺少必需参数: " + key);
+            }
+            Object value = config.get(key);
+            if (value == null || (value instanceof String && ((String) value).isEmpty())) {
+                return ValidationResult.invalid("参数 " + key + " 值为空");
+            }
+        }
+
+        return ValidationResult.valid();
+    }
+
+    /**
+     * 获取不同工具类型的必需配置参数
+     */
+    private Set<String> getRequiredConfigKeys(ToolType toolType) {
+        return switch (toolType) {
+            case HTTP_API -> Set.of("url");
+            case LOCAL_SCRIPT -> Set.of("scriptPath");
+            case MCP_CLIENT -> Set.of("serverName");
+        };
+    }
+
+    /**
+     * 验证 inputSchema 格式
+     */
+    private boolean validateInputSchema(Map<String, Object> schema) {
+        // 检查 type 字段
+        Object type = schema.get("type");
+        if (type == null || !"object".equals(type)) {
+            return false;
+        }
+
+        // 检查 properties 字段
+        Object properties = schema.get("properties");
+        if (properties == null || !(properties instanceof Map)) {
+            return false;
+        }
+
+        // 检查每个属性是否有 type
+        @SuppressWarnings("unchecked")
+        Map<String, Object> props = (Map<String, Object>) properties;
+        for (Map.Entry<String, Object> entry : props.entrySet()) {
+            if (!(entry.getValue() instanceof Map)) {
+                return false;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> propSchema = (Map<String, Object>) entry.getValue();
+            if (propSchema.get("type") == null) {
+                return false;
+            }
+        }
+
+        // 检查 required 字段格式（如果存在）
+        Object required = schema.get("required");
+        if (required != null && !(required instanceof List)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * 验证工具名称格式
+     * 名称必须：小写字母开头，只包含字母、数字、下划线，长度 2-50
+     */
+    private boolean validateToolName(String name) {
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+        // 名称格式：小写字母开头，可包含字母、数字、下划线、点
+        return name.matches("^[a-z][a-z0-9_.-]{1,49}$");
+    }
+
+    /**
+     * 验证结果封装
+     */
+    private static class ValidationResult {
+        private final boolean valid;
+        private final String message;
+
+        private ValidationResult(boolean valid, String message) {
+            this.valid = valid;
+            this.message = message;
+        }
+
+        static ValidationResult valid() {
+            return new ValidationResult(true, null);
+        }
+
+        static ValidationResult invalid(String message) {
+            return new ValidationResult(false, message);
+        }
+
+        boolean isValid() {
+            return valid;
+        }
+
+        String getMessage() {
+            return message;
+        }
     }
 }

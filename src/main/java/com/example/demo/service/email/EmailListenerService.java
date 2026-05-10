@@ -118,18 +118,25 @@ public class EmailListenerService {
      */
     public void startListener(EmailConfig config) {
         emailAuthConfigService.decodeTransientFields(config);
-        if (storeMap.containsKey(config.getId())) {
-            log.warn("邮箱 {} 已在监听中", config.getEmail());
-            return;
+        Long configId = config.getId();
+
+        // 检查是否已有连接：如果 key 存在但连接已死，先清理再重启
+        Store existingStore = storeMap.get(configId);
+        if (existingStore != null) {
+            if (existingStore.isConnected()) {
+                log.warn("[{}] 邮箱已在监听中且连接正常", config.getEmail());
+                return;
+            }
+            log.info("[{}] 检测到已断开的旧连接，先清理再重新启动", config.getEmail());
+            cleanup(configId);
         }
 
         executorService.submit(() -> {
             try {
                 connectAndListen(config);
             } catch (Exception e) {
-                log.error("邮箱 {} 监听异常: {}", config.getEmail(), e.getMessage());
-                // 清理资源
-                cleanup(config.getId());
+                log.error("[{}] 监听异常: {}", config.getEmail(), e.getMessage());
+                cleanup(configId);
             }
         });
     }
@@ -138,7 +145,8 @@ public class EmailListenerService {
      * 连接邮箱并开始监听
      */
     private void connectAndListen(EmailConfig config) throws MessagingException {
-        log.info("正在连接邮箱: {}", config.getEmail());
+        String emailAddr = config.getEmail();
+        log.info("[{}] 正在连接邮箱...", emailAddr);
 
         String protocol = normalizeProtocol(config.getProtocol());
         String host = safeTrim(config.getHost());
@@ -159,6 +167,7 @@ public class EmailListenerService {
             props.put("mail." + protocol + ".ssl.trust", host);
         }
         applyAuthProperties(props, protocol, authCredential);
+        applyVendorSpecificProperties(props, protocol, host);
 
         // 创建Session
         Session session = Session.getInstance(props);
@@ -173,11 +182,12 @@ public class EmailListenerService {
         folder.open(Folder.READ_WRITE);
 
         // 保存连接
-        storeMap.put(config.getId(), store);
-        folderMap.put(config.getId(), folder);
-        configMap.put(config.getId(), config);
+        Long configId = config.getId();
+        storeMap.put(configId, store);
+        folderMap.put(configId, folder);
+        configMap.put(configId, config);
 
-        log.info("邮箱 {} 连接成功，开始监听文件夹: {}", config.getEmail(), folderName);
+        log.info("[{}] 连接成功，开始监听文件夹: {}", emailAddr, folderName);
 
         // 添加消息监听器
         folder.addMessageCountListener(new MessageCountAdapter() {
@@ -190,42 +200,66 @@ public class EmailListenerService {
             }
         });
 
-        // 保持连接并轮询
-        keepAlive(config.getId());
+        // 保持连接并轮询（阻塞当前线程）
+        keepAlive(configId);
     }
 
     /**
      * 保持连接并轮询新邮件
+     * 每个邮箱在独立的线程中运行此循环
      */
     private void keepAlive(Long configId) {
         EmailConfig config = configMap.get(configId);
         if (config == null) return;
 
         int intervalSeconds = config.getPollInterval() != null ? config.getPollInterval() : 30;
+        String emailAddr = config.getEmail();
 
         while (storeMap.containsKey(configId)) {
             try {
                 Folder folder = folderMap.get(configId);
                 if (folder != null && folder.isOpen()) {
-                    // 触发IDLE或轮询
-                    folder.getMessageCount(); // 简单轮询
+                    folder.getMessageCount(); // 简单轮询保活
                 }
                 Thread.sleep(intervalSeconds * 1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                log.info("[{}] 轮询线程被中断，退出保活循环", emailAddr);
                 break;
             } catch (Exception e) {
-                log.warn("邮箱 {} 轮询异常: {}", config.getEmail(), e.getMessage());
-                // 尝试重连
-                try {
-                    reconnect(configId);
-                } catch (Exception ex) {
-                    log.error("邮箱 {} 重连失败: {}", config.getEmail(), ex.getMessage());
-                    cleanup(configId);
-                    break;
-                }
+                log.warn("[{}] 轮询异常: {}", emailAddr, e.getMessage());
+                // 清理旧连接，然后由异步任务重新连接，避免当前线程递归调用 connectAndListen
+                cleanup(configId);
+                submitReconnect(config);
+                break;
             }
         }
+    }
+
+    /**
+     * 提交异步重连任务，避免在 keepAlive 线程中同步递归调用 connectAndListen
+     */
+    private void submitReconnect(EmailConfig config) {
+        String emailAddr = config.getEmail();
+        log.info("[{}] 将在 5 秒后尝试异步重连...", emailAddr);
+        executorService.submit(() -> {
+            try {
+                Thread.sleep(5000);
+                // 再次确认没有在监听中（可能被用户手动重启了）
+                Store current = storeMap.get(config.getId());
+                if (current != null && current.isConnected()) {
+                    log.info("[{}] 已有活跃连接，跳过重连", emailAddr);
+                    return;
+                }
+                cleanup(config.getId());
+                connectAndListen(config);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                log.error("[{}] 异步重连失败: {}", emailAddr, e.getMessage());
+                cleanup(config.getId());
+            }
+        });
     }
 
     /**
@@ -234,14 +268,14 @@ public class EmailListenerService {
     private void processNewMessage(Message message, EmailConfig config) {
         try {
             EmailMessage emailMessage = parseMessage(message, config);
-            log.info("收到新邮件: {} -> {}", emailMessage.getFrom(), emailMessage.getSubject());
+            log.info("[{}] 收到新邮件: {} -> {}", config.getEmail(), emailMessage.getFrom(), emailMessage.getSubject());
 
             // 调用处理器
             if (emailHandler != null) {
                 emailHandler.handle(emailMessage);
             }
         } catch (Exception e) {
-            log.error("处理邮件失败: {}", e.getMessage());
+            log.error("[{}] 处理邮件失败: {}", config.getEmail(), e.getMessage());
         }
     }
 
@@ -325,14 +359,13 @@ public class EmailListenerService {
     }
 
     /**
-     * 重新连接
+     * 重新连接（已废弃，使用 submitReconnect 异步重连以避免线程递归）
      */
-    private void reconnect(Long configId) throws MessagingException {
+    private void reconnect(Long configId) {
         EmailConfig config = configMap.get(configId);
         if (config == null) return;
-
         cleanup(configId);
-        connectAndListen(config);
+        submitReconnect(config);
     }
 
     /**
@@ -373,8 +406,10 @@ public class EmailListenerService {
      * 停止单个邮箱监听
      */
     public void stopListener(Long configId) {
+        EmailConfig config = configMap.get(configId);
+        String email = config != null ? config.getEmail() : String.valueOf(configId);
         cleanup(configId);
-        log.info("已停止邮箱监听: {}", configId);
+        log.info("[{}] 已停止邮箱监听", email);
     }
 
     /**
@@ -386,12 +421,21 @@ public class EmailListenerService {
     }
 
     /**
-     * 获取监听状态
+     * 获取监听状态（支持多邮箱）
+     * 返回每个邮箱的连接状态和基本信息
      */
-    public Map<Long, String> getListenerStatus() {
-        Map<Long, String> status = new HashMap<>();
+    public Map<Long, Map<String, Object>> getListenerStatus() {
+        Map<Long, Map<String, Object>> status = new HashMap<>();
         for (Map.Entry<Long, Store> entry : storeMap.entrySet()) {
-            status.put(entry.getKey(), entry.getValue().isConnected() ? "已连接" : "未连接");
+            Long configId = entry.getKey();
+            Store store = entry.getValue();
+            EmailConfig config = configMap.get(configId);
+            Map<String, Object> item = new HashMap<>();
+            item.put("connected", store.isConnected());
+            item.put("status", store.isConnected() ? "已连接" : "未连接");
+            item.put("email", config != null ? config.getEmail() : "未知");
+            item.put("host", config != null ? config.getHost() : "未知");
+            status.put(configId, item);
         }
         return status;
     }
@@ -437,6 +481,7 @@ public class EmailListenerService {
                 props.put("mail." + protocol + ".ssl.trust", host);
             }
             applyAuthProperties(props, protocol, authCredential);
+            applyVendorSpecificProperties(props, protocol, host);
 
             // 创建Session
             Session session = Session.getInstance(props);
@@ -603,13 +648,56 @@ public class EmailListenerService {
     }
 
     private void applyAuthProperties(Properties props, String protocol, AuthCredential authCredential) {
-        if (authCredential == null || authCredential.mode() != AuthMode.OAUTH2) {
+        String prefix = "mail." + protocol + ".";
+
+        if (authCredential != null && authCredential.mode() == AuthMode.OAUTH2) {
+            props.put(prefix + "auth.mechanisms", "XOAUTH2");
+            props.put(prefix + "auth.login.disable", "true");
+            props.put(prefix + "auth.plain.disable", "true");
+        } else {
+            // 163/126/188 等国内邮箱需要显式启用 PLAIN 认证，否则会被识别为 "Unsafe Login"
+            props.put(prefix + "auth.login.disable", "false");
+            props.put(prefix + "auth.plain.disable", "false");
+        }
+    }
+
+    /**
+     * 根据邮箱服务商应用特定的连接属性
+     * 163/126/188/QQ 对 JavaMail 有客户端识别限制，需要额外配置
+     */
+    private void applyVendorSpecificProperties(Properties props, String protocol, String host) {
+        if (!StringUtils.hasText(host)) {
             return;
         }
+        String lowerHost = host.toLowerCase(Locale.ROOT);
         String prefix = "mail." + protocol + ".";
-        props.put(prefix + "auth.mechanisms", "XOAUTH2");
-        props.put(prefix + "auth.login.disable", "true");
-        props.put(prefix + "auth.plain.disable", "true");
+
+        // 163 / 126 / 188 / yeah 邮箱的特殊处理
+        if (lowerHost.contains("163.com") || lowerHost.contains("126.com")
+                || lowerHost.contains("188.com") || lowerHost.contains("yeah.net")) {
+            // 强制 SSL，关闭 STARTTLS 混用
+            props.put(prefix + "ssl.enable", "true");
+            props.put(prefix + "starttls.enable", "false");
+            // 信任所有证书（163 证书链有时不完整）
+            props.put(prefix + "ssl.trust", "*");
+            // socket channels 改善兼容性
+            props.put(prefix + "usesocketchannels", "true");
+            // 禁用 SASL，强制 LOGIN + PLAIN
+            props.put(prefix + "sasl.enable", "false");
+            props.put(prefix + "peek", "true");
+            props.put(prefix + "connectionpool.debug", "false");
+        }
+
+        // QQ 邮箱 / 腾讯企业邮箱
+        if (lowerHost.contains("qq.com") || lowerHost.contains("exmail.qq.com")) {
+            // QQ 邮箱 IMAP 必须使用 SSL
+            props.put(prefix + "ssl.enable", "true");
+            props.put(prefix + "starttls.enable", "false");
+            props.put(prefix + "ssl.trust", "*");
+            // QQ 对连接频率有限制，适当延长超时
+            props.put(prefix + "connectiontimeout", 15000);
+            props.put(prefix + "timeout", 15000);
+        }
     }
 
     private AuthCredential resolveAuthCredential(EmailConfig config, String host, String protocol) {

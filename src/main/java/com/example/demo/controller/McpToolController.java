@@ -14,6 +14,7 @@ import java.util.Map;
 
 /**
  * MCP 工具管理控制器
+ * 工具添加/删除/执行等敏感操作需要管理员权限
  */
 @RestController
 @RequestMapping("/api/mcp/tools")
@@ -27,15 +28,15 @@ public class McpToolController {
     // ==================== 工具管理 ====================
 
     /**
-     * 获取所有工具
+     * 获取所有工具 - 需要管理员权限
      */
     @GetMapping
-    public List<McpTool> listAll() {
+        public List<McpTool> listAll() {
         return mcpToolService.listAll();
     }
 
     /**
-     * 获取启用的工具
+     * 获取启用的工具 - 普通用户可查看
      */
     @GetMapping("/enabled")
     public List<McpTool> listEnabled() {
@@ -43,10 +44,10 @@ public class McpToolController {
     }
 
     /**
-     * 获取工具详情
+     * 获取工具详情 - 需要管理员权限
      */
     @GetMapping("/{id}")
-    public ResponseEntity<McpTool> getById(@PathVariable Long id) {
+        public ResponseEntity<McpTool> getById(@PathVariable Long id) {
         McpTool tool = mcpToolService.getById(id);
         if (tool == null) {
             return ResponseEntity.notFound().build();
@@ -55,10 +56,10 @@ public class McpToolController {
     }
 
     /**
-     * 添加工具
+     * 添加工具 - 需要管理员权限
      */
     @PostMapping
-    public ResponseEntity<String> add(@RequestBody McpTool tool) {
+        public ResponseEntity<String> add(@RequestBody McpTool tool) {
         try {
             mcpToolService.add(tool);
             return ResponseEntity.ok("添加成功");
@@ -68,10 +69,10 @@ public class McpToolController {
     }
 
     /**
-     * 更新工具
+     * 更新工具 - 需要管理员权限
      */
     @PutMapping("/{id}")
-    public ResponseEntity<String> update(@PathVariable Long id, @RequestBody McpTool tool) {
+        public ResponseEntity<String> update(@PathVariable Long id, @RequestBody McpTool tool) {
         try {
             tool.setId(id);
             mcpToolService.update(tool);
@@ -82,19 +83,19 @@ public class McpToolController {
     }
 
     /**
-     * 删除工具
+     * 删除工具 - 需要管理员权限
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> delete(@PathVariable Long id) {
+        public ResponseEntity<String> delete(@PathVariable Long id) {
         mcpToolService.delete(id);
         return ResponseEntity.ok("删除成功");
     }
 
     /**
-     * 切换启用状态
+     * 切换启用状态 - 需要管理员权限
      */
     @PutMapping("/{id}/toggle")
-    public ResponseEntity<String> toggleEnabled(@PathVariable Long id) {
+        public ResponseEntity<String> toggleEnabled(@PathVariable Long id) {
         try {
             mcpToolService.toggleEnabled(id);
             return ResponseEntity.ok("状态已切换");
@@ -106,10 +107,10 @@ public class McpToolController {
     // ==================== 工具执行 ====================
 
     /**
-     * 执行工具
+     * 执行工具 - 需要管理员权限（工具可能执行危险命令）
      */
     @PostMapping("/{name}/execute")
-    public ResponseEntity<ToolExecutionResult> execute(
+        public ResponseEntity<ToolExecutionResult> execute(
             @PathVariable String name,
             @RequestBody(required = false) Map<String, Object> params) {
         ToolExecutionResult result = mcpToolService.execute(name, params != null ? params : Map.of());
@@ -117,10 +118,10 @@ public class McpToolController {
     }
 
     /**
-     * 测试工具
+     * 测试工具 - 需要管理员权限
      */
     @PostMapping("/{id}/test")
-    public ResponseEntity<ToolExecutionResult> test(
+        public ResponseEntity<ToolExecutionResult> test(
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, Object> params) {
         ToolExecutionResult result = mcpToolService.testTool(id, params != null ? params : Map.of());

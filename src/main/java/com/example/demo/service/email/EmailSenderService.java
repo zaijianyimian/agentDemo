@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.UnsupportedEncodingException;
@@ -67,15 +68,17 @@ public class EmailSenderService {
     }
 
     /**
-     * 发送纯文本邮件
+     * 发送纯文本邮件（异步）
      */
+    @Async("emailProcessingExecutor")
     public void sendText(String to, String subject, String content) {
         sendEmail(to, subject, content, false);
     }
 
     /**
-     * 发送HTML邮件
+     * 发送HTML邮件（异步）
      */
+    @Async("emailProcessingExecutor")
     public void sendHtml(String to, String subject, String htmlContent) {
         sendEmail(to, subject, htmlContent, true);
     }

@@ -3,7 +3,9 @@ package com.example.demo.service.task;
 import com.example.demo.entity.ScheduledTask;
 import com.example.demo.mapper.ScheduledTaskMapper;
 import com.example.demo.service.chat.QwenChatService;
+import com.example.demo.service.email.EmailSenderService;
 import com.example.demo.service.skill.SkillExecutor;
+import com.example.demo.service.SystemSettingsService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,8 @@ public class ScheduledTaskService {
     private final ScheduledTaskMapper taskMapper;
     private final SkillExecutor skillExecutor;
     private final QwenChatService chatService;
+    private final EmailSenderService emailSenderService;
+    private final SystemSettingsService systemSettingsService;
     private final ObjectMapper objectMapper;
 
     private TaskScheduler taskScheduler;
@@ -39,10 +43,14 @@ public class ScheduledTaskService {
     public ScheduledTaskService(ScheduledTaskMapper taskMapper,
                                 SkillExecutor skillExecutor,
                                 QwenChatService chatService,
+                                EmailSenderService emailSenderService,
+                                SystemSettingsService systemSettingsService,
                                 ObjectMapper objectMapper) {
         this.taskMapper = taskMapper;
         this.skillExecutor = skillExecutor;
         this.chatService = chatService;
+        this.emailSenderService = emailSenderService;
+        this.systemSettingsService = systemSettingsService;
         this.objectMapper = objectMapper;
     }
 
@@ -325,11 +333,50 @@ public class ScheduledTaskService {
 
     /**
      * 执行提醒任务
+     * 通过邮件服务发送提醒通知
      */
     private String executeReminderTask(ScheduledTask task) {
-        // 提醒任务只是记录日志，实际提醒需要配合邮件服务
         log.info("提醒任务: {} - {}", task.getName(), task.getDescription());
-        return "提醒已触发: " + task.getDescription();
+
+        // 获取用户邮箱配置
+        String userEmail = systemSettingsService.getSetting("user", "email", null);
+
+        if (userEmail == null || userEmail.isEmpty()) {
+            log.warn("用户邮箱未配置，提醒任务仅记录日志");
+            return "提醒已触发（无邮件通知）: " + task.getDescription();
+        }
+
+        // 检查邮件服务是否可用
+        if (!emailSenderService.isAvailable()) {
+            log.warn("邮件服务不可用，提醒任务仅记录日志");
+            return "提醒已触发（邮件服务不可用）: " + task.getDescription();
+        }
+
+        // 发送提醒邮件
+        try {
+            String date = java.time.LocalDate.now().toString();
+            String reminderContent = buildReminderContent(task);
+            emailSenderService.sendScheduleReminder(userEmail, date, reminderContent);
+            log.info("提醒邮件已发送: {} -> {}", task.getName(), userEmail);
+            return "提醒邮件已发送: " + task.getDescription();
+        } catch (Exception e) {
+            log.error("发送提醒邮件失败: {}", task.getName(), e);
+            return "提醒已触发（邮件发送失败: " + e.getMessage() + "）: " + task.getDescription();
+        }
+    }
+
+    /**
+     * 构建提醒内容
+     */
+    private String buildReminderContent(ScheduledTask task) {
+        StringBuilder content = new StringBuilder();
+        content.append("<div style=\"margin-bottom: 12px;\">");
+        content.append("<strong>").append(task.getName()).append("</strong>");
+        if (task.getDescription() != null && !task.getDescription().isEmpty()) {
+            content.append("<br/><span style=\"color: #78350F;\">").append(task.getDescription()).append("</span>");
+        }
+        content.append("</div>");
+        return content.toString();
     }
 
     /**
