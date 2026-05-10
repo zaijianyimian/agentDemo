@@ -1,14 +1,13 @@
 # AI Agent Demo API 文档
 
-> 更新时间：2026-04-05
+> 更新时间：2026-04-06
 >
 > 本文档按当前仓库源码整理，优先以 `controller`、`service`、前端 API 封装与安全配置为准。
 >
 > 当前状态：
 >
 > - 前端 `npm run build` 通过。
-> - 后端 `.\gradlew.bat test` 无法通过，原因是 [`SystemSettingsController.java`](/D:/javaproject/agentDemo/src/main/java/com/example/demo/controller/SystemSettingsController.java) 依赖的 `DataArchiveService` 已缺失。
-> - 因此，下文列出的接口是“当前源码声明的接口面”，不是“已可运行验证通过”的接口面。
+> - 后端 `.\gradlew.bat test` 通过。
 
 ## 1. 基本信息
 
@@ -70,9 +69,8 @@
 
 ## 2. 当前代码差异
 
-这些不是“接口设计说明”，而是当前代码需要特别注意的现实状态：
+这些不是”接口设计说明”，而是当前代码需要特别注意的现实状态：
 
-- 后端目前无法编译，原因是 `DataArchiveService` 文件缺失，但设置控制器仍保留数据导入导出接口。
 - [`SecurityConfig.java`](/D:/javaproject/agentDemo/src/main/java/com/example/demo/config/SecurityConfig.java) 仍放行 `/api/auth/captcha/puzzle` 与 `/api/auth/captcha/puzzle/verify`，但当前 [`AuthController.java`](/D:/javaproject/agentDemo/src/main/java/com/example/demo/controller/AuthController.java) 中已经没有这两个接口。
 - 带会话聊天当前始终使用“当前启用模型”；源码没有真正提供按请求切换模型的能力。
 - 文件与知识库上传虽然允许 `pdf/doc/docx`，但当前真正提取文本内容的只有 `txt` 与 `md`。
@@ -360,7 +358,24 @@ OAuth2 模式时可额外传：
 | `POST` | `/memory/extract-store` | `MemoryRecord` | 请求体需包含 `sessionId`、`recentMessages` |
 | `GET` | `/memory/search` | `List<Map<String,Object>>` | 参数 `query`、`topK`、`sessionId`、`category` |
 
-### 6.3 Search
+### 6.3 Chat Import / Virtual Assistant
+
+| 方法 | 路径 | 返回 | 说明 |
+| --- | --- | --- | --- |
+| `POST` | `/chatimport/import` | `ApiResponse<ChatImportResult>` | 导入聊天记录文件，参数 `file`（multipart）、`platform`（可选，默认 auto） |
+| `GET` | `/chatimport/sessions` | `ApiResponse<List<String>>` | 已导入会话 ID 列表，可选参数 `platform` 筛选 |
+| `GET` | `/chatimport/session/{sessionId}/messages` | `ApiResponse<List<ChatHistory>>` | 获取会话消息列表 |
+| `DELETE` | `/chatimport/session/{sessionId}` | `ApiResponse<Void>` | 删除导入的会话及其消息 |
+| `GET` | `/chatimport/assistants` | `ApiResponse<List<VirtualAssistant>>` | 获取所有虚拟助手 |
+| `GET` | `/chatimport/assistant/{id}` | `ApiResponse<VirtualAssistant>` | 获取助手详情 |
+| `POST` | `/chatimport/assistant` | `ApiResponse<VirtualAssistant>` | 创建虚拟助手，参数 `name`、`description`（可选）、`platform`、`sessionIds`（多个） |
+| `PUT` | `/chatimport/assistant/{id}` | `ApiResponse<VirtualAssistant>` | 更新助手，参数 `name`、`description`、`enabled`（均为可选） |
+| `DELETE` | `/chatimport/assistant/{id}` | `ApiResponse<Void>` | 删除虚拟助手及向量数据 |
+| `POST` | `/chatimport/assistant/{id}/chat` | `ApiResponse<String>` | 与助手对话，参数 `message`，请求体可选 `history`（历史上下文） |
+| `POST` | `/chatimport/assistant/{id}/analyze` | `ApiResponse<Void>` | 分析助手人格特征 |
+| `POST` | `/chatimport/assistant/{id}/revectorize` | `ApiResponse<Integer>` | 重新向量化助手消息 |
+
+### 6.4 Search
 
 | 方法 | 路径 | 返回 | 说明 |
 | --- | --- | --- | --- |
@@ -380,7 +395,7 @@ OAuth2 模式时可额外传：
 | `DELETE` | `/search/interests/{id}` | `ApiResponse<Void>` | 删除单个兴趣标签 |
 | `GET` | `/search/test` | `ApiResponse<Map>` | 搜索模块自检 |
 
-### 6.4 File / Knowledge
+### 6.5 File / Knowledge
 
 | 方法 | 路径 | 返回 | 说明 |
 | --- | --- | --- | --- |
@@ -403,7 +418,7 @@ OAuth2 模式时可额外传：
 | `GET` | `/knowledge/{baseId}/query` | `ApiResponse<String>` | RAG 检索，参数 `question`、`topK` |
 | `GET` | `/knowledge/{baseId}/search` | `ApiResponse<List<Map>>` | 文档片段搜索，参数 `query`、`topK` |
 
-### 6.5 MCP Tool / MCP Agent / Skill
+### 6.6 MCP Tool / MCP Agent / Skill
 
 | 方法 | 路径 | 返回 | 说明 |
 | --- | --- | --- | --- |
@@ -447,7 +462,7 @@ OAuth2 模式时可额外传：
 | `POST` | `/skill/import` | `Map` | 导入技能 JSON |
 | `GET` | `/skill/{id}/export` | `Map` / `404` | 导出技能 JSON |
 
-### 6.6 Schedule / Email
+### 6.7 Schedule / Email
 
 | 方法 | 路径 | 返回 | 说明 |
 | --- | --- | --- | --- |
@@ -486,7 +501,7 @@ OAuth2 模式时可额外传：
 | `POST` | `/email/config/test` | `Map` | 测试未保存配置的邮箱连接 |
 | `GET` | `/email/templates` | `List<EmailTemplate>` | 常见邮箱模板 |
 
-### 6.7 Note / Snippet / Code
+### 6.8 Note / Snippet / Code
 
 | 方法 | 路径 | 返回 | 说明 |
 | --- | --- | --- | --- |
@@ -515,7 +530,7 @@ OAuth2 模式时可额外传：
 | `GET` | `/code/analyze` | `ApiResponse<Map>` | 分析项目目录结构，参数 `path` |
 | `GET` | `/code/types` | `ApiResponse<List<String>>` | 获取支持的代码类型 |
 
-### 6.8 Task / Model / Settings
+### 6.9 Task / Model / Settings
 
 | 方法 | 路径 | 返回 | 说明 |
 | --- | --- | --- | --- |
@@ -556,10 +571,10 @@ OAuth2 模式时可额外传：
 | `PUT` | `/settings/model` | `ApiResponse<Void>` | 更新模型参数设置 |
 | `GET` | `/settings/proxy` | `ApiResponse<Map<String,String>>` | 获取代理配置，当前为公开接口 |
 | `PUT` | `/settings/proxy` | `ApiResponse<Void>` | 更新代理配置 |
-| `GET` | `/settings/data/export` | `byte[]` | 导出 ZIP；当前控制器声明存在，但后端编译被缺失服务阻塞 |
-| `POST` | `/settings/data/import` | `ApiResponse<Map>` | 导入 ZIP；当前控制器声明存在，但后端编译被缺失服务阻塞 |
+| `GET` | `/settings/data/export` | `byte[]` | 导出 ZIP |
+| `POST` | `/settings/data/import` | `ApiResponse<Map>` | 导入 ZIP |
 
-### 6.9 Inbox / Report / Autonomy / Personal
+### 6.10 Inbox / Report / Autonomy / Personal
 
 | 方法 | 路径 | 返回 | 说明 |
 | --- | --- | --- | --- |
@@ -610,4 +625,14 @@ OAuth2 模式时可额外传：
 本次更新过程中的实际验证结果：
 
 - `frontend`: `npm run build` 通过
-- `backend`: `.\gradlew.bat test` 失败，缺失 `DataArchiveService`
+- `backend`: `.\gradlew.bat test` 通过
+
+### 7.5 聊天导入功能说明
+
+聊天导入模块支持从微信、QQ、Telegram、WhatsApp 等平台导入聊天记录，并基于这些记录创建个性化虚拟助手：
+
+- 导入时会自动检测平台格式，或可手动指定平台类型
+- 导入的消息存储到 `chat_history` 表，按 `session_id` 分组
+- 创建虚拟助手时会将关联消息向量化存入 Qdrant
+- 助手人格分析通过 AI 从历史消息中提取性格特征、常用话题等
+- 与助手对话时会检索相似历史消息作为上下文参考

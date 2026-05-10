@@ -1,57 +1,19 @@
 -- ============================================
--- AI Agent 数据库初始化脚本
--- 创建时间: 2026-03-29
--- 说明: 合并所有模块的数据库表结构
--- 注意: 本脚本为非破坏性初始化，不会自动 DROP 现有表
--- 如需重置数据库，请在开发环境手动执行 DROP 后再运行本脚本
+-- AI Agent 数据库完整初始化脚本
+-- 创建时间: 2026-04-06
+-- 版本: 4.0
+-- 说明: 包含所有模块的数据库表结构，适合新部署
+-- 注意: 本脚本为非破坏性初始化，使用 CREATE TABLE IF NOT EXISTS
 -- ============================================
 
--- 设置字符集
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ============================================
--- 1. AI 模型配置表
+-- 1. 用户与认证模块
 -- ============================================
-CREATE TABLE IF NOT EXISTS `ai_model_config` (
-    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `name` VARCHAR(50) NOT NULL COMMENT '模型名称(显示用)',
-    `provider` VARCHAR(50) NOT NULL COMMENT '提供商: openai/aliyun/deepseek/anthropic/glm',
-    `base_url` VARCHAR(200) NOT NULL COMMENT 'API请求地址',
-    `model_name` VARCHAR(100) NOT NULL COMMENT '模型名称',
-    `api_key` VARCHAR(500) NOT NULL COMMENT 'API Key(加密存储)',
-    `is_default` TINYINT(1) DEFAULT 0 COMMENT '是否为默认模型',
-    `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
-    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    INDEX `idx_enabled` (`enabled`),
-    INDEX `idx_is_default` (`is_default`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型配置表';
 
--- ============================================
--- 2. 邮箱配置表
--- ============================================
-CREATE TABLE IF NOT EXISTS `email_config` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `email` VARCHAR(100) NOT NULL COMMENT '邮箱地址',
-    `password` VARCHAR(255) NOT NULL COMMENT '邮箱授权码/密码(加密存储)',
-    `host` VARCHAR(100) NOT NULL COMMENT '邮箱服务器主机',
-    `protocol` VARCHAR(20) DEFAULT 'imap' COMMENT '协议类型: imap, pop3',
-    `port` INT DEFAULT 993 COMMENT '端口号',
-    `ssl_enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用SSL',
-    `enabled` TINYINT(1) DEFAULT 0 COMMENT '是否启用监听',
-    `folder` VARCHAR(50) DEFAULT 'INBOX' COMMENT '监听文件夹',
-    `poll_interval` INT DEFAULT 30 COMMENT '轮询间隔(秒)',
-    `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
-    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_email` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮箱配置表';
-
--- ============================================
--- 3. 文件上传记录表
--- ============================================
+-- 用户账号表
 CREATE TABLE IF NOT EXISTS `user_account` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     `username` VARCHAR(50) NOT NULL COMMENT '登录名',
@@ -71,6 +33,7 @@ CREATE TABLE IF NOT EXISTS `user_account` (
     INDEX `idx_user_account_enabled` (`enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户账号表';
 
+-- 用户人脸认证向量表
 CREATE TABLE IF NOT EXISTS `user_face_profile` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     `user_id` BIGINT NOT NULL COMMENT '用户ID',
@@ -85,6 +48,7 @@ CREATE TABLE IF NOT EXISTS `user_face_profile` (
     CONSTRAINT `fk_user_face_profile_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户人脸认证向量表';
 
+-- 第三方账号绑定表
 CREATE TABLE IF NOT EXISTS `oauth_account` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     `user_id` BIGINT NOT NULL COMMENT '本地用户ID',
@@ -98,6 +62,7 @@ CREATE TABLE IF NOT EXISTS `oauth_account` (
     CONSTRAINT `fk_oauth_account_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='第三方账号绑定表';
 
+-- OAuth state表
 CREATE TABLE IF NOT EXISTS `oauth_state` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     `state` VARCHAR(80) NOT NULL COMMENT 'OAuth state',
@@ -108,6 +73,7 @@ CREATE TABLE IF NOT EXISTS `oauth_state` (
     INDEX `idx_oauth_state_expire` (`expire_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='OAuth state表';
 
+-- 邮箱验证码表
 CREATE TABLE IF NOT EXISTS `auth_email_code` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     `email` VARCHAR(100) NOT NULL COMMENT '邮箱',
@@ -123,8 +89,50 @@ CREATE TABLE IF NOT EXISTS `auth_email_code` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邮箱验证码表';
 
 -- ============================================
--- 3. 文件上传记录表
+-- 2. AI 模型配置模块
 -- ============================================
+
+CREATE TABLE IF NOT EXISTS `ai_model_config` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(50) NOT NULL COMMENT '模型名称(显示用)',
+    `provider` VARCHAR(50) NOT NULL COMMENT '提供商: openai/aliyun/deepseek/anthropic/glm',
+    `base_url` VARCHAR(200) NOT NULL COMMENT 'API请求地址',
+    `model_name` VARCHAR(100) NOT NULL COMMENT '模型名称',
+    `api_key` VARCHAR(500) NOT NULL COMMENT 'API Key(加密存储)',
+    `is_default` TINYINT(1) DEFAULT 0 COMMENT '是否为默认模型',
+    `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX `idx_enabled` (`enabled`),
+    INDEX `idx_is_default` (`is_default`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型配置表';
+
+-- ============================================
+-- 3. 邮件配置模块
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS `email_config` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `email` VARCHAR(100) NOT NULL COMMENT '邮箱地址',
+    `password` VARCHAR(255) NOT NULL COMMENT '邮箱授权码/密码(加密存储)',
+    `host` VARCHAR(100) NOT NULL COMMENT '邮箱服务器主机',
+    `protocol` VARCHAR(20) DEFAULT 'imap' COMMENT '协议类型: imap, pop3',
+    `port` INT DEFAULT 993 COMMENT '端口号',
+    `ssl_enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用SSL',
+    `enabled` TINYINT(1) DEFAULT 0 COMMENT '是否启用监听',
+    `folder` VARCHAR(50) DEFAULT 'INBOX' COMMENT '监听文件夹',
+    `poll_interval` INT DEFAULT 30 COMMENT '轮询间隔(秒)',
+    `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮箱配置表';
+
+-- ============================================
+-- 4. 文件管理模块
+-- ============================================
+
 CREATE TABLE IF NOT EXISTS `document` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     `file_name` VARCHAR(255) NOT NULL COMMENT '文件名',
@@ -145,8 +153,9 @@ CREATE TABLE IF NOT EXISTS `document` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件上传记录表';
 
 -- ============================================
--- 4. 日程事件表
+-- 5. 日程管理模块
 -- ============================================
+
 CREATE TABLE IF NOT EXISTS `schedule_event` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     `title` VARCHAR(255) NOT NULL COMMENT '事件标题',
@@ -169,8 +178,9 @@ CREATE TABLE IF NOT EXISTS `schedule_event` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日程事件表';
 
 -- ============================================
--- 5. 定时任务表
+-- 6. 定时任务模块
 -- ============================================
+
 CREATE TABLE IF NOT EXISTS `scheduled_task` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(100) NOT NULL COMMENT '任务名称',
@@ -193,8 +203,9 @@ CREATE TABLE IF NOT EXISTS `scheduled_task` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定时任务表';
 
 -- ============================================
--- 6. 聊天会话表
+-- 7. 聊天模块
 -- ============================================
+
 CREATE TABLE IF NOT EXISTS `chat_session` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '会话ID',
     `title` VARCHAR(255) DEFAULT '新会话' COMMENT '会话标题',
@@ -205,7 +216,6 @@ CREATE TABLE IF NOT EXISTS `chat_session` (
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天会话表';
 
--- 聊天消息表
 CREATE TABLE IF NOT EXISTS `chat_message` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '消息ID',
     `session_id` BIGINT NOT NULL COMMENT '会话ID',
@@ -219,8 +229,53 @@ CREATE TABLE IF NOT EXISTS `chat_message` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天消息表';
 
 -- ============================================
--- 7. 知识库表
+-- 8. 聊天记录导入与虚拟助手模块
 -- ============================================
+
+CREATE TABLE IF NOT EXISTS `chat_history` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    `session_id` VARCHAR(100) NOT NULL COMMENT '会话ID（同一对话的记录分组）',
+    `platform` VARCHAR(30) NOT NULL COMMENT '来源平台: wechat/qq/telegram/whatsapp/other',
+    `sender` VARCHAR(100) COMMENT '发送者名称',
+    `sender_type` VARCHAR(20) NOT NULL COMMENT '发送者类型: user/assistant/system',
+    `content` TEXT NOT NULL COMMENT '消息内容',
+    `message_type` VARCHAR(20) DEFAULT 'text' COMMENT '消息类型: text/media/system',
+    `media_type` VARCHAR(20) COMMENT '媒体类型: image/audio/video/file/sticker',
+    `media_name` VARCHAR(255) COMMENT '媒体文件名或描述',
+    `message_time` DATETIME COMMENT '消息时间',
+    `assistant_id` BIGINT COMMENT '关联的虚拟助手ID（如果已训练）',
+    `vectorized` TINYINT(1) DEFAULT 0 COMMENT '是否已向量化',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX `idx_session_id` (`session_id`),
+    INDEX `idx_platform` (`platform`),
+    INDEX `idx_assistant_id` (`assistant_id`),
+    INDEX `idx_vectorized` (`vectorized`),
+    INDEX `idx_message_time` (`message_time`),
+    INDEX `idx_message_type` (`message_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='聊天记录表';
+
+CREATE TABLE IF NOT EXISTS `virtual_assistant` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    `name` VARCHAR(100) NOT NULL COMMENT '助手名称',
+    `description` VARCHAR(500) COMMENT '助手描述',
+    `source_platform` VARCHAR(30) NOT NULL COMMENT '来源平台（训练数据来源）',
+    `trained_messages` INT DEFAULT 0 COMMENT '训练的消息数量',
+    `collection_name` VARCHAR(100) NOT NULL COMMENT '关联的向量集合名称',
+    `personality_summary` TEXT COMMENT '人格描述（AI生成的摘要）',
+    `topics` VARCHAR(500) COMMENT '常用话题标签',
+    `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY `uk_collection_name` (`collection_name`),
+    INDEX `idx_enabled` (`enabled`),
+    INDEX `idx_platform` (`source_platform`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='虚拟助手表';
+
+-- ============================================
+-- 9. 知识库模块
+-- ============================================
+
 CREATE TABLE IF NOT EXISTS `knowledge_base` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(100) NOT NULL COMMENT '知识库名称',
@@ -237,7 +292,6 @@ CREATE TABLE IF NOT EXISTS `knowledge_base` (
     INDEX `idx_enabled` (`enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库配置表';
 
--- 知识库文档表
 CREATE TABLE IF NOT EXISTS `knowledge_document` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `base_id` BIGINT NOT NULL COMMENT '知识库ID',
@@ -257,8 +311,9 @@ CREATE TABLE IF NOT EXISTS `knowledge_document` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库文档表';
 
 -- ============================================
--- 8. 笔记表 & 代码片段表
+-- 10. 笔记与代码片段模块
 -- ============================================
+
 CREATE TABLE IF NOT EXISTS `note` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '笔记ID',
     `title` VARCHAR(255) NOT NULL COMMENT '标题',
@@ -270,7 +325,6 @@ CREATE TABLE IF NOT EXISTS `note` (
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='笔记表';
 
--- 代码片段表
 CREATE TABLE IF NOT EXISTS `code_snippet` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '片段ID',
     `title` VARCHAR(255) NOT NULL COMMENT '标题',
@@ -282,13 +336,13 @@ CREATE TABLE IF NOT EXISTS `code_snippet` (
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代码片段表';
 
--- 创建索引
 CREATE INDEX `idx_note_pinned` ON `note`(`is_pinned` DESC, `update_time` DESC);
 CREATE INDEX `idx_snippet_language` ON `code_snippet`(`language`);
 
 -- ============================================
--- 9. MCP 工具配置表
+-- 11. MCP工具与技能模块
 -- ============================================
+
 CREATE TABLE IF NOT EXISTS `mcp_tool` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `name` VARCHAR(100) NOT NULL COMMENT '工具名称，唯一标识',
@@ -305,9 +359,6 @@ CREATE TABLE IF NOT EXISTS `mcp_tool` (
     UNIQUE KEY `uk_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP工具配置表';
 
--- ============================================
--- 10. 技能表
--- ============================================
 CREATE TABLE IF NOT EXISTS `skill` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `code` VARCHAR(50) NOT NULL COMMENT '技能编码，系统唯一标识',
@@ -327,7 +378,6 @@ CREATE TABLE IF NOT EXISTS `skill` (
     KEY `idx_enabled` (`enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI技能表';
 
--- 技能-工具映射表（一个技能可调用多个工具，支持链式调用）
 CREATE TABLE IF NOT EXISTS `skill_tool_mapping` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `skill_id` BIGINT NOT NULL COMMENT '技能ID',
@@ -344,8 +394,82 @@ CREATE TABLE IF NOT EXISTS `skill_tool_mapping` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='技能-工具映射表';
 
 -- ============================================
--- 示例数据
+-- 12. 搜索模块
 -- ============================================
+
+CREATE TABLE IF NOT EXISTS `search_history` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `query` VARCHAR(500) NOT NULL COMMENT '搜索关键词',
+    `search_mode` VARCHAR(20) DEFAULT 'normal' COMMENT '搜索模式: normal/summary/stream',
+    `result_count` INT DEFAULT 0 COMMENT '搜索结果数量',
+    `has_summary` BOOLEAN DEFAULT FALSE COMMENT '是否有AI总结',
+    `duration_ms` BIGINT COMMENT '搜索耗时（毫秒）',
+    `session_id` VARCHAR(100) COMMENT '用户会话ID',
+    `source_ip` VARCHAR(50) COMMENT '搜索来源IP',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '搜索时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='搜索历史表';
+
+CREATE TABLE IF NOT EXISTS `user_interest` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `tag` VARCHAR(100) NOT NULL COMMENT '兴趣标签名称',
+    `category` VARCHAR(50) DEFAULT 'other' COMMENT '兴趣分类: technology/business/entertainment/sports/health/education/other',
+    `weight` INT DEFAULT 1 COMMENT '兴趣权重',
+    `related_keywords` TEXT COMMENT '相关搜索关键词（JSON数组）',
+    `last_search_time` DATETIME COMMENT '最后搜索时间',
+    `search_count` INT DEFAULT 1 COMMENT '搜索次数',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_tag` (`tag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户兴趣表';
+
+CREATE INDEX `idx_search_history_create_time` ON `search_history`(`create_time`);
+CREATE INDEX `idx_search_history_query` ON `search_history`(`query`);
+
+-- ============================================
+-- 13. 系统设置模块
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS `system_settings` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `category` VARCHAR(50) NOT NULL COMMENT '配置分类: system/database/search/mail/schedule/file',
+    `config_key` VARCHAR(100) NOT NULL COMMENT '配置键',
+    `config_value` TEXT COMMENT '配置值',
+    `description` VARCHAR(255) COMMENT '配置描述',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_category_key` (`category`, `config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统设置表';
+
+-- ============================================
+-- 14. 初始化数据
+-- ============================================
+
+-- 系统设置初始化
+INSERT INTO `system_settings` (`category`, `config_key`, `config_value`, `description`) VALUES
+('system', 'site_name', 'AI Agent', '系统名称'),
+('system', 'site_logo', '', '系统Logo URL'),
+('system', 'default_theme', 'light', '默认主题'),
+('model', 'temperature', '0.7', '模型温度'),
+('model', 'maxTokens', '4096', '最大Token数'),
+('model', 'topP', '0.9', 'Top P 核采样'),
+('model', 'memorySize', '20', '上下文记忆数量'),
+('model', 'systemPrompt', '你是一个有帮助的AI助手，请用简洁、准确的语言回答问题。', '系统提示词'),
+('qdrant', 'host', 'localhost', 'Qdrant 服务地址'),
+('qdrant', 'port', '6334', 'Qdrant 服务端口'),
+('qdrant', 'collection_name', 'agent_memory', '向量集合名称'),
+('qdrant', 'top_k', '5', '返回结果数量'),
+('qdrant', 'min_score', '0.5', '最小相似度分数'),
+('search', 'enabled', 'true', '是否启用搜索'),
+('search', 'engine', 'serper', '搜索引擎: serper/tavily/bing'),
+('search', 'api_key', '', '搜索API密钥'),
+('search', 'max_results', '3', '最大搜索结果数'),
+('schedule', 'enabled', 'true', '是否启用日程功能'),
+('schedule', 'storage_path', './data/schedules', '日程文件存储路径'),
+('schedule', 'user_email', '', '用户接收邮件地址'),
+('file', 'upload_dir', './data/documents', '文件上传目录'),
+('file', 'allowed_types', 'txt,md,pdf,doc,docx', '允许的文件类型'),
+('file', 'max_file_size', '10MB', '最大文件大小')
+ON DUPLICATE KEY UPDATE `update_time` = CURRENT_TIMESTAMP;
 
 -- MCP工具示例数据
 INSERT INTO `mcp_tool` (`name`, `display_name`, `description`, `tool_type`, `config`, `input_schema`, `enabled`, `remark`) VALUES
@@ -356,23 +480,14 @@ INSERT INTO `mcp_tool` (`name`, `display_name`, `description`, `tool_type`, `con
 ('web_search', '网络搜索', '在互联网上搜索相关信息', 'http_api',
  '{"url": "https://api.serper.dev/search", "method": "POST", "headers": {"X-API-KEY": "${SERPER_API_KEY}"}, "timeout": 30}',
  '{"type": "object", "properties": {"query": {"type": "string", "description": "搜索关键词"}}, "required": ["query"]}',
- 0, '示例：网络搜索工具'),
-('file_read', '文件读取', '读取本地文件内容', 'local_script',
- '{"scriptPath": "./scripts/file_read.sh", "timeout": 10, "workingDir": "."}',
- '{"type": "object", "properties": {"filepath": {"type": "string", "description": "文件路径"}}, "required": ["filepath"]}',
- 0, '示例：本地文件读取工具'),
-('system_info', '系统信息', '获取系统运行状态信息', 'local_script',
- '{"scriptPath": "./scripts/system_info.sh", "timeout": 5}',
- '{"type": "object", "properties": {}, "required": []}',
- 0, '示例：系统信息查询工具');
+ 0, '示例：网络搜索工具')
+ON DUPLICATE KEY UPDATE `update_time` = CURRENT_TIMESTAMP;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================
--- 技能分类说明：
--- search: 搜索类技能（网络搜索、文档搜索等）
--- data: 数据类技能（天气查询、股票查询、数据库查询等）
--- system: 系统类技能（文件操作、邮件发送、任务调度等）
--- ai: AI类技能（对话、内容分析、翻译等）
--- custom: 用户自定义技能
+-- 完成提示
+-- ============================================
+-- 数据库初始化完成！
+-- 包含模块：用户认证、AI模型、邮件、文件、日程、任务、聊天、知识库、笔记、工具技能、搜索、设置
 -- ============================================

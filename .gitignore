@@ -13,6 +13,18 @@ src/main/resources/application-local.yaml
 src/main/resources/application-*.yaml
 !src/main/resources/application.example.yaml
 
+### 旧版文档（已合并到主文档）###
+API1.md
+README1.md
+TECHNICAL_DOC_OLD.md
+
+### 旧版SQL（已合并）###
+src/main/resources/sql/agent.sql
+src/main/resources/sql/search_history.sql
+src/main/resources/sql/system_settings.sql
+src/main/resources/sql/migration_*.sql
+!src/main/resources/sql/migration_increments.sql
+
 ### STS ###
 .apt_generated
 .classpath
@@ -57,3 +69,6 @@ frontend/.vite/
 Thumbs.db
 *.log
 *.tmp
+
+### Claude Code 会话记录 ###
+*.jsonl
