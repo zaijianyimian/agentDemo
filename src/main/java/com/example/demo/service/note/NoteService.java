@@ -102,6 +102,34 @@ public class NoteService {
     }
 
     /**
+     * 从备份恢复笔记，保留原始元数据并重建 Markdown 文件
+     */
+    @Transactional
+    public Note restoreNote(Note note) {
+        if (note == null) {
+            return null;
+        }
+
+        Note restored = Note.builder()
+                .title(note.getTitle())
+                .content(note.getContent())
+                .tags(note.getTags())
+                .aiSummary(note.getAiSummary())
+                .isPinned(Boolean.TRUE.equals(note.getIsPinned()))
+                .createTime(note.getCreateTime() != null ? note.getCreateTime() : LocalDateTime.now())
+                .updateTime(note.getUpdateTime() != null ? note.getUpdateTime() : LocalDateTime.now())
+                .build();
+
+        noteMapper.insert(restored);
+        restored.setFilePath(NOTES_DIR + "/" + restored.getId() + ".md");
+        saveContentToFile(restored);
+        noteMapper.updateById(restored);
+        noteVectorService.syncNote(restored);
+        log.info("恢复笔记: id={}, filePath={}", restored.getId(), restored.getFilePath());
+        return restored;
+    }
+
+    /**
      * 更新笔记
      */
     @Transactional
@@ -261,6 +289,9 @@ public class NoteService {
         }
         try {
             Path filePath = Paths.get(note.getFilePath());
+            if (filePath.getParent() != null) {
+                Files.createDirectories(filePath.getParent());
+            }
             String content = note.getContent() != null ? note.getContent() : "";
             Files.writeString(filePath, content);
             log.debug("保存笔记文件: filePath={}, size={} bytes", note.getFilePath(), content.length());

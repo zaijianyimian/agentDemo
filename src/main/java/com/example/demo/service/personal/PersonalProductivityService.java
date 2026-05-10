@@ -12,6 +12,7 @@ import com.example.demo.mapper.NoteMapper;
 import com.example.demo.mapper.ScheduleEventMapper;
 import com.example.demo.mapper.ScheduledTaskMapper;
 import com.example.demo.mapper.SystemSettingsMapper;
+import com.example.demo.service.note.NoteService;
 import com.example.demo.service.task.ScheduledTaskService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,6 +39,7 @@ public class PersonalProductivityService {
     private final ChatMessageMapper chatMessageMapper;
     private final ObjectMapper objectMapper;
     private final ScheduledTaskService scheduledTaskService;
+    private final NoteService noteService;
 
     public Map<String, Object> insights() {
         List<ScheduledTask> tasks = scheduledTaskMapper.selectList(null);
@@ -112,7 +114,7 @@ public class PersonalProductivityService {
         payload.put("exportedAt", LocalDateTime.now());
         payload.put("systemSettings", systemSettingsMapper.selectList(null));
         payload.put("scheduledTasks", scheduledTaskMapper.selectList(null));
-        payload.put("notes", noteMapper.selectList(null));
+        payload.put("notes", noteService.getAllNotes());
         payload.put("snippets", codeSnippetMapper.selectList(null));
         payload.put("schedules", scheduleEventMapper.selectList(null));
         return payload;
@@ -134,7 +136,7 @@ public class PersonalProductivityService {
         if (replaceExisting) {
             systemSettingsMapper.delete(null);
             scheduledTaskMapper.delete(null);
-            noteMapper.delete(null);
+            noteMapper.selectList(null).forEach(note -> noteService.deleteNote(note.getId()));
             codeSnippetMapper.delete(null);
             scheduleEventMapper.delete(null);
         }
@@ -155,8 +157,7 @@ public class PersonalProductivityService {
             scheduledTaskMapper.insert(item);
         });
         notes.forEach(item -> {
-            item.setId(null);
-            noteMapper.insert(item);
+            noteService.restoreNote(item);
         });
         snippets.forEach(item -> {
             item.setId(null);

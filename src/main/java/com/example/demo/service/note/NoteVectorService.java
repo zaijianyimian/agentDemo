@@ -4,6 +4,7 @@ import com.example.demo.dto.NoteSemanticHit;
 import com.example.demo.entity.Note;
 import com.example.demo.mapper.NoteMapper;
 import com.example.demo.properties.QdrantProperties;
+import com.example.demo.service.SystemSettingsService;
 import com.example.demo.service.memory.EmbeddingCacheService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,15 +33,18 @@ public class NoteVectorService {
     private final EmbeddingCacheService embeddingCacheService;
     private final QdrantProperties qdrantProperties;
     private final NoteMapper noteMapper;
+    private final SystemSettingsService settingsService;
     private final ObjectMapper objectMapper;
 
     public NoteVectorService(EmbeddingCacheService embeddingCacheService,
                              QdrantProperties qdrantProperties,
                              NoteMapper noteMapper,
+                             SystemSettingsService settingsService,
                              ObjectMapper objectMapper) {
         this.embeddingCacheService = embeddingCacheService;
         this.qdrantProperties = qdrantProperties;
         this.noteMapper = noteMapper;
+        this.settingsService = settingsService;
         this.objectMapper = objectMapper;
     }
 
@@ -166,8 +170,8 @@ public class NoteVectorService {
     }
 
     private String sendRaw(String method, String path, String body, boolean tolerateDelete404) throws Exception {
-        String host = normalizeHttpHost(qdrantProperties.getHost());
-        URL url = new URL(host + ":6333" + path);
+        String host = normalizeHttpHost(settingsService.getSetting("qdrant", "host", qdrantProperties.getHost()));
+        URL url = new URL(host + ":" + resolveRestPort() + path);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod(method);
         conn.setConnectTimeout(10000);
@@ -202,6 +206,11 @@ public class NoteVectorService {
             conn.disconnect();
         }
         throw new IllegalStateException("Qdrant 请求失败: " + status + " " + error);
+    }
+
+    private int resolveRestPort() {
+        int grpcPort = settingsService.getIntSetting("qdrant", "port", qdrantProperties.getPort());
+        return settingsService.getIntSetting("qdrant", "rest_port", grpcPort == 6334 ? 6333 : grpcPort);
     }
 
     private String buildIndexText(Note note) {

@@ -17,6 +17,7 @@ import java.util.Map;
 
 /**
  * 系统设置控制器
+ * 敏感操作需要管理员权限
  */
 @Slf4j
 @RestController
@@ -33,10 +34,10 @@ public class SystemSettingsController {
     }
 
     /**
-     * 获取所有配置
+     * 获取所有配置 - 需要管理员权限
      */
     @GetMapping
-    public ApiResponse<Map<String, Map<String, String>>> getAllSettings() {
+        public ApiResponse<Map<String, Map<String, String>>> getAllSettings() {
         try {
             Map<String, Map<String, String>> settings = settingsService.getAllSettings();
             return ApiResponse.success(settings);
@@ -47,18 +48,18 @@ public class SystemSettingsController {
     }
 
     /**
-     * 获取指定分类的配置
+     * 获取指定分类的配置 - 需要管理员权限
      */
     @GetMapping("/{category}")
-    public ApiResponse<Map<String, String>> getSettingsByCategory(@PathVariable String category) {
+        public ApiResponse<Map<String, String>> getSettingsByCategory(@PathVariable String category) {
         return ApiResponse.success(settingsService.getSettingsByCategory(category));
     }
 
     /**
-     * 获取单个配置
+     * 获取单个配置 - 需要管理员权限（敏感配置如API密钥）
      */
     @GetMapping("/{category}/{key}")
-    public ApiResponse<String> getSetting(
+        public ApiResponse<String> getSetting(
             @PathVariable String category,
             @PathVariable String key) {
         String value = settingsService.getSetting(category, key);
@@ -66,10 +67,10 @@ public class SystemSettingsController {
     }
 
     /**
-     * 设置单个配置
+     * 设置单个配置 - 需要管理员权限
      */
     @PutMapping("/{category}/{key}")
-    public ApiResponse<Void> setSetting(
+        public ApiResponse<Void> setSetting(
             @PathVariable String category,
             @PathVariable String key,
             @RequestBody String value) {
@@ -78,10 +79,10 @@ public class SystemSettingsController {
     }
 
     /**
-     * 批量设置配置
+     * 批量设置配置 - 需要管理员权限
      */
     @PutMapping("/{category}")
-    public ApiResponse<Void> setSettings(
+        public ApiResponse<Void> setSettings(
             @PathVariable String category,
             @RequestBody Map<String, String> settings) {
         settingsService.setSettings(category, settings);
@@ -89,10 +90,10 @@ public class SystemSettingsController {
     }
 
     /**
-     * 删除配置
+     * 删除配置 - 需要管理员权限
      */
     @DeleteMapping("/{category}/{key}")
-    public ApiResponse<Void> deleteSetting(
+        public ApiResponse<Void> deleteSetting(
             @PathVariable String category,
             @PathVariable String key) {
         settingsService.deleteSetting(category, key);
@@ -102,44 +103,44 @@ public class SystemSettingsController {
     // ==================== 便捷接口 ====================
 
     /**
-     * 获取系统设置
+     * 获取系统设置 - 需要管理员权限
      */
     @GetMapping("/system")
-    public ApiResponse<Map<String, String>> getSystemSettings() {
+        public ApiResponse<Map<String, String>> getSystemSettings() {
         return ApiResponse.success(settingsService.getSettingsByCategory("system"));
     }
 
     /**
-     * 更新系统设置
+     * 更新系统设置 - 需要管理员权限
      */
     @PutMapping("/system")
-    public ApiResponse<Void> updateSystemSettings(@RequestBody Map<String, String> settings) {
+        public ApiResponse<Void> updateSystemSettings(@RequestBody Map<String, String> settings) {
         settingsService.setSettings("system", settings);
         return ApiResponse.success(null);
     }
 
     /**
-     * 获取向量数据库配置
+     * 获取向量数据库配置 - 需要管理员权限
      */
     @GetMapping("/qdrant")
-    public ApiResponse<Map<String, String>> getQdrantSettings() {
+        public ApiResponse<Map<String, String>> getQdrantSettings() {
         return ApiResponse.success(settingsService.getSettingsByCategory("qdrant"));
     }
 
     /**
-     * 更新向量数据库配置
+     * 更新向量数据库配置 - 需要管理员权限
      */
     @PutMapping("/qdrant")
-    public ApiResponse<Void> updateQdrantSettings(@RequestBody Map<String, String> settings) {
+        public ApiResponse<Void> updateQdrantSettings(@RequestBody Map<String, String> settings) {
         settingsService.setSettings("qdrant", settings);
         return ApiResponse.success(null);
     }
 
     /**
-     * 获取搜索配置
+     * 获取搜索配置 - 需要管理员权限
      */
     @GetMapping("/search")
-    public ApiResponse<Map<String, String>> getSearchSettings() {
+        public ApiResponse<Map<String, String>> getSearchSettings() {
         Map<String, String> settings = settingsService.getSettingsByCategory("search");
         // 隐藏敏感信息
         if (settings.containsKey("api_key") && settings.get("api_key") != null) {
@@ -152,10 +153,10 @@ public class SystemSettingsController {
     }
 
     /**
-     * 更新搜索配置
+     * 更新搜索配置 - 需要管理员权限
      */
     @PutMapping("/search")
-    public ApiResponse<Void> updateSearchSettings(@RequestBody Map<String, String> settings) {
+        public ApiResponse<Void> updateSearchSettings(@RequestBody Map<String, String> settings) {
         // 如果 API Key 没有变化（包含 ****），则不更新
         if (settings.containsKey("api_key") && settings.get("api_key") != null) {
             String apiKey = settings.get("api_key");
@@ -219,27 +220,10 @@ public class SystemSettingsController {
     }
 
     /**
-     * 获取代理配置
-     */
-    @GetMapping("/proxy")
-    public ApiResponse<Map<String, String>> getProxySettings() {
-        return ApiResponse.success(settingsService.getProxySettings());
-    }
-
-    /**
-     * 更新代理配置
-     */
-    @PutMapping("/proxy")
-    public ApiResponse<Void> updateProxySettings(@RequestBody Map<String, String> settings) {
-        settingsService.setProxySettings(settings);
-        return ApiResponse.success(null);
-    }
-
-    /**
-     * 导出全量数据（ZIP）
+     * 导出全量数据（ZIP） - 需要管理员权限
      */
     @GetMapping("/data/export")
-    public ResponseEntity<StreamingResponseBody> exportAllDataZip() {
+        public ResponseEntity<StreamingResponseBody> exportAllDataZip() {
         String filename = dataArchiveService.buildArchiveFileName();
         String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
         StreamingResponseBody body = outputStream -> dataArchiveService.writeArchiveTo(outputStream);
@@ -251,10 +235,10 @@ public class SystemSettingsController {
     }
 
     /**
-     * 导入全量数据（ZIP）
+     * 导入全量数据（ZIP） - 需要管理员权限
      */
     @PostMapping(value = "/data/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<Map<String, Object>> importAllDataZip(@RequestParam("file") MultipartFile file,
+        public ApiResponse<Map<String, Object>> importAllDataZip(@RequestParam("file") MultipartFile file,
                                                              @RequestParam(defaultValue = "true") boolean replaceExisting) {
         try {
             Map<String, Object> result = dataArchiveService.importAllDataFromZip(file, replaceExisting);

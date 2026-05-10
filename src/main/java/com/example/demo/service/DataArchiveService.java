@@ -59,20 +59,24 @@ public class DataArchiveService {
     private final ObjectMapper objectMapper;
     private final ScheduledTaskService scheduledTaskService;
     private final CacheManager cacheManager;
+    private final QdrantVectorExportService qdrantVectorExportService;
 
     public DataArchiveService(DataSource dataSource,
                               ObjectMapper objectMapper,
                               ScheduledTaskService scheduledTaskService,
-                              CacheManager cacheManager) {
+                              CacheManager cacheManager,
+                              QdrantVectorExportService qdrantVectorExportService) {
         this.dataSource = dataSource;
         this.objectMapper = objectMapper;
         this.scheduledTaskService = scheduledTaskService;
         this.cacheManager = cacheManager;
+        this.qdrantVectorExportService = qdrantVectorExportService;
     }
 
     public void writeArchiveTo(OutputStream outputStream) {
         try (ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream, StandardCharsets.UTF_8)) {
             writeDatabasePayload(zipOutputStream);
+            writeVectorPayload(zipOutputStream);
             int fileCount = appendManagedDirectories(zipOutputStream);
             zipOutputStream.finish();
             log.info("数据导出完成: files={}", fileCount);
@@ -105,6 +109,11 @@ public class DataArchiveService {
             Map<String, Object> summary = restoreDatabaseAndFiles(tablePayload, importArchive.tempFilesRoot, replaceExisting, tempRoot);
             scheduledTaskService.reloadScheduledTasks();
             evictAllCaches();
+
+            // 导入向量数据
+            Map<String, Object> vectorSummary = importVectorsData(importArchive.vectorsJson, replaceExisting);
+            summary.put("vectors", vectorSummary);
+
             summary.put("importedAt", LocalDateTime.now());
             return summary;
         } catch (Exception e) {
@@ -113,6 +122,30 @@ public class DataArchiveService {
             if (tempRoot != null) {
                 deleteRecursively(tempRoot);
             }
+        }
+    }
+
+    /**
+     * 导入向量数据
+     */
+    private Map<String, Object> importVectorsData(String vectorsJson, boolean replaceExisting) {
+        if (vectorsJson == null || vectorsJson.isBlank()) {
+            return Map.of("message", "备份中不包含向量数据");
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> vectorData = objectMapper.readValue(vectorsJson, new TypeReference<Map<String, Object>>() {});
+
+            // 检查是否有错误
+            if (vectorData.containsKey("error") && !vectorData.containsKey("collections")) {
+                return Map.of("message", "向量数据导出时出错，无法导入", "error", vectorData.get("error"));
+            }
+
+            return qdrantVectorExportService.importVectors(vectorData, replaceExisting);
+        } catch (Exception e) {
+            log.warn("导入向量数据失败: {}", e.getMessage());
+            return Map.of("message", "向量数据导入失败", "error", e.getMessage());
         }
     }
 
@@ -133,7 +166,7 @@ public class DataArchiveService {
             List<String> tables = listCurrentDatabaseTables(connection, metadata);
 
             generator.writeStartObject();
-            generator.writeStringField("version", "3.0");
+            generator.writeStringField("version", "4.0");
             generator.writeStringField("exportedAt", LocalDateTime.now().toString());
             generator.writeStringField("databaseProduct", databaseProduct);
             generator.writeArrayFieldStart("managedDirectories");
@@ -149,6 +182,33 @@ public class DataArchiveService {
             generator.writeEndObject();
             generator.writeEndObject();
             generator.flush();
+        }
+
+        zipOutputStream.closeEntry();
+    }
+
+    /**
+     * 写入向量数据库数据
+     */
+    private void writeVectorPayload(ZipOutputStream zipOutputStream) throws IOException {
+        ZipEntry vectorEntry = new ZipEntry("vectors.json");
+        zipOutputStream.putNextEntry(vectorEntry);
+
+        try {
+            Map<String, Object> vectorData = qdrantVectorExportService.exportAllVectors();
+            String json = objectMapper.writeValueAsString(vectorData);
+            zipOutputStream.write(json.getBytes(StandardCharsets.UTF_8));
+            log.info("向量数据导出完成: collections={}", vectorData.get("totalCollections"));
+        } catch (Exception e) {
+            log.warn("向量数据导出失败，继续导出其他数据: {}", e.getMessage());
+            // 写入空的向量数据
+            Map<String, Object> emptyData = Map.of(
+                    "version", "1.0",
+                    "error", e.getMessage(),
+                    "collections", Map.of()
+            );
+            String json = objectMapper.writeValueAsString(emptyData);
+            zipOutputStream.write(json.getBytes(StandardCharsets.UTF_8));
         }
 
         zipOutputStream.closeEntry();
@@ -202,6 +262,7 @@ public class DataArchiveService {
 
     private ImportArchive unzipToTemp(MultipartFile archiveFile, Path tempRoot) throws IOException {
         String backupJson = null;
+        String vectorsJson = null;
         Path tempFilesRoot = tempRoot.resolve("files").normalize();
         int extractedFiles = 0;
         try (ZipInputStream zipInputStream = new ZipInputStream(archiveFile.getInputStream(), StandardCharsets.UTF_8)) {
@@ -215,6 +276,12 @@ public class DataArchiveService {
 
                 if (BACKUP_JSON.equals(name)) {
                     backupJson = new String(readAllBytes(zipInputStream), StandardCharsets.UTF_8);
+                    zipInputStream.closeEntry();
+                    continue;
+                }
+
+                if ("vectors.json".equals(name)) {
+                    vectorsJson = new String(readAllBytes(zipInputStream), StandardCharsets.UTF_8);
                     zipInputStream.closeEntry();
                     continue;
                 }
@@ -233,8 +300,8 @@ public class DataArchiveService {
                 zipInputStream.closeEntry();
             }
         }
-        log.info("读取导入压缩包完成: extractedFiles={}", extractedFiles);
-        return new ImportArchive(backupJson, tempFilesRoot);
+        log.info("读取导入压缩包完成: extractedFiles={}, hasVectors={}", extractedFiles, vectorsJson != null);
+        return new ImportArchive(backupJson, vectorsJson, tempFilesRoot);
     }
 
     private Map<String, Object> restoreDatabaseAndFiles(Map<String, Object> tablePayload,
@@ -743,7 +810,7 @@ public class DataArchiveService {
     private record InsertSummary(int insertedRows, int skippedRows) {
     }
 
-    private record ImportArchive(String backupJson, Path tempFilesRoot) {
+    private record ImportArchive(String backupJson, String vectorsJson, Path tempFilesRoot) {
     }
 
     private static final class FileRestorePlan {

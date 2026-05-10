@@ -57,7 +57,11 @@ public class ScheduleController {
 
     @GetMapping("/latest")
     public ApiResponse<List<ScheduleEvent>> getLatest(@RequestParam(defaultValue = "5") int limit) {
-        List<ScheduleEvent> all = scheduleEventMapper.selectList(null);
+        List<ScheduleEvent> all = scheduleEventMapper.selectList(
+                new QueryWrapper<ScheduleEvent>()
+                        .orderByDesc("update_time")
+                        .orderByDesc("create_time")
+        );
         return ApiResponse.success(all.stream().limit(limit).toList());
     }
 

@@ -14,6 +14,7 @@ import java.util.List;
 
 /**
  * 受控自治控制器
+ * 项目扫描、验证等敏感操作需要管理员权限
  */
 @RestController
 @RequestMapping("/api/autonomy")
@@ -25,35 +26,53 @@ public class AutonomyController {
         this.autonomyService = autonomyService;
     }
 
+    /**
+     * 获取自治能力 - 普通用户可查看
+     */
     @GetMapping("/capabilities")
     public ApiResponse<Map<String, Object>> getCapabilities() {
         return ApiResponse.success(autonomyService.getCapabilities());
     }
 
+    /**
+     * 查看历史记录 - 需要管理员权限
+     */
     @GetMapping("/history")
-    public ApiResponse<List<AutonomyArtifact>> history(@RequestParam(defaultValue = "12") int limit) {
+        public ApiResponse<List<AutonomyArtifact>> history(@RequestParam(defaultValue = "12") int limit) {
         return ApiResponse.success(autonomyService.listArtifacts(limit));
     }
 
+    /**
+     * 查看差异对比 - 需要管理员权限
+     */
     @GetMapping("/diff")
-    public ApiResponse<AutonomyDiff> diff() {
+        public ApiResponse<AutonomyDiff> diff() {
         return ApiResponse.success(autonomyService.compareLatestScans());
     }
 
+    /**
+     * 读取产物文件 - 需要管理员权限
+     */
     @GetMapping("/artifact")
-    public ApiResponse<String> readArtifact(@RequestParam String path) {
+        public ApiResponse<String> readArtifact(@RequestParam String path) {
         return ApiResponse.success(autonomyService.readArtifact(path));
     }
 
+    /**
+     * 扫描项目 - 需要管理员权限
+     */
     @PostMapping("/scan")
-    public ApiResponse<AutonomyScanReport> scanProject() {
+        public ApiResponse<AutonomyScanReport> scanProject() {
         return ApiResponse.success(autonomyService.scanProject());
     }
 
     public record VerifyRequest(Boolean backend, Boolean frontend) {}
 
+    /**
+     * 验证项目 - 需要管理员权限
+     */
     @PostMapping("/verify")
-    public ApiResponse<AutonomyVerificationResult> verify(@RequestBody(required = false) VerifyRequest request) {
+        public ApiResponse<AutonomyVerificationResult> verify(@RequestBody(required = false) VerifyRequest request) {
         boolean backend = request == null || request.backend() == null || request.backend();
         boolean frontend = request == null || request.frontend() == null || request.frontend();
         return ApiResponse.success(autonomyService.verifyProject(backend, frontend));

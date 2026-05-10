@@ -90,6 +90,28 @@ public class SystemSettingsService {
         return value != null ? value : defaultValue;
     }
 
+    public boolean getBooleanSetting(String category, String key, boolean defaultValue) {
+        return "true".equalsIgnoreCase(getSetting(category, key, String.valueOf(defaultValue)));
+    }
+
+    public int getIntSetting(String category, String key, int defaultValue) {
+        String value = getSetting(category, key, String.valueOf(defaultValue));
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    public double getDoubleSetting(String category, String key, double defaultValue) {
+        String value = getSetting(category, key, String.valueOf(defaultValue));
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
     /**
      * 设置单个配置
      */
@@ -193,85 +215,6 @@ public class SystemSettingsService {
      */
     public String getSearchApiKey() {
         return getSetting("search", "api_key", "");
-    }
-
-    // ==================== 代理配置便捷方法 ====================
-
-    /**
-     * 检查代理是否启用
-     */
-    public boolean isProxyEnabled() {
-        return "true".equalsIgnoreCase(getSetting("proxy", "enabled", "false"));
-    }
-
-    /**
-     * 获取代理主机
-     */
-    public String getProxyHost() {
-        return getSetting("proxy", "host", "127.0.0.1");
-    }
-
-    /**
-     * 获取代理端口
-     */
-    public int getProxyPort() {
-        String portStr = getSetting("proxy", "port", "7890");
-        try {
-            return Integer.parseInt(portStr);
-        } catch (NumberFormatException e) {
-            return 7890;
-        }
-    }
-
-    /**
-     * 获取代理类型 (http/socks5)
-     */
-    public String getProxyType() {
-        return getSetting("proxy", "type", "http");
-    }
-
-    /**
-     * 获取完整代理配置
-     */
-    public Map<String, String> getProxySettings() {
-        return getSettingsByCategory("proxy");
-    }
-
-    /**
-     * 设置代理配置
-     */
-    public void setProxySettings(Map<String, String> settings) {
-        if (settings == null) {
-            return;
-        }
-        Map<String, String> normalized = new HashMap<>();
-        if (settings.containsKey("enabled")) {
-            normalized.put("enabled", "true".equalsIgnoreCase(settings.get("enabled")) ? "true" : "false");
-        }
-        if (settings.containsKey("host")) {
-            String host = settings.get("host");
-            normalized.put("host", host == null ? "" : host.trim());
-        }
-        if (settings.containsKey("port")) {
-            String portRaw = settings.get("port");
-            int port = 7890;
-            try {
-                port = Integer.parseInt(portRaw);
-            } catch (Exception ignored) {
-            }
-            if (port < 1 || port > 65535) {
-                throw new IllegalArgumentException("代理端口范围必须在 1-65535");
-            }
-            normalized.put("port", String.valueOf(port));
-        }
-        if (settings.containsKey("type")) {
-            String type = settings.get("type");
-            normalized.put("type", "socks5".equalsIgnoreCase(type) ? "socks5" : "http");
-        }
-        if (normalized.isEmpty()) {
-            return;
-        }
-        setSettings("proxy", normalized);
     }
 
     private String maskValue(String key, String value) {

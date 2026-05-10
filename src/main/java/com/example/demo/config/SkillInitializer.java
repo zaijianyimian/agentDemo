@@ -2,15 +2,18 @@ package com.example.demo.config;
 
 import com.example.demo.entity.McpTool;
 import com.example.demo.entity.Skill;
+import com.example.demo.entity.SkillToolMapping;
 import com.example.demo.entity.ToolType;
 import com.example.demo.mapper.McpToolMapper;
 import com.example.demo.mapper.SkillMapper;
+import com.example.demo.mapper.SkillToolMappingMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +28,7 @@ public class SkillInitializer {
 
     private final SkillMapper skillMapper;
     private final McpToolMapper mcpToolMapper;
+    private final SkillToolMappingMapper skillToolMappingMapper;
     private final ObjectMapper objectMapper;
 
     /**
@@ -243,8 +247,34 @@ public class SkillInitializer {
      * 创建技能-工具映射
      */
     private void createSkillToolMapping(Long skillId, Long toolId) {
-        // 使用原生 SQL 插入，避免实体类依赖
-        // 这里简化处理，实际应该通过 SkillToolMappingMapper
+        try {
+            // 检查映射是否已存在
+            SkillToolMapping existing = skillToolMappingMapper.selectOne(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SkillToolMapping>()
+                            .eq(SkillToolMapping::getSkillId, skillId)
+                            .eq(SkillToolMapping::getToolId, toolId)
+            );
+
+            if (existing != null) {
+                log.debug("技能-工具映射已存在: skillId={}, toolId={}", skillId, toolId);
+                return;
+            }
+
+            // 创建新的映射关系
+            SkillToolMapping mapping = SkillToolMapping.builder()
+                    .skillId(skillId)
+                    .toolId(toolId)
+                    .invokeOrder(1)  // 默认调用顺序
+                    .isRequired(true)  // 默认必须
+                    .createTime(LocalDateTime.now())
+                    .build();
+
+            skillToolMappingMapper.insert(mapping);
+            log.debug("创建技能-工具映射: skillId={}, toolId={}", skillId, toolId);
+
+        } catch (Exception e) {
+            log.error("创建技能-工具映射失败: skillId={}, toolId={}", skillId, toolId, e);
+        }
     }
 
     /**
