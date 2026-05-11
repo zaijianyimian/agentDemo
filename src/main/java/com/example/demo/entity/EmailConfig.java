@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 /**
  * 邮箱配置实体
@@ -139,6 +140,16 @@ public class EmailConfig {
      * 轮询间隔(秒)
      */
     private Integer pollInterval;
+
+    /**
+     * 监听开始时间，为空表示全天监听
+     */
+    private LocalTime listenStartTime;
+
+    /**
+     * 监听结束时间，为空表示全天监听
+     */
+    private LocalTime listenEndTime;
 
     /**
      * 备注

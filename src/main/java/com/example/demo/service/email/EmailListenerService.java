@@ -28,6 +28,7 @@ import java.net.URLEncoder;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,6 +52,11 @@ public class EmailListenerService {
     private final Map<Long, Store> storeMap = new ConcurrentHashMap<>();
     private final Map<Long, Folder> folderMap = new ConcurrentHashMap<>();
     private final Map<Long, EmailConfig> configMap = new ConcurrentHashMap<>();
+    private final Map<Long, Long> lastSeenUidMap = new ConcurrentHashMap<>();
+    private final Map<Long, Integer> initialMessageCountMap = new ConcurrentHashMap<>();
+    private final Map<Long, LocalDateTime> listenerStartedAtMap = new ConcurrentHashMap<>();
+    private final Set<String> processedMessageKeys = ConcurrentHashMap.newKeySet();
+    private volatile boolean shuttingDown = false;
 
     // 邮件处理器（可以注入自定义处理器）
     private EmailHandler emailHandler;
@@ -88,6 +94,7 @@ public class EmailListenerService {
     @PreDestroy
     public void destroy() {
         log.info("关闭邮件监听服务...");
+        shuttingDown = true;
         stopAllListeners();
         executorService.shutdown();
     }
@@ -177,31 +184,55 @@ public class EmailListenerService {
         Store store = session.getStore(protocol);
         store.connect(host, email, authCredential.secret());
 
-        // 打开文件夹
-        Folder folder = store.getFolder(folderName);
-        folder.open(Folder.READ_WRITE);
-
         // 保存连接
         Long configId = config.getId();
         storeMap.put(configId, store);
-        folderMap.put(configId, folder);
         configMap.put(configId, config);
+        listenerStartedAtMap.put(configId, LocalDateTime.now().minusMinutes(2));
+
+        // 打开文件夹
+        Folder folder = openListenerFolder(configId, config, store);
+        initializeLastSeenUid(configId, folder);
 
         log.info("[{}] 连接成功，开始监听文件夹: {}", emailAddr, folderName);
 
-        // 添加消息监听器
+        // 保持连接并轮询（阻塞当前线程）
+        keepAlive(configId);
+    }
+
+    private Folder openListenerFolder(Long configId, EmailConfig config, Store store) throws MessagingException {
+        String folderName = normalizeFolder(config.getFolder());
+        Folder folder = store.getFolder(folderName);
+        folder.open(Folder.READ_WRITE);
         folder.addMessageCountListener(new MessageCountAdapter() {
             @Override
             public void messagesAdded(MessageCountEvent e) {
                 Message[] messages = e.getMessages();
                 for (Message message : messages) {
-                    processNewMessage(message, config);
+                    processNewMessage(message, config, "event");
                 }
             }
         });
+        folderMap.put(configId, folder);
+        return folder;
+    }
 
-        // 保持连接并轮询（阻塞当前线程）
-        keepAlive(configId);
+    private Folder refreshListenerFolder(Long configId, EmailConfig config) throws MessagingException {
+        Store store = storeMap.get(configId);
+        if (store == null || !store.isConnected()) {
+            throw new MessagingException("邮箱连接已断开");
+        }
+
+        Folder oldFolder = folderMap.remove(configId);
+        if (oldFolder != null && oldFolder.isOpen()) {
+            try {
+                oldFolder.close(false);
+            } catch (MessagingException e) {
+                log.debug("[{}] 关闭旧Folder失败: {}", config.getEmail(), e.getMessage());
+            }
+        }
+
+        return openListenerFolder(configId, config, store);
     }
 
     /**
@@ -217,9 +248,9 @@ public class EmailListenerService {
 
         while (storeMap.containsKey(configId)) {
             try {
-                Folder folder = folderMap.get(configId);
+                Folder folder = refreshListenerFolder(configId, config);
                 if (folder != null && folder.isOpen()) {
-                    folder.getMessageCount(); // 简单轮询保活
+                    pollNewMessages(configId, folder, config);
                 }
                 Thread.sleep(intervalSeconds * 1000L);
             } catch (InterruptedException e) {
@@ -227,6 +258,9 @@ public class EmailListenerService {
                 log.info("[{}] 轮询线程被中断，退出保活循环", emailAddr);
                 break;
             } catch (Exception e) {
+                if (shuttingDown) {
+                    break;
+                }
                 log.warn("[{}] 轮询异常: {}", emailAddr, e.getMessage());
                 // 清理旧连接，然后由异步任务重新连接，避免当前线程递归调用 connectAndListen
                 cleanup(configId);
@@ -236,10 +270,117 @@ public class EmailListenerService {
         }
     }
 
+    private void initializeLastSeenUid(Long configId, Folder folder) {
+        try {
+            int messageCount = folder.getMessageCount();
+            initialMessageCountMap.put(configId, messageCount);
+            if (folder instanceof UIDFolder uidFolder) {
+                long lastUid = 0L;
+                if (messageCount > 0) {
+                    lastUid = uidFolder.getUID(folder.getMessage(messageCount));
+                }
+                lastSeenUidMap.put(configId, lastUid);
+                log.info("[{}] 初始化邮件UID游标: {}", configId, lastUid);
+            } else {
+                lastSeenUidMap.put(configId, (long) folder.getMessageCount());
+                log.warn("[{}] 当前邮箱Folder不支持UID，退化为按邮件数量轮询", configId);
+            }
+        } catch (Exception e) {
+            log.warn("[{}] 初始化邮件UID游标失败: {}", configId, e.getMessage());
+        }
+    }
+
+    private void pollNewMessages(Long configId, Folder folder, EmailConfig config) throws MessagingException {
+        int currentCount = folder.getMessageCount();
+        if (folder instanceof UIDFolder uidFolder) {
+            long lastSeenUid = lastSeenUidMap.getOrDefault(configId, 0L);
+            Message[] messages = uidFolder.getMessagesByUID(lastSeenUid + 1, UIDFolder.LASTUID);
+            long maxUid = lastSeenUid;
+            log.debug("[{}] 邮件轮询: messageCount={}, lastSeenUid={}, uidMatches={}",
+                    config.getEmail(), currentCount, lastSeenUid, messages.length);
+
+            for (Message message : messages) {
+                long uid = uidFolder.getUID(message);
+                if (uid <= lastSeenUid) {
+                    continue;
+                }
+                maxUid = Math.max(maxUid, uid);
+                processNewMessage(message, config, "poll");
+            }
+
+            if (maxUid > lastSeenUid) {
+                lastSeenUidMap.put(configId, maxUid);
+            }
+            scanRecentMessages(configId, folder, config, currentCount);
+            return;
+        }
+
+        int lastCount = lastSeenUidMap.getOrDefault(configId, 0L).intValue();
+        log.debug("[{}] 邮件轮询: messageCount={}, lastCount={}",
+                config.getEmail(), currentCount, lastCount);
+        if (currentCount <= lastCount) {
+            lastSeenUidMap.put(configId, (long) currentCount);
+            scanRecentMessages(configId, folder, config, currentCount);
+            return;
+        }
+
+        for (int messageNumber = lastCount + 1; messageNumber <= currentCount; messageNumber++) {
+            processNewMessage(folder.getMessage(messageNumber), config, "poll");
+        }
+        lastSeenUidMap.put(configId, (long) currentCount);
+        scanRecentMessages(configId, folder, config, currentCount);
+    }
+
+    private void scanRecentMessages(Long configId, Folder folder, EmailConfig config, int currentCount) throws MessagingException {
+        if (currentCount <= 0) {
+            return;
+        }
+
+        int initialCount = initialMessageCountMap.getOrDefault(configId, currentCount);
+        LocalDateTime listenerStartedAt = listenerStartedAtMap.getOrDefault(configId, LocalDateTime.now());
+        int start = Math.max(1, currentCount - 30 + 1);
+        int handled = 0;
+
+        for (int messageNumber = start; messageNumber <= currentCount; messageNumber++) {
+            Message message = folder.getMessage(messageNumber);
+            boolean appendedAfterStartup = messageNumber > initialCount;
+            boolean receivedAfterStartup = isReceivedAfter(message, listenerStartedAt);
+            if (!appendedAfterStartup && !receivedAfterStartup) {
+                continue;
+            }
+
+            handled++;
+            processNewMessage(message, config, "tail-scan");
+        }
+
+        if (handled > 0) {
+            log.debug("[{}] 末尾扫描命中新邮件候选: {}", config.getEmail(), handled);
+        }
+    }
+
+    private boolean isReceivedAfter(Message message, LocalDateTime threshold) {
+        try {
+            Date receivedDate = message.getReceivedDate();
+            if (receivedDate == null) {
+                receivedDate = message.getSentDate();
+            }
+            if (receivedDate == null) {
+                return false;
+            }
+            LocalDateTime receivedAt = LocalDateTime.ofInstant(receivedDate.toInstant(), ZoneId.systemDefault());
+            return !receivedAt.isBefore(threshold);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /**
      * 提交异步重连任务，避免在 keepAlive 线程中同步递归调用 connectAndListen
      */
     private void submitReconnect(EmailConfig config) {
+        if (shuttingDown) {
+            return;
+        }
         String emailAddr = config.getEmail();
         log.info("[{}] 将在 5 秒后尝试异步重连...", emailAddr);
         executorService.submit(() -> {
@@ -265,10 +406,21 @@ public class EmailListenerService {
     /**
      * 处理新邮件
      */
-    private void processNewMessage(Message message, EmailConfig config) {
+    private void processNewMessage(Message message, EmailConfig config, String trigger) {
         try {
+            if (!isWithinListeningWindow(config)) {
+                log.debug("[{}] 当前不在监听时间段内，跳过邮件处理: {}", config.getEmail(), trigger);
+                return;
+            }
+
+            String messageKey = buildMessageKey(message, config);
+            if (!processedMessageKeys.add(messageKey)) {
+                log.debug("[{}] 跳过已处理邮件: {}", config.getEmail(), messageKey);
+                return;
+            }
+
             EmailMessage emailMessage = parseMessage(message, config);
-            log.info("[{}] 收到新邮件: {} -> {}", config.getEmail(), emailMessage.getFrom(), emailMessage.getSubject());
+            log.info("[{}] 收到新邮件({}): {} -> {}", config.getEmail(), trigger, emailMessage.getFrom(), emailMessage.getSubject());
 
             // 调用处理器
             if (emailHandler != null) {
@@ -276,6 +428,48 @@ public class EmailListenerService {
             }
         } catch (Exception e) {
             log.error("[{}] 处理邮件失败: {}", config.getEmail(), e.getMessage());
+        }
+    }
+
+    private boolean isWithinListeningWindow(EmailConfig config) {
+        LocalTime start = config.getListenStartTime();
+        LocalTime end = config.getListenEndTime();
+        if (start == null || end == null || start.equals(end)) {
+            return true;
+        }
+
+        LocalTime now = LocalTime.now();
+        if (start.isBefore(end)) {
+            return !now.isBefore(start) && now.isBefore(end);
+        }
+        return !now.isBefore(start) || now.isBefore(end);
+    }
+
+    private String buildMessageKey(Message message, EmailConfig config) {
+        Long configId = config.getId();
+        try {
+            Folder folder = message.getFolder();
+            if (folder instanceof UIDFolder uidFolder) {
+                long uid = uidFolder.getUID(message);
+                if (uid > 0) {
+                    return configId + ":uid:" + uid;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        try {
+            String[] messageIds = message.getHeader("Message-ID");
+            if (messageIds != null && messageIds.length > 0 && messageIds[0] != null) {
+                return configId + ":message-id:" + messageIds[0];
+            }
+        } catch (Exception ignored) {
+        }
+
+        try {
+            return configId + ":fallback:" + message.getSentDate() + ":" + message.getSubject();
+        } catch (Exception e) {
+            return configId + ":fallback:" + System.identityHashCode(message);
         }
     }
 
@@ -391,6 +585,9 @@ public class EmailListenerService {
         }
 
         configMap.remove(configId);
+        lastSeenUidMap.remove(configId);
+        initialMessageCountMap.remove(configId);
+        listenerStartedAtMap.remove(configId);
     }
 
     /**

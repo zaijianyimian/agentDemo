@@ -122,6 +122,8 @@ CREATE TABLE IF NOT EXISTS `email_config` (
     `enabled` TINYINT(1) DEFAULT 0 COMMENT '是否启用监听',
     `folder` VARCHAR(50) DEFAULT 'INBOX' COMMENT '监听文件夹',
     `poll_interval` INT DEFAULT 30 COMMENT '轮询间隔(秒)',
+    `listen_start_time` TIME DEFAULT NULL COMMENT '监听开始时间，为空表示全天监听',
+    `listen_end_time` TIME DEFAULT NULL COMMENT '监听结束时间，为空表示全天监听',
     `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

@@ -14,6 +14,44 @@ SET FOREIGN_KEY_CHECKS = 1;
 SET @db_name = DATABASE();
 
 -- ============================================
+-- 0. 邮件监听配置增量迁移
+-- ============================================
+
+SET @has_email_listen_start_time = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = @db_name
+      AND table_name = 'email_config'
+      AND column_name = 'listen_start_time'
+);
+
+SET @sql_email_listen_start_time = IF(
+    @has_email_listen_start_time = 0,
+    'ALTER TABLE `email_config` ADD COLUMN `listen_start_time` TIME DEFAULT NULL COMMENT ''监听开始时间，为空表示全天监听'' AFTER `poll_interval`',
+    'SELECT ''email_config.listen_start_time exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_email_listen_start_time;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_email_listen_end_time = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = @db_name
+      AND table_name = 'email_config'
+      AND column_name = 'listen_end_time'
+);
+
+SET @sql_email_listen_end_time = IF(
+    @has_email_listen_end_time = 0,
+    'ALTER TABLE `email_config` ADD COLUMN `listen_end_time` TIME DEFAULT NULL COMMENT ''监听结束时间，为空表示全天监听'' AFTER `listen_start_time`',
+    'SELECT ''email_config.listen_end_time exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_email_listen_end_time;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ============================================
 -- 1. user_account 表增量迁移
 -- ============================================
 

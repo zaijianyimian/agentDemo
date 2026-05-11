@@ -56,6 +56,8 @@ export interface EmailConfig {
   enabled: boolean
   folder: string
   pollInterval: number
+  listenStartTime?: string | null
+  listenEndTime?: string | null
   remark: string
   createTime: string
   updateTime: string

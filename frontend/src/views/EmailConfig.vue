@@ -3,7 +3,7 @@
     <!-- 操作栏 -->
     <n-card class="action-card" :bordered="false">
       <n-space>
-        <n-button type="primary" @click="showAddModal = true">
+        <n-button type="primary" @click="openAddConfig">
           <template #icon><n-icon><AddIcon /></n-icon></template>
           添加邮箱
         </n-button>
@@ -41,6 +41,9 @@
             <n-tag v-if="config.sslEnabled" type="info" size="small">SSL</n-tag>
             <n-tag v-if="config.authType && config.authType !== 'password'" type="warning" size="small">
               {{ config.authType === 'oauth2_refresh_token' ? 'OAuth2-Refresh' : 'OAuth2-Access' }}
+            </n-tag>
+            <n-tag type="info" size="small">
+              {{ formatListeningWindow(config) }}
             </n-tag>
             <n-tag :type="connectionStatus[config.id]?.success ? 'success' : (connectionStatus[config.id] ? 'error' : 'default')" size="small">
               {{ connectionStatus[config.id]?.message || '未测试' }}
@@ -145,6 +148,36 @@
         <n-form-item label="启用SSL" path="sslEnabled">
           <n-switch v-model:value="formData.sslEnabled" />
         </n-form-item>
+        <n-form-item label="监听文件夹" path="folder">
+          <n-input v-model:value="formData.folder" placeholder="INBOX" />
+        </n-form-item>
+        <n-form-item label="轮询间隔" path="pollInterval">
+          <n-input-number v-model:value="formData.pollInterval" :min="10" :max="3600">
+            <template #suffix>秒</template>
+          </n-input-number>
+        </n-form-item>
+        <n-form-item label="监听时间段">
+          <n-switch v-model:value="formData.listenWindowEnabled">
+            <template #checked>指定时间段</template>
+            <template #unchecked>全天监听</template>
+          </n-switch>
+        </n-form-item>
+        <n-form-item v-if="formData.listenWindowEnabled" label="开始时间" path="listenStartTime">
+          <n-time-picker
+            v-model:formatted-value="formData.listenStartTime"
+            value-format="HH:mm:ss"
+            format="HH:mm"
+            clearable
+          />
+        </n-form-item>
+        <n-form-item v-if="formData.listenWindowEnabled" label="结束时间" path="listenEndTime">
+          <n-time-picker
+            v-model:formatted-value="formData.listenEndTime"
+            value-format="HH:mm:ss"
+            format="HH:mm"
+            clearable
+          />
+        </n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
@@ -202,6 +235,7 @@ import {
   NInput,
   NInputNumber,
   NSelect,
+  NTimePicker,
   NDataTable,
   NEmpty,
   NResult,
@@ -238,7 +272,12 @@ const formData = ref({
   host: '',
   port: 993,
   sslEnabled: true,
-  protocol: 'imap'
+  protocol: 'imap',
+  folder: 'INBOX',
+  pollInterval: 30,
+  listenWindowEnabled: false,
+  listenStartTime: null as string | null,
+  listenEndTime: null as string | null
 })
 const testingNew = ref(false)
 const checkingNewNetwork = ref(false)
@@ -294,8 +333,27 @@ const normalizeConfigPayload = (payload: Partial<EmailConfig>): Partial<EmailCon
   oauthTokenEndpoint: payload.oauthTokenEndpoint == null ? payload.oauthTokenEndpoint : trimText(payload.oauthTokenEndpoint),
   oauthScope: payload.oauthScope == null ? payload.oauthScope : trimText(payload.oauthScope),
   folder: payload.folder == null ? payload.folder : trimText(payload.folder),
+  listenStartTime: payload.listenStartTime || null,
+  listenEndTime: payload.listenEndTime || null,
   remark: payload.remark == null ? payload.remark : trimText(payload.remark)
 })
+
+const buildSavePayload = () => {
+  const payload = normalizeConfigPayload({
+    ...formData.value,
+    folder: formData.value.folder || 'INBOX',
+    pollInterval: formData.value.pollInterval || 30,
+    listenStartTime: formData.value.listenWindowEnabled ? formData.value.listenStartTime : null,
+    listenEndTime: formData.value.listenWindowEnabled ? formData.value.listenEndTime : null
+  }) as Partial<EmailConfig>
+  delete (payload as any).listenWindowEnabled
+  return payload
+}
+
+const formatListeningWindow = (config: EmailConfig): string => {
+  if (!config.listenStartTime || !config.listenEndTime) return '全天监听'
+  return `${config.listenStartTime.slice(0, 5)}-${config.listenEndTime.slice(0, 5)}`
+}
 
 const parseObjectPayload = (payload: any): Record<string, any> => {
   if (payload && typeof payload === 'object' && !Array.isArray(payload)) return payload
@@ -311,6 +369,35 @@ const parseResultPayload = <T extends Record<string, any>>(payload: any): T | nu
     return payload.data as T
   }
   return null
+}
+
+const resetFormData = () => {
+  editingConfig.value = null
+  formData.value = {
+    email: '',
+    password: '',
+    authType: 'password',
+    oauthClientId: '',
+    oauthClientSecret: '',
+    oauthRefreshToken: '',
+    oauthAccessToken: '',
+    oauthTokenEndpoint: '',
+    oauthScope: '',
+    host: '',
+    port: 993,
+    sslEnabled: true,
+    protocol: 'imap',
+    folder: 'INBOX',
+    pollInterval: 30,
+    listenWindowEnabled: false,
+    listenStartTime: null,
+    listenEndTime: null
+  }
+}
+
+const openAddConfig = () => {
+  resetFormData()
+  showAddModal.value = true
 }
 
 // 加载配置
@@ -409,7 +496,8 @@ const testNewConfig = async () => {
       host: formData.value.host,
       port: formData.value.port,
       sslEnabled: formData.value.sslEnabled,
-      protocol: formData.value.protocol
+      protocol: formData.value.protocol,
+      folder: formData.value.folder || 'INBOX'
     }))
     const data = parseResultPayload<{
       success: boolean
@@ -544,7 +632,12 @@ const editConfig = (config: EmailConfig) => {
     host: trimText(config.host),
     port: config.port,
     sslEnabled: config.sslEnabled,
-    protocol: trimText(config.protocol)
+    protocol: trimText(config.protocol || 'imap'),
+    folder: trimText(config.folder || 'INBOX'),
+    pollInterval: config.pollInterval || 30,
+    listenWindowEnabled: Boolean(config.listenStartTime && config.listenEndTime),
+    listenStartTime: config.listenStartTime || null,
+    listenEndTime: config.listenEndTime || null
   }
   showAddModal.value = true
 }
@@ -553,13 +646,18 @@ const editConfig = (config: EmailConfig) => {
 const saveConfig = async () => {
   formData.value = normalizeConfigPayload(formData.value) as typeof formData.value
   try {
+    if (formData.value.listenWindowEnabled && (!formData.value.listenStartTime || !formData.value.listenEndTime)) {
+      message.warning('请选择完整的监听时间段')
+      return
+    }
+    const payload = buildSavePayload()
     if (editingConfig.value) {
       await emailService.updateConfig(normalizeConfigPayload({
         id: editingConfig.value.id,
-        ...formData.value
+        ...payload
       }))
     } else {
-      await emailService.createConfig(normalizeConfigPayload(formData.value))
+      await emailService.createConfig(payload)
     }
     message.success('保存成功')
     showAddModal.value = false
