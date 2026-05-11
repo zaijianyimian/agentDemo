@@ -527,10 +527,10 @@ watch(actualTheme, (theme) => {
   margin-top: 24px;
   background: var(--bg-card);
   border-radius: var(--radius-xl);
-  border: 2px solid var(--border-light);
+  border: 1px solid var(--border-light);
   box-shadow: var(--shadow-sm);
   z-index: 10;
-  min-width: 480px;
+  min-width: min(480px, calc(100vw - 160px));
   flex-shrink: 0;
 }
 
@@ -581,7 +581,7 @@ watch(actualTheme, (theme) => {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-base), color var(--transition-base);
 }
 
 .user-menu-btn:hover {
@@ -614,7 +614,7 @@ watch(actualTheme, (theme) => {
   position: relative;
   z-index: 1;
   /* Critical: Minimum width to prevent card deformation */
-  min-width: 600px;
+  min-width: min(600px, calc(100vw - 144px));
   /* macOS style scrollbar overlay */
   scrollbar-color: rgba(142, 142, 147, 0.24) transparent;
 }
@@ -662,14 +662,14 @@ watch(actualTheme, (theme) => {
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
-  border-left: 2px solid var(--border-light);
+  border-left: 1px solid var(--border-light);
   box-shadow: var(--shadow-sidebar);
   transform: translateX(100%);
   opacity: 0;
   visibility: hidden;
   transition:
-    transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1),
-    opacity 0.25s ease,
+    transform var(--transition-slide),
+    opacity var(--transition-base),
     visibility 0s 0.25s;
 }
 
@@ -678,8 +678,8 @@ watch(actualTheme, (theme) => {
   opacity: 1;
   visibility: visible;
   transition:
-    transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1),
-    opacity 0.25s ease,
+    transform var(--transition-slide),
+    opacity var(--transition-base),
     visibility 0s 0s;
 }
 
@@ -707,7 +707,7 @@ watch(actualTheme, (theme) => {
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-base), color var(--transition-base);
 }
 
 .inspector-close-btn:hover {
@@ -735,7 +735,7 @@ watch(actualTheme, (theme) => {
 .command-palette {
   width: min(560px, 90vw);
   background: var(--bg-card);
-  border: 2px solid var(--border-light);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
   overflow: hidden;
@@ -792,7 +792,7 @@ watch(actualTheme, (theme) => {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-base);
 }
 
 .command-item:hover,
@@ -841,7 +841,7 @@ watch(actualTheme, (theme) => {
   justify-content: space-around;
   padding: 8px 16px;
   background: var(--bg-card);
-  border-top: 2px solid var(--border-light);
+  border-top: 1px solid var(--border-light);
   z-index: 200;
 }
 
@@ -855,7 +855,7 @@ watch(actualTheme, (theme) => {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: color var(--transition-base), background-color var(--transition-base);
 }
 
 .mobile-nav-item.active {

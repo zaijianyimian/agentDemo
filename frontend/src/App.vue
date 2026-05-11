@@ -58,50 +58,50 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
       primaryColor: isDark ? '#FB923C' : '#EA580C',
       primaryColorHover: isDark ? '#F97316' : '#F97316',
       primaryColorPressed: isDark ? '#EA580C' : '#C2410C',
-      borderRadius: '14px',
-      borderRadiusSmall: '10px',
+      borderRadius: '12px',
+      borderRadiusSmall: '8px',
       fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
       // Critical: Ensure text is visible (warm dark on light, warm light on dark)
-      textColor: isDark ? '#FFF7ED' : '#431407',
-      textColor2: isDark ? '#FED7AA' : '#78350F',
-      textColor3: isDark ? '#A16207' : '#A16207',
-      textColorDisabled: isDark ? '#3D2E22' : '#FDE68A',
+      textColor: isDark ? '#FFF7ED' : '#321207',
+      textColor2: isDark ? '#FED7AA' : '#6F3312',
+      textColor3: isDark ? '#D6A45F' : '#9A5A16',
+      textColorDisabled: isDark ? '#7B5F44' : '#CBAA68',
       // Background colors - warm cream/coffee
-      bodyColor: isDark ? '#1C1410' : '#FDF6E3',
-      cardColor: isDark ? '#2A1F18' : '#FFFBF0',
-      inputColor: isDark ? '#3D2E22' : '#FEF3C7',
-      borderColor: isDark ? '#3D2E22' : '#FDE68A'
+      bodyColor: isDark ? '#1B140F' : '#FFF9EC',
+      cardColor: isDark ? '#2B2018' : '#FFFDF7',
+      inputColor: isDark ? '#3D2E22' : '#FFF7E6',
+      borderColor: isDark ? '#4A3526' : '#F3DBA4'
     },
     Button: {
       borderRadiusMedium: '8px',
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      textColor: isDark ? '#FFF7ED' : '#321207'
     },
     Card: {
-      borderRadius: '16px',
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      borderRadius: '14px',
+      textColor: isDark ? '#FFF7ED' : '#321207'
     },
     Input: {
       borderRadius: '8px',
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      textColor: isDark ? '#FFF7ED' : '#321207'
     },
     Tag: {
       borderRadius: '100px'
     },
     Menu: {
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F',
-      itemTextColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      textColor: isDark ? '#FFF7ED' : '#321207',
+      itemTextColor: isDark ? '#FFF7ED' : '#321207'
     },
     Dropdown: {
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      textColor: isDark ? '#FFF7ED' : '#321207'
     },
     Modal: {
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      textColor: isDark ? '#FFF7ED' : '#321207'
     },
     Form: {
-      labelTextColor: isDark ? '#EBEBF5' : '#6E6E73'
+      labelTextColor: isDark ? '#FED7AA' : '#6F3312'
     },
     DataTable: {
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      textColor: isDark ? '#FFF7ED' : '#321207'
     }
   }
 })
