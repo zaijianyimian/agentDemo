@@ -17,6 +17,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 /**
  * 日程汇总服务
@@ -42,6 +45,7 @@ public class ScheduleSummaryService {
         log.info("日程汇总服务已启动");
         log.info("每日汇总时间: {}", scheduleProperties.getDailySummaryCron());
         log.info("早上提醒时间: {}", scheduleProperties.getMorningReminderCron());
+        log.info("日程文件排序时间: {}", scheduleProperties.getFileSortCron());
     }
 
     /**
@@ -119,6 +123,49 @@ public class ScheduleSummaryService {
 
         } catch (Exception e) {
             log.error("早上日程提醒失败", e);
+        }
+    }
+
+    /**
+     * 每晚 19:00 按时间重写日程 Markdown 文件。
+     */
+    @Scheduled(cron = "${app.schedule.file-sort-cron:0 0 19 * * ?}")
+    public void sortScheduleFilesByTime() {
+        log.info("开始按时间排序日程Markdown文件...");
+
+        try {
+            List<ScheduleEvent> events = scheduleEventMapper.selectList(
+                    new QueryWrapper<ScheduleEvent>()
+                            .isNotNull("event_date")
+                            .orderByAsc("event_date")
+                            .orderByAsc("event_time")
+                            .orderByAsc("create_time")
+            );
+
+            Map<LocalDate, List<ScheduleEvent>> eventsByDate = events.stream()
+                    .collect(Collectors.groupingBy(
+                            ScheduleEvent::getEventDate,
+                            TreeMap::new,
+                            Collectors.toList()
+                    ));
+
+            for (Map.Entry<LocalDate, List<ScheduleEvent>> entry : eventsByDate.entrySet()) {
+                String filePath = scheduleFileService.saveScheduleByDate(entry.getKey(), entry.getValue());
+                if (filePath == null) {
+                    continue;
+                }
+                for (ScheduleEvent event : entry.getValue()) {
+                    if (!filePath.equals(event.getFilePath())) {
+                        event.setFilePath(filePath);
+                        event.setUpdateTime(LocalDateTime.now());
+                        scheduleEventMapper.updateById(event);
+                    }
+                }
+            }
+
+            log.info("日程Markdown文件排序完成，共处理 {} 个日期文件", eventsByDate.size());
+        } catch (Exception e) {
+            log.error("日程Markdown文件排序失败", e);
         }
     }
 

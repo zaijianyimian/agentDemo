@@ -75,6 +75,7 @@ app:
     user-email: your_mail@example.com
     daily-summary-cron: "0 0 20 * * ?"
     morning-reminder-cron: "0 0 8 * * ?"
+    file-sort-cron: "0 0 19 * * ?"
   file:
     upload-dir: ./data/documents
     allowed-types: txt,md

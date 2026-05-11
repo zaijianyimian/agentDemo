@@ -36,4 +36,9 @@ public class ScheduleProperties {
      * 早上提醒时间 (cron表达式)
      */
     private String morningReminderCron = "0 0 8 * * ?";
+
+    /**
+     * 日程Markdown文件排序时间 (cron表达式)
+     */
+    private String fileSortCron = "0 0 19 * * ?";
 }

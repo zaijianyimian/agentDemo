@@ -11,6 +11,7 @@ import jakarta.mail.*;
 import jakarta.mail.event.MessageCountAdapter;
 import jakarta.mail.event.MessageCountEvent;
 import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeUtility;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -333,6 +334,9 @@ public class EmailListenerService {
 
         for (int messageNumber = start; messageNumber <= currentCount; messageNumber++) {
             Message message = folder.getMessage(messageNumber);
+            if (message.isSet(Flags.Flag.SEEN)) {
+                continue;
+            }
             boolean appendedAfterStartup = messageNumber > initialCount;
             boolean receivedAfterStartup = isReceivedAfter(message, listenerStartedAt);
             if (!appendedAfterStartup && !receivedAfterStartup) {
@@ -416,8 +420,20 @@ public class EmailListenerService {
             if (emailHandler != null) {
                 emailHandler.handle(emailMessage);
             }
+            markMessageSeen(message, config);
         } catch (Exception e) {
             log.error("[{}] 处理邮件失败: {}", config.getEmail(), e.getMessage());
+        }
+    }
+
+    private void markMessageSeen(Message message, EmailConfig config) {
+        try {
+            if (!message.isSet(Flags.Flag.SEEN)) {
+                message.setFlag(Flags.Flag.SEEN, true);
+                log.debug("[{}] 已标记邮件为已读: {}", config.getEmail(), buildMessageKey(message, config));
+            }
+        } catch (Exception e) {
+            log.warn("[{}] 标记邮件已读失败: {}", config.getEmail(), e.getMessage());
         }
     }
 
@@ -473,9 +489,9 @@ public class EmailListenerService {
         // 基本信息
         Address[] fromAddresses = message.getFrom();
         if (fromAddresses != null && fromAddresses.length > 0) {
-            builder.from(fromAddresses[0].toString());
+            builder.from(formatAddress(fromAddresses[0]));
             if (fromAddresses[0] instanceof InternetAddress) {
-                builder.fromName(((InternetAddress) fromAddresses[0]).getPersonal());
+                builder.fromName(decodeMimeText(((InternetAddress) fromAddresses[0]).getPersonal()));
             }
         }
 
@@ -486,7 +502,7 @@ public class EmailListenerService {
         if (toAddresses != null) {
             List<String> toList = new ArrayList<>();
             for (Address addr : toAddresses) {
-                toList.add(addr.toString());
+                toList.add(formatAddress(addr));
             }
             builder.to(toList);
         }
@@ -496,7 +512,7 @@ public class EmailListenerService {
         if (ccAddresses != null) {
             List<String> ccList = new ArrayList<>();
             for (Address addr : ccAddresses) {
-                ccList.add(addr.toString());
+                ccList.add(formatAddress(addr));
             }
             builder.cc(ccList);
         }
@@ -519,6 +535,24 @@ public class EmailListenerService {
         parseContent(message, builder);
 
         return builder.build();
+    }
+
+    private String formatAddress(Address address) {
+        if (address instanceof InternetAddress internetAddress) {
+            return internetAddress.toUnicodeString();
+        }
+        return decodeMimeText(address == null ? null : address.toString());
+    }
+
+    private String decodeMimeText(String text) {
+        if (text == null) {
+            return null;
+        }
+        try {
+            return MimeUtility.decodeText(text);
+        } catch (Exception e) {
+            return text;
+        }
     }
 
     /**

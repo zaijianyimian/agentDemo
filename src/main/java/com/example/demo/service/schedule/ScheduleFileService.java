@@ -3,6 +3,7 @@ package com.example.demo.service.schedule;
 import com.example.demo.entity.ScheduleEvent;
 import com.example.demo.properties.ScheduleProperties;
 import jakarta.annotation.PostConstruct;
+import jakarta.mail.internet.MimeUtility;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -97,8 +99,9 @@ public class ScheduleFileService {
             content.append("**更新时间**: ").append(java.time.LocalDateTime.now().format(TIME_FORMATTER)).append("\n\n");
             content.append("---\n\n");
 
-            for (int i = 0; i < events.size(); i++) {
-                ScheduleEvent event = events.get(i);
+            List<ScheduleEvent> sortedEvents = sortEventsByTime(events);
+            for (int i = 0; i < sortedEvents.size(); i++) {
+                ScheduleEvent event = sortedEvents.get(i);
                 content.append("## ").append(i + 1).append(". ").append(event.getTitle()).append("\n\n");
 
                 if (event.getEventTime() != null) {
@@ -111,7 +114,7 @@ public class ScheduleFileService {
                     content.append("- **描述**: ").append(event.getDescription()).append("\n");
                 }
                 if (event.getSourceEmail() != null && !event.getSourceEmail().isEmpty()) {
-                    content.append("- **来源邮件**: ").append(event.getSourceEmail()).append("\n");
+                    content.append("- **来源邮件**: ").append(formatSourceEmail(event.getSourceEmail())).append("\n");
                 }
                 content.append("\n");
             }
@@ -139,11 +142,12 @@ public class ScheduleFileService {
             content.append("**生成时间**: ").append(java.time.LocalDateTime.now().format(TIME_FORMATTER)).append("\n\n");
             content.append("---\n\n");
 
-            if (events.isEmpty()) {
+            List<ScheduleEvent> sortedEvents = sortEventsByTime(events);
+            if (sortedEvents.isEmpty()) {
                 content.append("暂无日程安排。\n");
             } else {
-                for (int i = 0; i < events.size(); i++) {
-                    ScheduleEvent event = events.get(i);
+                for (int i = 0; i < sortedEvents.size(); i++) {
+                    ScheduleEvent event = sortedEvents.get(i);
                     content.append("## ").append(i + 1).append(". ").append(event.getTitle()).append("\n\n");
 
                     if (event.getEventTime() != null) {
@@ -156,7 +160,7 @@ public class ScheduleFileService {
                         content.append("- **描述**: ").append(event.getDescription()).append("\n");
                     }
                     if (event.getSourceEmail() != null && !event.getSourceEmail().isEmpty()) {
-                        content.append("- **来源邮件**: ").append(event.getSourceEmail()).append("\n");
+                        content.append("- **来源邮件**: ").append(formatSourceEmail(event.getSourceEmail())).append("\n");
                     }
                     content.append("\n");
                 }
@@ -190,12 +194,32 @@ public class ScheduleFileService {
             sb.append("- **描述**: ").append(event.getDescription()).append("\n");
         }
         if (event.getSourceEmail() != null && !event.getSourceEmail().isEmpty()) {
-            sb.append("- **来源邮件**: ").append(event.getSourceEmail()).append("\n");
+            sb.append("- **来源邮件**: ").append(formatSourceEmail(event.getSourceEmail())).append("\n");
         }
 
         sb.append("\n---\n\n");
 
         return sb.toString();
+    }
+
+    private List<ScheduleEvent> sortEventsByTime(List<ScheduleEvent> events) {
+        return events.stream()
+                .sorted(Comparator
+                        .comparing(ScheduleEvent::getEventTime, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(ScheduleEvent::getCreateTime, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(ScheduleEvent::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+    }
+
+    private String formatSourceEmail(String sourceEmail) {
+        if (sourceEmail == null || sourceEmail.isBlank()) {
+            return sourceEmail;
+        }
+        try {
+            return MimeUtility.decodeText(sourceEmail);
+        } catch (Exception e) {
+            return sourceEmail;
+        }
     }
 
     /**

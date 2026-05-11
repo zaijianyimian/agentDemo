@@ -86,6 +86,7 @@ public class EmailProcessingService implements EmailListenerService.EmailHandler
             if (event.getStatus() == null) event.setStatus("pending");
             if (event.getReminderEnabled() == null) event.setReminderEnabled(true);
 
+            logScheduleConflicts(event);
             scheduleEventMapper.insert(event);
             log.info("日程已保存: {} - {}", event.getTitle(), event.getEventTime());
 
@@ -103,6 +104,19 @@ public class EmailProcessingService implements EmailListenerService.EmailHandler
 
         } catch (Exception e) {
             log.error("处理邮件失败: {}", e.getMessage(), e);
+        }
+    }
+
+    private void logScheduleConflicts(ScheduleEvent event) {
+        if (event == null || event.getEventTime() == null) {
+            return;
+        }
+        Long conflictCount = scheduleEventMapper.selectCount(new QueryWrapper<ScheduleEvent>()
+                .eq("event_time", event.getEventTime())
+                .ne("status", "cancelled"));
+        if (conflictCount != null && conflictCount > 0) {
+            log.info("检测到 {} 条同时间日程，默认继续添加，由用户判定优先级: {} - {}",
+                    conflictCount, event.getTitle(), event.getEventTime());
         }
     }
 
