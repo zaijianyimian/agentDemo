@@ -329,7 +329,8 @@ const loadConfigs = async () => {
     const statusPayload = parseObjectPayload(statusRes)
     listenerStatus.value = {}
     for (const [key, value] of Object.entries(statusPayload)) {
-      listenerStatus.value[Number(key)] = value === '已连接'
+      const item = value as any
+      listenerStatus.value[Number(key)] = item === '已连接' || item?.connected === true || item?.status === '已连接'
     }
   } catch (error) {
     message.error('加载失败')

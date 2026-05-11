@@ -347,7 +347,8 @@ const doStreamSummary = async () => {
 
     for (const line of lines) {
       if (line.startsWith('data:')) {
-        const data = line.slice(5).trim()
+        let data = line.slice(5)
+        if (data.startsWith(' ')) data = data.slice(1)
         if (data === '[DONE]') {
           continue
         }
@@ -404,11 +405,14 @@ const doStreamChat = async () => {
 
     for (const line of lines) {
       if (line.startsWith('data:')) {
-        const data = line.slice(5).trim()
+        let data = line.slice(5)
+        if (data.startsWith(' ')) data = data.slice(1)
         if (data && data !== '[DONE]') {
           try {
             const parsed = JSON.parse(data)
-            chatAnswer.value += parsed.content || parsed.text || data
+            if (!parsed.isComplete && !parsed.complete) {
+              chatAnswer.value += parsed.content || parsed.text || data
+            }
           } catch {
             chatAnswer.value += data
           }

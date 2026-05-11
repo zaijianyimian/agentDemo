@@ -361,6 +361,37 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- 会话消息详情 -->
+    <Teleport to="body">
+      <div v-if="showSessionMessages" class="modal-overlay" @click.self="showSessionMessages = false">
+        <div class="modal-card session-modal">
+          <div class="modal-header">
+            <h3>{{ selectedSessionId }}</h3>
+            <button class="modal-close" @click="showSessionMessages = false">
+              <n-icon size="18"><CloseOutline /></n-icon>
+            </button>
+          </div>
+          <div class="session-message-list">
+            <div v-if="loadingSessionMessages" class="chat-empty">正在加载消息...</div>
+            <div
+              v-for="(item, index) in sessionMessages"
+              :key="`${item.sender}-${item.messageTime || index}`"
+              class="session-message"
+            >
+              <div class="session-message-meta">
+                <span>{{ item.sender || '未知发送者' }}</span>
+                <time>{{ formatMessageTime(item.messageTime || item.createTime) }}</time>
+              </div>
+              <p>{{ item.content }}</p>
+            </div>
+            <div v-if="!loadingSessionMessages && sessionMessages.length === 0" class="chat-empty">
+              暂无消息
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -387,7 +418,7 @@ import {
   AnalyticsOutline,
   RefreshOutline
 } from '@vicons/ionicons5'
-import axios from 'axios'
+import api from '@/services/api'
 
 // Types
 interface ChatImportResult {
@@ -414,6 +445,14 @@ interface SessionRow {
   platform: string
   messageCount: number
   createTime: string
+}
+
+interface ImportedChatMessage {
+  sender?: string
+  content: string
+  messageTime?: string
+  createTime?: string
+  platform?: string
 }
 
 // State
@@ -447,6 +486,10 @@ const chatMessages = ref<{ role: string; content: string }[]>([])
 const chatInput = ref('')
 const chatting = ref(false)
 const chatMessagesRef = ref<HTMLElement | null>(null)
+const showSessionMessages = ref(false)
+const loadingSessionMessages = ref(false)
+const selectedSessionId = ref('')
+const sessionMessages = ref<ImportedChatMessage[]>([])
 
 // Constants
 const tabs = [
@@ -527,7 +570,7 @@ const uploadFile = async (file: File) => {
 
   try {
     progressWidth.value = '60%'
-    const res = await axios.post('/api/chatimport/import', formData, {
+    const res = await api.post('/chatimport/import', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
     progressWidth.value = '100%'
@@ -559,13 +602,13 @@ const loadSessions = async () => {
   loadingSessions.value = true
   try {
     const params = filterPlatform.value ? { platform: filterPlatform.value } : {}
-    const res = await axios.get('/api/chatimport/sessions', { params })
+    const res = await api.get('/chatimport/sessions', { params })
     if (res.data.success) {
       const sessionIds = res.data.data as string[]
       const details = await Promise.all(
         sessionIds.slice(0, 50).map(async (id) => {
           try {
-            const msgRes = await axios.get(`/api/chatimport/session/${encodeURIComponent(id)}/messages`)
+            const msgRes = await api.get(`/chatimport/session/${encodeURIComponent(id)}/messages`)
             const messages = msgRes.data.data || []
             return {
               sessionId: id,
@@ -588,19 +631,25 @@ const loadSessions = async () => {
 }
 
 const viewSessionMessages = async (sessionId: string) => {
+  selectedSessionId.value = sessionId
+  sessionMessages.value = []
+  showSessionMessages.value = true
+  loadingSessionMessages.value = true
   try {
-    const res = await axios.get(`/api/chatimport/session/${encodeURIComponent(sessionId)}/messages`)
+    const res = await api.get(`/chatimport/session/${encodeURIComponent(sessionId)}/messages`)
     if (res.data.success) {
-      message.info(`会话包含 ${res.data.data.length} 条消息`)
+      sessionMessages.value = res.data.data || []
     }
   } catch {
     message.error('加载会话消息失败')
+  } finally {
+    loadingSessionMessages.value = false
   }
 }
 
 const deleteSession = async (sessionId: string) => {
   try {
-    await axios.delete(`/api/chatimport/session/${encodeURIComponent(sessionId)}`)
+    await api.delete(`/chatimport/session/${encodeURIComponent(sessionId)}`)
     message.success('会话已删除')
     loadSessions()
   } catch {
@@ -611,7 +660,7 @@ const deleteSession = async (sessionId: string) => {
 // Assistant management
 const loadAssistants = async () => {
   try {
-    const res = await axios.get('/api/chatimport/assistants')
+    const res = await api.get('/chatimport/assistants')
     if (res.data.success) {
       assistants.value = res.data.data
     }
@@ -649,7 +698,9 @@ const createAssistant = async () => {
     params.append('platform', assistantForm.value.platform)
     assistantForm.value.sessionIds.forEach(id => params.append('sessionIds', id))
 
-    await axios.post('/api/chatimport/assistant', params)
+    await api.post('/chatimport/assistant', params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
     message.success('助手创建成功，正在训练...')
     showCreateAssistant.value = false
     loadAssistants()
@@ -663,7 +714,7 @@ const createAssistant = async () => {
 const toggleAssistant = async (assistant: VirtualAssistant) => {
   assistant.enabled = !assistant.enabled
   try {
-    await axios.put('/api/chatimport/assistant/' + assistant.id, null, {
+    await api.put('/chatimport/assistant/' + assistant.id, null, {
       params: { enabled: assistant.enabled }
     })
     message.success(assistant.enabled ? '已启用' : '已禁用')
@@ -675,7 +726,7 @@ const toggleAssistant = async (assistant: VirtualAssistant) => {
 
 const deleteAssistant = async (id: number) => {
   try {
-    await axios.delete('/api/chatimport/assistant/' + id)
+    await api.delete('/chatimport/assistant/' + id)
     message.success('助手已删除')
     loadAssistants()
   } catch {
@@ -685,7 +736,7 @@ const deleteAssistant = async (id: number) => {
 
 const analyzePersonality = async (id: number) => {
   try {
-    await axios.post('/api/chatimport/assistant/' + id + '/analyze')
+    await api.post('/chatimport/assistant/' + id + '/analyze')
     message.success('人格分析完成')
     loadAssistants()
   } catch {
@@ -707,7 +758,7 @@ const sendChatMessage = async () => {
   chatInput.value = ''
   chatting.value = true
   try {
-    const res = await axios.post('/api/chatimport/assistant/' + chatAssistant.value.id + '/chat',
+    const res = await api.post('/chatimport/assistant/' + chatAssistant.value.id + '/chat',
       chatMessages.value.slice(-10),
       { params: { message: userMessage } }
     )
@@ -726,6 +777,13 @@ const sendChatMessage = async () => {
       }
     })
   }
+}
+
+const formatMessageTime = (value?: string) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', { hour12: false })
 }
 
 // Lifecycle
@@ -1591,6 +1649,51 @@ textarea.form-input {
   height: 480px;
   display: flex;
   flex-direction: column;
+}
+
+.session-modal {
+  width: min(720px, 92vw);
+  max-height: min(720px, 86vh);
+  display: flex;
+  flex-direction: column;
+}
+
+.session-message-list {
+  flex: 1;
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.session-message {
+  padding: 12px 14px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+}
+
+.session-message-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.session-message-meta time {
+  flex-shrink: 0;
+}
+
+.session-message p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .chat-header-left {

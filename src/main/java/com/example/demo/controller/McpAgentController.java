@@ -1,13 +1,16 @@
 package com.example.demo.controller;
 
+import com.example.demo.service.chat.ChatHistoryService;
 import com.example.demo.service.mcp.McpAgentService;
 import jakarta.annotation.Resource;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * MCP Agent 聊天控制器
@@ -22,6 +25,9 @@ public class McpAgentController {
 
     @Resource(name = "mcpAgentStreamingService")
     private McpAgentService mcpAgentStreamingService;
+
+    @Resource
+    private ChatHistoryService chatHistoryService;
 
     /**
      * 普通对话 - AI 可自动调用工具
@@ -56,7 +62,15 @@ public class McpAgentController {
     public String chatWithMemory(
             @PathVariable String sessionId,
             @RequestParam String message) {
-        return mcpAgentService.chatWithMemory(sessionId, withRuntimeContext(message));
+        Long chatSessionId = parseSessionId(sessionId);
+        if (chatSessionId != null) {
+            chatHistoryService.addMessage(chatSessionId, "user", message, null);
+        }
+        String response = mcpAgentService.chatWithMemory(sessionId, withRuntimeContext(message));
+        if (chatSessionId != null) {
+            chatHistoryService.addMessage(chatSessionId, "assistant", response, "mcp-agent");
+        }
+        return response;
     }
 
     /**
@@ -66,8 +80,11 @@ public class McpAgentController {
      * @return SSE 流式响应
      */
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> chatStream(@RequestParam String message) {
-        return mcpAgentStreamingService.chatStream(withRuntimeContext(message));
+    public Flux<ServerSentEvent<String>> chatStream(@RequestParam String message) {
+        return mcpAgentStreamingService.chatStream(withRuntimeContext(message))
+                .map(chunk -> ServerSentEvent.<String>builder()
+                        .data(chunk)
+                        .build());
     }
 
     /**
@@ -78,10 +95,24 @@ public class McpAgentController {
      * @return SSE 流式响应
      */
     @GetMapping(value = "/chat/stream/{sessionId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> chatStreamWithMemory(
+    public Flux<ServerSentEvent<String>> chatStreamWithMemory(
             @PathVariable String sessionId,
             @RequestParam String message) {
-        return mcpAgentStreamingService.chatStreamWithMemory(sessionId, withRuntimeContext(message));
+        Long chatSessionId = parseSessionId(sessionId);
+        if (chatSessionId != null) {
+            chatHistoryService.addMessage(chatSessionId, "user", message, null);
+        }
+        AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
+        return mcpAgentStreamingService.chatStreamWithMemory(sessionId, withRuntimeContext(message))
+                .doOnNext(chunk -> fullResponse.get().append(chunk))
+                .doOnComplete(() -> {
+                    if (chatSessionId != null) {
+                        chatHistoryService.addMessage(chatSessionId, "assistant", fullResponse.get().toString(), "mcp-agent");
+                    }
+                })
+                .map(chunk -> ServerSentEvent.<String>builder()
+                        .data(chunk)
+                        .build());
     }
 
     /**
@@ -100,5 +131,13 @@ public class McpAgentController {
                 LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
                 message
         );
+    }
+
+    private Long parseSessionId(String sessionId) {
+        try {
+            return Long.parseLong(sessionId);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 }

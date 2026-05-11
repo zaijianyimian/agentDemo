@@ -145,6 +145,7 @@
             />
             <button
               class="voice-btn"
+              :class="{ active: isVoiceActive }"
               title="语音输入"
               @click="toggleVoiceInput"
             >
@@ -245,25 +246,19 @@ const chatModes = [
 const parseSseEvents = (rawEvent: string): string[] => {
   const lines = rawEvent.replace(/\r/g, '').split('\n')
   const chunks: string[] = []
-  let currentData = ''
+  const dataLines: string[] = []
   for (const line of lines) {
     if (line.startsWith('data:')) {
-      const data = line.slice(5).trim()
+      let data = line.slice(5)
+      if (data.startsWith(' ')) data = data.slice(1)
       if (data === '[DONE]') continue
-      // Each data line is a separate chunk for typewriter effect
-      if (currentData) chunks.push(currentData)
-      currentData = data
-    } else if (!line.startsWith(':') && !line.startsWith('event:') && !line.startsWith('id:') && !line.startsWith('retry:') && line.trim()) {
-      // Non-standard SSE: content without data prefix
-      currentData += line
-    } else if (!line.trim() && currentData) {
-      // Empty line signals end of current data block
-      chunks.push(currentData)
-      currentData = ''
+      dataLines.push(data)
+    } else if (!line.startsWith(':') && !line.startsWith('event:') && !line.startsWith('id:') && !line.startsWith('retry:') && line) {
+      dataLines.push(line)
     }
   }
-  // Don't forget remaining data
-  if (currentData) chunks.push(currentData)
+  const data = dataLines.join('\n')
+  if (data) chunks.push(data)
   return chunks
 }
 
@@ -500,7 +495,7 @@ const sendMessage = async () => {
   animateNewMessage(messages.value.length - 1)
 
   try {
-    if (chatMode.value === 'stream') {
+    if (chatMode.value === 'stream' || chatMode.value === 'mcp') {
       await streamChat(queryText, assistantMessage)
     } else {
       await normalChat(queryText, assistantMessage)
@@ -543,7 +538,7 @@ const animateNewMessage = (index: number) => {
 const streamChat = async (query: string, messageObj: ChatMessage) => {
   abortController = new AbortController()
   const apiPath = chatMode.value === 'mcp'
-    ? `/api/mcp/agent/chat/stream?message=${encodeURIComponent(query)}`
+    ? `/api/mcp/agent/chat/stream/${currentSession.value!.id}?message=${encodeURIComponent(query)}`
     : `/api/chat/stream/session?message=${encodeURIComponent(query)}&sessionId=${currentSession.value!.id}`
 
   try {
@@ -654,16 +649,48 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 }
 
-// 语音输入（占位）
+let speechRecognition: any = null
 const isVoiceActive = ref(false)
+
 const toggleVoiceInput = () => {
-  isVoiceActive.value = !isVoiceActive.value
-  if (isVoiceActive.value) {
-    message.info('语音输入功能开发中...')
-    setTimeout(() => {
-      isVoiceActive.value = false
-    }, 1500)
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+  if (!SpeechRecognition) {
+    message.warning('当前浏览器不支持语音输入')
+    return
   }
+
+  if (isVoiceActive.value && speechRecognition) {
+    speechRecognition.stop()
+    return
+  }
+
+  speechRecognition = new SpeechRecognition()
+  speechRecognition.lang = 'zh-CN'
+  speechRecognition.interimResults = true
+  speechRecognition.continuous = false
+  isVoiceActive.value = true
+
+  speechRecognition.onresult = (event: any) => {
+    const transcript = Array.from(event.results)
+      .map((result: any) => result[0]?.transcript || '')
+      .join('')
+      .trim()
+    if (transcript) {
+      inputText.value = transcript
+      nextTick(autoResize)
+    }
+  }
+
+  speechRecognition.onerror = () => {
+    message.error('语音识别失败，请检查麦克风权限')
+    isVoiceActive.value = false
+  }
+
+  speechRecognition.onend = () => {
+    isVoiceActive.value = false
+  }
+
+  speechRecognition.start()
 }
 
 // 滚动到底部
@@ -675,6 +702,7 @@ const scrollToBottom = () => {
 
 onUnmounted(() => {
   stopStreaming()
+  speechRecognition?.stop?.()
   // 清理资源
   messageRefs.value.clear()
   abortController = null
@@ -1401,6 +1429,11 @@ onMounted(async () => {
 .voice-btn:hover {
   background: var(--warm-100);
   color: var(--text-primary);
+}
+
+.voice-btn.active {
+  background: var(--warm-200);
+  color: var(--warm-700);
 }
 
 /* Mode pills - warm style */

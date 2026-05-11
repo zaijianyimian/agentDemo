@@ -17,6 +17,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -84,7 +85,7 @@ public class SearchController {
      * 先发送搜索结果，再流式发送AI总结
      */
     @GetMapping(value = "/summary", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<Flux<String>> searchWithSummaryStream(@RequestParam("query") String query) {
+    public ResponseEntity<Flux<ServerSentEvent<String>>> searchWithSummaryStream(@RequestParam("query") String query) {
         long startTime = System.currentTimeMillis();
 
         // 1. 执行搜索
@@ -108,34 +109,44 @@ public class SearchController {
         String searchContext = buildSearchContext(searchResult);
 
         // 3. 先发送搜索结果
-        Flux<String> searchResultsFlux = Flux.defer(() -> {
+        Flux<ServerSentEvent<String>> searchResultsFlux = Flux.defer(() -> {
             try {
                 SearchSummaryResponse response = SearchSummaryResponse.builder()
                         .query(query)
                         .searchResults(searchResult.getResults())
                         .aiSummary(null)
                         .build();
-                return Flux.just(objectMapper.writeValueAsString(response));
+                return Flux.just(ServerSentEvent.<String>builder()
+                        .data(objectMapper.writeValueAsString(response))
+                        .build());
             } catch (JsonProcessingException e) {
-                return Flux.just("{\"error\":\"serialization error\"}");
+                return Flux.just(ServerSentEvent.<String>builder()
+                        .data("{\"error\":\"serialization error\"}")
+                        .build());
             }
         });
 
         // 4. 流式发送AI总结
-        Flux<String> summaryFlux = enhancedChatService.streamChatWithSearch(
+        Flux<ServerSentEvent<String>> summaryFlux = enhancedChatService.streamChatWithSearch(
                 "请用简洁的语言总结以下搜索结果的关键信息：" + query,
                 searchContext
         ).map(chunk -> {
             try {
                 SummaryChunk summaryChunk = new SummaryChunk(chunk, false);
-                return objectMapper.writeValueAsString(summaryChunk);
+                return ServerSentEvent.<String>builder()
+                        .data(objectMapper.writeValueAsString(summaryChunk))
+                        .build();
             } catch (JsonProcessingException e) {
-                return "{\"error\":\"serialization error\"}";
+                return ServerSentEvent.<String>builder()
+                        .data("{\"error\":\"serialization error\"}")
+                        .build();
             }
         });
 
         // 5. 发送完成标记
-        Flux<String> doneFlux = Flux.just("[DONE]");
+        Flux<ServerSentEvent<String>> doneFlux = Flux.just(ServerSentEvent.<String>builder()
+                .data("[DONE]")
+                .build());
 
         // 6. 合并流
         return ResponseEntity.ok()
@@ -200,7 +211,7 @@ public class SearchController {
      * 带搜索的流式聊天接口 - 先搜索再流式回答
      */
     @GetMapping("/chat/stream")
-    public ResponseEntity<Flux<String>> chatWithSearchStream(@RequestParam("message") String message) {
+    public ResponseEntity<Flux<ServerSentEvent<String>>> chatWithSearchStream(@RequestParam("message") String message) {
         // 1. 执行搜索
         SearchResult.ListResult searchResult = webSearchService.search(message);
 
@@ -223,13 +234,17 @@ public class SearchController {
         // 3. 流式回答
         AtomicReference<StringBuilder> contentBuilder = new AtomicReference<>(new StringBuilder());
 
-        Flux<String> stream = enhancedChatService.streamChatWithSearch(message, searchContext)
+        Flux<ServerSentEvent<String>> stream = enhancedChatService.streamChatWithSearch(message, searchContext)
                 .map(chunk -> {
                     contentBuilder.get().append(chunk);
                     try {
-                        return objectMapper.writeValueAsString(ChatResponse.contentChunk(chunk));
+                        return ServerSentEvent.<String>builder()
+                                .data(objectMapper.writeValueAsString(ChatResponse.contentChunk(chunk)))
+                                .build();
                     } catch (JsonProcessingException e) {
-                        return "{\"error\":\"serialization error\"}";
+                        return ServerSentEvent.<String>builder()
+                                .data("{\"error\":\"serialization error\"}")
+                                .build();
                     }
                 })
                 .concatWith(Mono.fromSupplier(() -> {
@@ -244,9 +259,13 @@ public class SearchController {
                                 .summary(analysis.getSummary())
                                 .isComplete(true)
                                 .build();
-                        return objectMapper.writeValueAsString(finalResponse);
+                        return ServerSentEvent.<String>builder()
+                                .data(objectMapper.writeValueAsString(finalResponse))
+                                .build();
                     } catch (JsonProcessingException e) {
-                        return "{\"error\":\"analysis error\"}";
+                        return ServerSentEvent.<String>builder()
+                                .data("{\"error\":\"analysis error\"}")
+                                .build();
                     }
                 }));
 

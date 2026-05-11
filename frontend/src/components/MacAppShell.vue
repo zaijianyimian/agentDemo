@@ -188,7 +188,7 @@ import {
 import { useMacNavStore } from '@/stores/mac-nav'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
-import { authService } from '@/services/api'
+import { authService, inboxService, modelService, searchService, settingsService } from '@/services/api'
 import MacGlobalRail from '@/components/MacGlobalRail.vue'
 import MacFunctionalPane from '@/components/MacFunctionalPane.vue'
 import MacControlCenter from '@/components/MacControlCenter.vue'
@@ -243,17 +243,55 @@ const closeInspectorPanel = () => {
   macNavStore.closeInspector()
 }
 
-// System status (mock for now, could be fetched from API)
+type ServiceStatus = 'active' | 'inactive' | 'error'
+
+// System status
 const systemStatus = ref<{
-  model: 'active' | 'inactive' | 'error'
-  qdrant: 'active' | 'inactive' | 'error'
-  search: 'active' | 'inactive' | 'error'
+  model: ServiceStatus
+  qdrant: ServiceStatus
+  search: ServiceStatus
 }>({
-  model: 'active',
-  qdrant: 'active',
+  model: 'inactive',
+  qdrant: 'inactive',
   search: 'inactive'
 })
 const notificationCount = ref(0)
+let statusRefreshTimer: number | undefined
+
+const loadSystemStatus = async () => {
+  const [modelResult, qdrantResult, searchResult, inboxResult] = await Promise.allSettled([
+    modelService.health(),
+    settingsService.getAll(),
+    searchService.test(),
+    inboxService.summary(18)
+  ])
+
+  if (modelResult.status === 'fulfilled' && modelResult.value.success) {
+    const models = modelResult.value.data || []
+    systemStatus.value.model = models.some((item: Record<string, any>) =>
+      item.isAvailable === true
+      || item.available === true
+      || item.healthAvailable === true
+      || item.status === 'available'
+    ) ? 'active' : 'inactive'
+  } else {
+    systemStatus.value.model = 'error'
+  }
+
+  if (qdrantResult.status === 'fulfilled' && qdrantResult.value.success) {
+    const qdrant = qdrantResult.value.data?.qdrant || {}
+    systemStatus.value.qdrant = qdrant.host || qdrant.port ? 'active' : 'inactive'
+  } else {
+    systemStatus.value.qdrant = 'error'
+  }
+
+  systemStatus.value.search =
+    searchResult.status === 'fulfilled' && searchResult.value.success ? 'active' : 'error'
+
+  if (inboxResult.status === 'fulfilled' && inboxResult.value.success) {
+    notificationCount.value = inboxResult.value.data?.items?.length || 0
+  }
+}
 
 // Command palette
 const showCommandPalette = ref(false)
@@ -434,10 +472,15 @@ onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
   // Apply theme to document
   document.documentElement.setAttribute('data-theme', actualTheme.value)
+  loadSystemStatus()
+  statusRefreshTimer = window.setInterval(loadSystemStatus, 60000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  if (statusRefreshTimer) {
+    window.clearInterval(statusRefreshTimer)
+  }
 })
 
 // Watch theme changes

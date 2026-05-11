@@ -13,6 +13,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * MCP Agent 配置
  * 配置支持动态工具调用的 AI 服务
@@ -23,6 +26,7 @@ import org.springframework.context.annotation.Configuration;
 public class McpAgentConfiguration {
 
     private final McpToolAdapter mcpToolAdapter;
+    private final Map<Object, MessageWindowChatMemory> chatMemories = new ConcurrentHashMap<>();
 
     /**
      * 动态工具提供者
@@ -54,7 +58,8 @@ public class McpAgentConfiguration {
         return AiServices.builder(McpAgentService.class)
                 .chatModel(chatModel)
                 .toolProvider(toolProvider)
-                .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(10))
+                .chatMemoryProvider(memoryId -> chatMemories.computeIfAbsent(memoryId,
+                        ignored -> MessageWindowChatMemory.withMaxMessages(10)))
                 .build();
     }
 
@@ -68,7 +73,8 @@ public class McpAgentConfiguration {
         return AiServices.builder(McpAgentService.class)
                 .streamingChatModel(streamingChatModel)
                 .toolProvider(toolProvider)
-                .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(10))
+                .chatMemoryProvider(memoryId -> chatMemories.computeIfAbsent(memoryId,
+                        ignored -> MessageWindowChatMemory.withMaxMessages(10)))
                 .build();
     }
 }

@@ -826,7 +826,7 @@ const loadAllSettings = async () => {
   } catch (error: any) {
     console.error('加载设置失败', error)
     if (error.response?.status === 500) {
-      message.warning('请先执行数据库建表SQL: src/main/resources/sql/system_settings.sql')
+      message.warning('请先确认数据库初始化脚本已执行: src/main/resources/sql/schema_init.sql')
     }
   }
 }

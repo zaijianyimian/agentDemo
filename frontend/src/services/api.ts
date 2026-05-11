@@ -983,6 +983,11 @@ export const modelService = {
   available: async (): Promise<ApiResponse<AiModelConfig[]>> => {
     const response = await api.get('/model/available')
     return response.data
+  },
+
+  health: async (): Promise<ApiResponse<Array<Record<string, any>>>> => {
+    const response = await api.get('/model/health')
+    return response.data
   }
 }
 
