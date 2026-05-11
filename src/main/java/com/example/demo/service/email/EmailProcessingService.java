@@ -6,6 +6,7 @@ import com.example.demo.entity.ScheduleEvent;
 import com.example.demo.mapper.ScheduleEventMapper;
 import com.example.demo.service.chat.QwenChatService;
 import com.example.demo.service.schedule.ScheduleFileService;
+import com.example.demo.service.schedule.conflict.ScheduleConflictService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -29,18 +30,21 @@ public class EmailProcessingService implements EmailListenerService.EmailHandler
     private final ObjectMapper objectMapper;
     private final EmailListenerService emailListenerService;
     private final ScheduleFileService scheduleFileService;
+    private final ScheduleConflictService scheduleConflictService;
 
     public EmailProcessingService(
             QwenChatService qwenChatService,
             ScheduleEventMapper scheduleEventMapper,
             ObjectMapper objectMapper,
             EmailListenerService emailListenerService,
-            ScheduleFileService scheduleFileService) {
+            ScheduleFileService scheduleFileService,
+            ScheduleConflictService scheduleConflictService) {
         this.qwenChatService = qwenChatService;
         this.scheduleEventMapper = scheduleEventMapper;
         this.objectMapper = objectMapper;
         this.emailListenerService = emailListenerService;
         this.scheduleFileService = scheduleFileService;
+        this.scheduleConflictService = scheduleConflictService;
     }
 
     /**
@@ -86,7 +90,7 @@ public class EmailProcessingService implements EmailListenerService.EmailHandler
             if (event.getStatus() == null) event.setStatus("pending");
             if (event.getReminderEnabled() == null) event.setReminderEnabled(true);
 
-            logScheduleConflicts(event);
+            scheduleConflictService.reviewBeforeSave(event);
             scheduleEventMapper.insert(event);
             log.info("日程已保存: {} - {}", event.getTitle(), event.getEventTime());
 
@@ -104,19 +108,6 @@ public class EmailProcessingService implements EmailListenerService.EmailHandler
 
         } catch (Exception e) {
             log.error("处理邮件失败: {}", e.getMessage(), e);
-        }
-    }
-
-    private void logScheduleConflicts(ScheduleEvent event) {
-        if (event == null || event.getEventTime() == null) {
-            return;
-        }
-        Long conflictCount = scheduleEventMapper.selectCount(new QueryWrapper<ScheduleEvent>()
-                .eq("event_time", event.getEventTime())
-                .ne("status", "cancelled"));
-        if (conflictCount != null && conflictCount > 0) {
-            log.info("检测到 {} 条同时间日程，默认继续添加，由用户判定优先级: {} - {}",
-                    conflictCount, event.getTitle(), event.getEventTime());
         }
     }
 

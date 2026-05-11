@@ -5,6 +5,7 @@ import com.example.demo.entity.ScheduleEvent;
 import com.example.demo.mapper.ScheduleEventMapper;
 import com.example.demo.service.chat.QwenChatService;
 import com.example.demo.service.schedule.ScheduleFileService;
+import com.example.demo.service.schedule.conflict.ScheduleConflictService;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -23,6 +24,7 @@ class EmailProcessingServiceTest {
         ScheduleEventMapper scheduleEventMapper = mock(ScheduleEventMapper.class);
         EmailListenerService emailListenerService = mock(EmailListenerService.class);
         ScheduleFileService scheduleFileService = mock(ScheduleFileService.class);
+        ScheduleConflictService scheduleConflictService = mock(ScheduleConflictService.class);
 
         when(chatService.complete(any())).thenReturn("""
                 {
@@ -45,7 +47,8 @@ class EmailProcessingServiceTest {
                 scheduleEventMapper,
                 new com.fasterxml.jackson.databind.ObjectMapper(),
                 emailListenerService,
-                scheduleFileService
+                scheduleFileService,
+                scheduleConflictService
         );
 
         service.handle(EmailMessage.builder()
