@@ -5,6 +5,7 @@ import com.example.demo.entity.EmailConfig;
 import com.example.demo.mapper.EmailConfigMapper;
 import com.example.demo.service.email.EmailAuthConfigService;
 import com.example.demo.service.email.EmailListenerService;
+import com.example.demo.service.email.EmailListenerScheduleService;
 import jakarta.annotation.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,9 @@ public class EmailController {
 
     @Resource
     private EmailListenerService emailListenerService;
+
+    @Resource
+    private EmailListenerScheduleService emailListenerScheduleService;
 
     @Resource
     private EmailAuthConfigService emailAuthConfigService;
@@ -113,6 +117,10 @@ public class EmailController {
         emailAuthConfigService.prepareForPersist(config, null);
 
         emailConfigMapper.insert(config);
+        if (Boolean.TRUE.equals(config.getEnabled())) {
+            EmailConfig saved = emailConfigMapper.selectById(config.getId());
+            emailListenerScheduleService.scheduleEnabledListener(saved);
+        }
         return ResponseEntity.ok("添加成功");
     }
 
@@ -164,6 +172,12 @@ public class EmailController {
         }
         emailAuthConfigService.prepareForPersist(config, existing);
         emailConfigMapper.updateById(config);
+        EmailConfig saved = emailConfigMapper.selectById(config.getId());
+        if (saved != null && Boolean.TRUE.equals(saved.getEnabled())) {
+            emailListenerScheduleService.scheduleEnabledListener(saved);
+        } else {
+            emailListenerScheduleService.stopAndUnschedule(config.getId());
+        }
         return ResponseEntity.ok("更新成功");
     }
 
@@ -173,7 +187,7 @@ public class EmailController {
     @DeleteMapping("/config/{id}")
     public ResponseEntity<String> deleteConfig(@PathVariable Long id) {
         // 先停止监听
-        emailListenerService.stopListener(id);
+        emailListenerScheduleService.stopAndUnschedule(id);
         // 再删除配置
         emailConfigMapper.deleteById(id);
         return ResponseEntity.ok("删除成功");
@@ -198,11 +212,14 @@ public class EmailController {
         }
 
         // 更新启用状态
-        config.setEnabled(true);
-        emailConfigMapper.updateById(config);
+        EmailConfig update = new EmailConfig();
+        update.setId(id);
+        update.setEnabled(true);
+        emailConfigMapper.updateById(update);
 
-        // 启动监听
-        emailListenerService.startListener(config);
+        // 启动或交给时间轮安排监听
+        EmailConfig saved = emailConfigMapper.selectById(id);
+        emailListenerScheduleService.scheduleEnabledListener(saved);
         return ResponseEntity.ok("已启动监听: " + config.getEmail());
     }
 
@@ -219,11 +236,13 @@ public class EmailController {
         emailAuthConfigService.decodeTransientFields(config);
 
         // 更新启用状态
-        config.setEnabled(false);
-        emailConfigMapper.updateById(config);
+        EmailConfig update = new EmailConfig();
+        update.setId(id);
+        update.setEnabled(false);
+        emailConfigMapper.updateById(update);
 
-        // 停止监听
-        emailListenerService.stopListener(id);
+        // 停止监听并取消时间轮任务
+        emailListenerScheduleService.stopAndUnschedule(id);
         return ResponseEntity.ok("已停止监听: " + config.getEmail());
     }
 
@@ -232,7 +251,7 @@ public class EmailController {
      */
     @PostMapping("/listener/reload")
     public ResponseEntity<String> reloadListeners() {
-        emailListenerService.reloadListeners();
+        emailListenerScheduleService.reloadListeners();
         return ResponseEntity.ok("已重载所有邮箱监听");
     }
 
@@ -241,7 +260,7 @@ public class EmailController {
      */
     @GetMapping("/listener/status")
     public Map<Long, Map<String, Object>> getListenerStatus() {
-        return emailListenerService.getListenerStatus();
+        return emailListenerScheduleService.getListenerStatus();
     }
 
     // ==================== 邮箱测试 ====================

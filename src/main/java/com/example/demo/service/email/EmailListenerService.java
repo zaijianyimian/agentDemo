@@ -6,7 +6,6 @@ import com.example.demo.mapper.EmailConfigMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.mail.*;
 import jakarta.mail.event.MessageCountAdapter;
@@ -77,15 +76,6 @@ public class EmailListenerService {
      */
     public void setEmailHandler(EmailHandler handler) {
         this.emailHandler = handler;
-    }
-
-    /**
-     * 应用启动时初始化邮件监听
-     */
-    @PostConstruct
-    public void init() {
-        log.info("初始化邮件监听服务...");
-        loadAndStartListeners();
     }
 
     /**
