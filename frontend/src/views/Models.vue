@@ -256,9 +256,11 @@ const testConnection = async () => {
   testLoading.value = true
   try {
     const res = await modelService.test(form.value)
-    const msg = res.data || res.message || '测试完成'
-    if (msg.includes('连接失败')) message.warning(msg)
-    else message.success(msg)
+    if (res.success) {
+      message.success(res.data || res.message || '连接成功')
+    } else {
+      message.error(res.message || '连接失败')
+    }
   } finally {
     testLoading.value = false
   }
@@ -268,6 +270,14 @@ const submitForm = async () => {
   await formRef.value?.validate()
   submitLoading.value = true
   try {
+    if (!editingModel.value) {
+      const testRes = await modelService.test(form.value)
+      if (!testRes.success) {
+        message.error(testRes.message || '连接测试失败，已取消创建')
+        return
+      }
+    }
+
     const res = editingModel.value
       ? await modelService.update(editingModel.value.id, form.value)
       : await modelService.create(form.value)
