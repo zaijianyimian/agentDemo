@@ -4,8 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.entity.EmailConfig;
 import com.example.demo.mapper.EmailConfigMapper;
 import com.example.demo.service.email.EmailAuthConfigService;
-import com.example.demo.service.email.EmailListenerService;
+import com.example.demo.service.email.EmailConnectionTestService;
 import com.example.demo.service.email.EmailListenerScheduleService;
+import com.example.demo.service.listener.ContentListenerFactory;
+import com.example.demo.service.listener.ContentListenerFactoryRegistry;
+import com.example.demo.service.listener.ListenerConnectionTester;
+import com.example.demo.service.listener.ListenerContentType;
 import jakarta.annotation.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,13 +28,22 @@ public class EmailController {
     private EmailConfigMapper emailConfigMapper;
 
     @Resource
-    private EmailListenerService emailListenerService;
-
-    @Resource
     private EmailListenerScheduleService emailListenerScheduleService;
 
     @Resource
     private EmailAuthConfigService emailAuthConfigService;
+
+    @Resource
+    private EmailConnectionTestService emailConnectionTestService;
+
+    private ListenerConnectionTester<EmailConfig, EmailConnectionTestService.EmailTestResult> emailConnectionTester;
+
+    @Resource
+    public void setListenerFactoryRegistry(ContentListenerFactoryRegistry listenerFactoryRegistry) {
+        ContentListenerFactory<EmailConfig, EmailConnectionTestService.EmailTestResult> factory =
+                listenerFactoryRegistry.get(ListenerContentType.EMAIL);
+        this.emailConnectionTester = factory.tester();
+    }
 
     // ==================== 邮箱配置管理 ====================
 
@@ -114,6 +127,12 @@ public class EmailController {
         if (config.getPollInterval() == null) {
             config.setPollInterval(30);
         }
+
+        EmailConnectionTestService.EmailTestResult testResult = emailConnectionTester.testConnection(config);
+        if (!testResult.isSuccess()) {
+            return ResponseEntity.badRequest().body(testResult.getMessage());
+        }
+
         emailAuthConfigService.prepareForPersist(config, null);
 
         emailConfigMapper.insert(config);
@@ -206,7 +225,7 @@ public class EmailController {
         }
         normalizeConfig(config);
         emailAuthConfigService.decodeTransientFields(config);
-        EmailListenerService.EmailTestResult testResult = emailListenerService.testConnection(config);
+        EmailConnectionTestService.EmailTestResult testResult = emailConnectionTester.testConnection(config);
         if (!testResult.isSuccess()) {
             return ResponseEntity.badRequest().body(testResult.getMessage());
         }
@@ -280,7 +299,7 @@ public class EmailController {
         normalizeConfig(config);
         emailAuthConfigService.decodeTransientFields(config);
 
-        EmailListenerService.EmailTestResult result = emailListenerService.testConnection(config);
+        EmailConnectionTestService.EmailTestResult result = emailConnectionTester.testConnection(config);
         return ResponseEntity.ok(Map.of(
                 "success", result.isSuccess(),
                 "message", result.getMessage(),
@@ -304,7 +323,7 @@ public class EmailController {
         }
         normalizeConfig(config);
         emailAuthConfigService.decodeTransientFields(config);
-        EmailListenerService.NetworkCheckResult result = emailListenerService.checkNetworkConnectivity(
+        EmailConnectionTestService.NetworkCheckResult result = emailConnectionTestService.checkNetworkConnectivity(
                 config.getHost(),
                 config.getPort() == null ? 993 : config.getPort(),
                 10000
@@ -325,7 +344,7 @@ public class EmailController {
     public ResponseEntity<Map<String, Object>> checkNewConfigNetwork(@RequestBody EmailConfig config) {
         normalizeConfig(config);
         emailAuthConfigService.decodeTransientFields(config);
-        EmailListenerService.NetworkCheckResult result = emailListenerService.checkNetworkConnectivity(
+        EmailConnectionTestService.NetworkCheckResult result = emailConnectionTestService.checkNetworkConnectivity(
                 config.getHost(),
                 config.getPort() == null ? 993 : config.getPort(),
                 10000
@@ -346,7 +365,7 @@ public class EmailController {
     public ResponseEntity<Map<String, Object>> testNewConfig(@RequestBody EmailConfig config) {
         normalizeConfig(config);
         emailAuthConfigService.decodeTransientFields(config);
-        EmailListenerService.EmailTestResult result = emailListenerService.testConnection(config);
+        EmailConnectionTestService.EmailTestResult result = emailConnectionTester.testConnection(config);
         return ResponseEntity.ok(Map.of(
                 "success", result.isSuccess(),
                 "message", result.getMessage(),
