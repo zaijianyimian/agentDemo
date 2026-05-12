@@ -113,7 +113,7 @@ const handleSearchClick = () => {
   padding: 8px 12px;
   background: var(--bg-card);
   border-radius: var(--radius-lg);
-  border: 2px solid var(--border-light);
+  border: 1px solid var(--border-light);
 }
 
 .status-icons {
@@ -134,7 +134,7 @@ const handleSearchClick = () => {
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .status-icon-btn:hover {
@@ -148,6 +148,10 @@ const handleSearchClick = () => {
 
 .status-icon-btn.active:hover {
   background: var(--bg-active);
+}
+
+.status-icon-btn:active {
+  transform: scale(0.92);
 }
 
 /* Active dot indicator */
@@ -200,12 +204,16 @@ const handleSearchClick = () => {
   border-radius: var(--radius-md);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .search-capsule:hover {
   background: var(--bg-elevated);
   color: var(--text-secondary);
+}
+
+.search-capsule:active {
+  transform: scale(0.98);
 }
 
 .search-placeholder {

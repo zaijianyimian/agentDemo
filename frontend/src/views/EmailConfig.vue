@@ -657,6 +657,18 @@ const saveConfig = async () => {
         ...payload
       }))
     } else {
+      const testRes = await emailService.testNewConfig(payload)
+      const testData = parseResultPayload<{
+        success: boolean
+        message: string
+        durationMs: number
+        messageCount: number
+        errorDetail: string
+      }>(testRes)
+      if (!testData?.success) {
+        message.error(testData?.message || '连接测试失败，已取消保存')
+        return
+      }
       await emailService.createConfig(payload)
     }
     message.success('保存成功')

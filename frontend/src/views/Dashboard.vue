@@ -361,10 +361,10 @@ onUnmounted(() => {
 /* Base Card Style - Warm solid instead of glass */
 .bento-card {
   background: var(--bg-card);
-  border: 2px solid var(--border-light);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   padding: 20px;
-  transition: all 0.3s var(--ease-bounce);
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
   cursor: default;
   position: relative;
   overflow: hidden;
@@ -379,11 +379,11 @@ onUnmounted(() => {
   height: 3px;
   background: var(--gradient-sunset);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity var(--transition-base);
 }
 
 .bento-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-1px);
   box-shadow: var(--shadow-lg);
   border-color: var(--primary-light);
 }
@@ -467,11 +467,11 @@ onUnmounted(() => {
   flex-shrink: 0;
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  transition: transform 0.2s var(--ease-bounce);
+  transition: transform var(--transition-fast);
 }
 
 .bento-stat:hover .stat-icon {
-  transform: scale(1.1) rotate(-5deg);
+  transform: translateY(-1px) scale(1.025);
 }
 
 .stat-icon.files { background: linear-gradient(135deg, #FB923C, #EA580C); }
@@ -534,19 +534,19 @@ onUnmounted(() => {
   gap: 8px;
   padding: 16px;
   background: var(--warm-50);
-  border: 2px solid var(--border-light);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.25s var(--ease-bounce);
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base), background-color var(--transition-base);
 }
 
 .quick-item:hover {
   background: var(--warm-100);
   border-color: var(--primary-light);
-  transform: translateY(-3px) scale(1.02);
+  transform: translateY(-1px);
   box-shadow: 0 4px 12px var(--primary-glow);
 }
 

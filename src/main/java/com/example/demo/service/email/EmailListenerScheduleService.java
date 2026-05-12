@@ -3,6 +3,10 @@ package com.example.demo.service.email;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.entity.EmailConfig;
 import com.example.demo.mapper.EmailConfigMapper;
+import com.example.demo.service.listener.ContentListenerFactory;
+import com.example.demo.service.listener.ContentListenerFactoryRegistry;
+import com.example.demo.service.listener.ListenerContentType;
+import com.example.demo.service.listener.ListenerRuntime;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -34,7 +38,7 @@ public class EmailListenerScheduleService {
 
     private final EmailConfigMapper emailConfigMapper;
     private final EmailAuthConfigService emailAuthConfigService;
-    private final EmailListenerService emailListenerService;
+    private final ListenerRuntime<EmailConfig> listenerRuntime;
     private final TimeWheel timeWheel = new TimeWheel(TICK_MILLIS, WHEEL_SIZE);
     private final Map<Long, List<WheelTask>> scheduledTasks = new ConcurrentHashMap<>();
     private final AtomicBoolean initialized = new AtomicBoolean(false);
@@ -42,10 +46,11 @@ public class EmailListenerScheduleService {
     public EmailListenerScheduleService(
             EmailConfigMapper emailConfigMapper,
             EmailAuthConfigService emailAuthConfigService,
-            EmailListenerService emailListenerService) {
+            ContentListenerFactoryRegistry listenerFactoryRegistry) {
         this.emailConfigMapper = emailConfigMapper;
         this.emailAuthConfigService = emailAuthConfigService;
-        this.emailListenerService = emailListenerService;
+        ContentListenerFactory<EmailConfig, ?> factory = listenerFactoryRegistry.get(ListenerContentType.EMAIL);
+        this.listenerRuntime = factory.runtime();
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -64,7 +69,7 @@ public class EmailListenerScheduleService {
 
     public void reloadListeners() {
         cancelAllSchedules();
-        emailListenerService.stopAllListeners();
+        listenerRuntime.stopAll();
 
         List<EmailConfig> configs = emailConfigMapper.selectList(
                 new LambdaQueryWrapper<EmailConfig>()
@@ -82,22 +87,22 @@ public class EmailListenerScheduleService {
         cancelSchedule(config.getId());
 
         if (!Boolean.TRUE.equals(config.getEnabled())) {
-            emailListenerService.stopListener(config.getId());
+            listenerRuntime.stop(config.getId());
             return;
         }
 
         if (isAlwaysOn(config)) {
-            emailListenerService.startListener(config);
+            listenerRuntime.start(config);
             log.info("[{}] 已设置为全天监听", config.getEmail());
             return;
         }
 
         if (isWithinListeningWindow(config)) {
-            emailListenerService.startListener(config);
+            listenerRuntime.start(config);
             scheduleStop(config);
             log.info("[{}] 当前在监听时间段内，已启动并安排结束事件", config.getEmail());
         } else {
-            emailListenerService.stopListener(config.getId());
+            listenerRuntime.stop(config.getId());
             scheduleStart(config);
             log.info("[{}] 当前不在监听时间段内，已安排下一次开始事件", config.getEmail());
         }
@@ -105,11 +110,11 @@ public class EmailListenerScheduleService {
 
     public void stopAndUnschedule(Long configId) {
         cancelSchedule(configId);
-        emailListenerService.stopListener(configId);
+        listenerRuntime.stop(configId);
     }
 
     public Map<Long, Map<String, Object>> getListenerStatus() {
-        return emailListenerService.getListenerStatus();
+        return listenerRuntime.status();
     }
 
     private void scheduleStart(EmailConfig config) {
@@ -121,7 +126,7 @@ public class EmailListenerScheduleService {
                 return;
             }
             emailAuthConfigService.decodeTransientFields(latest);
-            emailListenerService.startListener(latest);
+            listenerRuntime.start(latest);
             scheduleStop(latest);
             log.info("[{}] 时间轮触发开始监听", latest.getEmail());
         });
@@ -131,7 +136,7 @@ public class EmailListenerScheduleService {
     private void scheduleStop(EmailConfig config) {
         Duration delay = delayUntil(config.getListenEndTime());
         WheelTask task = timeWheel.schedule(delay, () -> {
-            emailListenerService.stopListener(config.getId());
+            listenerRuntime.stop(config.getId());
             EmailConfig latest = loadEnabledConfig(config.getId());
             if (latest == null) {
                 cancelSchedule(config.getId());

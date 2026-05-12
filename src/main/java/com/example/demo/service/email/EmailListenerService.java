@@ -3,8 +3,7 @@ package com.example.demo.service.email;
 import com.example.demo.dto.EmailMessage;
 import com.example.demo.entity.EmailConfig;
 import com.example.demo.mapper.EmailConfigMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.demo.service.listener.ListenerRuntime;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.PreDestroy;
 import jakarta.mail.*;
@@ -15,18 +14,8 @@ import jakarta.mail.internet.MimeUtility;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -41,12 +30,12 @@ import java.util.concurrent.ExecutorService;
  */
 @Slf4j
 @Service
-public class EmailListenerService {
+public class EmailListenerService implements ListenerRuntime<EmailConfig> {
 
     private final EmailConfigMapper emailConfigMapper;
     private final ExecutorService executorService;
     private final EmailAuthConfigService emailAuthConfigService;
-    private final ObjectMapper objectMapper;
+    private final EmailConnectionTestService emailConnectionTestService;
 
     // 存储每个邮箱的Store和Folder连接
     private final Map<Long, Store> storeMap = new ConcurrentHashMap<>();
@@ -64,11 +53,11 @@ public class EmailListenerService {
     public EmailListenerService(
             EmailConfigMapper emailConfigMapper,
             EmailAuthConfigService emailAuthConfigService,
-            ObjectMapper objectMapper,
+            EmailConnectionTestService emailConnectionTestService,
             @Qualifier("emailProcessingExecutor") ExecutorService executorService) {
         this.emailConfigMapper = emailConfigMapper;
         this.emailAuthConfigService = emailAuthConfigService;
-        this.objectMapper = objectMapper;
+        this.emailConnectionTestService = emailConnectionTestService;
         this.executorService = executorService;
     }
 
@@ -114,6 +103,11 @@ public class EmailListenerService {
     /**
      * 启动单个邮箱监听
      */
+    @Override
+    public void start(EmailConfig config) {
+        startListener(config);
+    }
+
     public void startListener(EmailConfig config) {
         emailAuthConfigService.decodeTransientFields(config);
         Long configId = config.getId();
@@ -146,26 +140,15 @@ public class EmailListenerService {
         String emailAddr = config.getEmail();
         log.info("[{}] 正在连接邮箱...", emailAddr);
 
-        String protocol = normalizeProtocol(config.getProtocol());
+        String protocol = emailConnectionTestService.normalizeProtocol(config.getProtocol());
         String host = safeTrim(config.getHost());
         String email = safeTrim(config.getEmail());
-        String folderName = normalizeFolder(config.getFolder());
-        AuthCredential authCredential = resolveAuthCredential(config, host, protocol);
+        String folderName = emailConnectionTestService.normalizeFolder(config.getFolder());
+        int port = config.getPort() != null ? config.getPort() : 993;
+        EmailConnectionTestService.AuthCredential authCredential = emailConnectionTestService.resolveAuthCredential(config, host);
 
         // 配置邮件属性
-        Properties props = new Properties();
-        props.put("mail.store.protocol", protocol);
-        props.put("mail." + protocol + ".host", host);
-        props.put("mail." + protocol + ".port", config.getPort());
-        props.put("mail." + protocol + ".connectiontimeout", 10000);
-        props.put("mail." + protocol + ".timeout", 10000);
-
-        if (Boolean.TRUE.equals(config.getSslEnabled())) {
-            props.put("mail." + protocol + ".ssl.enable", "true");
-            props.put("mail." + protocol + ".ssl.trust", host);
-        }
-        applyAuthProperties(props, protocol, authCredential);
-        applyVendorSpecificProperties(props, protocol, host);
+        Properties props = emailConnectionTestService.buildMailProperties(config, protocol, host, port, authCredential);
 
         // 创建Session
         Session session = Session.getInstance(props);
@@ -192,7 +175,7 @@ public class EmailListenerService {
     }
 
     private Folder openListenerFolder(Long configId, EmailConfig config, Store store) throws MessagingException {
-        String folderName = normalizeFolder(config.getFolder());
+        String folderName = emailConnectionTestService.normalizeFolder(config.getFolder());
         Folder folder = store.getFolder(folderName);
         folder.open(Folder.READ_WRITE);
         folder.addMessageCountListener(new MessageCountAdapter() {
@@ -617,6 +600,11 @@ public class EmailListenerService {
     /**
      * 停止所有监听
      */
+    @Override
+    public void stopAll() {
+        stopAllListeners();
+    }
+
     public void stopAllListeners() {
         for (Long configId : new ArrayList<>(storeMap.keySet())) {
             cleanup(configId);
@@ -626,6 +614,11 @@ public class EmailListenerService {
     /**
      * 停止单个邮箱监听
      */
+    @Override
+    public void stop(Long configId) {
+        stopListener(configId);
+    }
+
     public void stopListener(Long configId) {
         EmailConfig config = configMap.get(configId);
         String email = config != null ? config.getEmail() : String.valueOf(configId);
@@ -661,149 +654,9 @@ public class EmailListenerService {
         return status;
     }
 
-    /**
-     * 测试邮箱连接
-     * 用于验证邮箱配置是否正确
-     */
-    public EmailTestResult testConnection(EmailConfig config) {
-        long startTime = System.currentTimeMillis();
-        try {
-            emailAuthConfigService.decodeTransientFields(config);
-            log.info("测试邮箱连接: {}", config.getEmail());
-
-            String protocol = normalizeProtocol(config.getProtocol());
-            String host = safeTrim(config.getHost());
-            String email = safeTrim(config.getEmail());
-            String folderName = normalizeFolder(config.getFolder());
-            int port = config.getPort() != null ? config.getPort() : 993;
-            AuthCredential authCredential = resolveAuthCredential(config, host, protocol);
-
-            NetworkCheckResult networkCheckResult = checkNetworkConnectivity(host, port, 10000);
-            if (!networkCheckResult.isSuccess()) {
-                return new EmailTestResult(
-                        false,
-                        "连接失败：服务器无法访问邮件服务器，请检查主机、端口或服务器防火墙",
-                        System.currentTimeMillis() - startTime,
-                        0,
-                        networkCheckResult.getErrorDetail()
-                );
-            }
-
-            // 配置邮件属性
-            Properties props = new Properties();
-            props.put("mail.store.protocol", protocol);
-            props.put("mail." + protocol + ".host", host);
-            props.put("mail." + protocol + ".port", port);
-            props.put("mail." + protocol + ".connectiontimeout", 10000);
-            props.put("mail." + protocol + ".timeout", 10000);
-
-            if (Boolean.TRUE.equals(config.getSslEnabled())) {
-                props.put("mail." + protocol + ".ssl.enable", "true");
-                props.put("mail." + protocol + ".ssl.trust", host);
-            }
-            applyAuthProperties(props, protocol, authCredential);
-            applyVendorSpecificProperties(props, protocol, host);
-
-            // 创建Session
-            Session session = Session.getInstance(props);
-            session.setDebug(false);
-
-            // 连接Store
-            Store store = session.getStore(protocol);
-            store.connect(host, email, authCredential.secret());
-
-            // 测试打开文件夹
-            Folder folder = store.getFolder(folderName);
-            folder.open(Folder.READ_ONLY);
-
-            // 获取邮件数量
-            int messageCount = folder.getMessageCount();
-
-            // 关闭连接
-            folder.close(false);
-            store.close();
-
-            long duration = System.currentTimeMillis() - startTime;
-            log.info("邮箱 {} 连接测试成功，耗时 {}ms，文件夹 {} 共有 {} 封邮件",
-                    config.getEmail(), duration, folderName, messageCount);
-
-            return new EmailTestResult(true, "连接成功", duration, messageCount, null);
-
-        } catch (AuthenticationFailedException e) {
-            long duration = System.currentTimeMillis() - startTime;
-            log.warn("邮箱 {} 认证失败: {}", config.getEmail(), e.getMessage());
-            String errorMsg = e.getMessage();
-            String detail = e.getMessage();
-
-            // 针对 163/126/188 邮箱的特殊错误提示
-            if (errorMsg != null) {
-                if (errorMsg.contains("Unsafe Login") || errorMsg.contains("LOGIN")) {
-                    errorMsg = "认证失败：163/126邮箱需要使用授权码而非登录密码。请在邮箱设置中开启IMAP服务并生成授权码";
-                } else if (errorMsg.contains("Too many login")) {
-                    errorMsg = "登录频率限制：请稍后再试或检查是否有其他客户端在同时登录";
-                } else if (errorMsg.contains("Invalid credentials")) {
-                    if (EmailAuthConfigService.AUTH_TYPE_OAUTH2_REFRESH_TOKEN.equalsIgnoreCase(config.getAuthType())
-                            || EmailAuthConfigService.AUTH_TYPE_OAUTH2_ACCESS_TOKEN.equalsIgnoreCase(config.getAuthType())) {
-                        errorMsg = "认证失败：OAuth2令牌无效或过期，请更新 access token / refresh token";
-                    } else {
-                        errorMsg = "认证失败：邮箱地址或密码/授权码错误";
-                    }
-                }
-            }
-
-            return new EmailTestResult(false, errorMsg, duration, 0, detail);
-
-        } catch (MessagingException e) {
-            long duration = System.currentTimeMillis() - startTime;
-            log.warn("邮箱 {} 连接失败: {}", config.getEmail(), e.getMessage());
-            String errorMsg = e.getMessage();
-            String detail = e.getMessage();
-
-            if (errorMsg != null) {
-                if (errorMsg.contains("Unsafe Login")) {
-                    errorMsg = "不安全登录被拒绝：163/126邮箱需要使用授权码而非登录密码。请在邮箱网页版设置中：1.开启IMAP服务 2.生成客户端授权码";
-                } else if (errorMsg.contains("connection") || errorMsg.contains("connect")) {
-                    errorMsg = "连接失败：无法连接到邮件服务器，请检查服务器地址和端口";
-                } else if (errorMsg.contains("SSL") || errorMsg.contains("TLS")) {
-                    errorMsg = "SSL/TLS错误：请检查SSL配置是否正确";
-                } else if (errorMsg.contains("timed out") || errorMsg.contains("timeout")) {
-                    errorMsg = "连接超时：服务器无法访问邮件服务器，请检查网络或防火墙设置";
-                }
-            } else {
-                errorMsg = "邮件服务连接失败";
-            }
-            return new EmailTestResult(false, errorMsg, duration, 0, detail);
-
-        } catch (Exception e) {
-            long duration = System.currentTimeMillis() - startTime;
-            log.error("邮箱 {} 测试异常: {}", config.getEmail(), e.getMessage());
-            return new EmailTestResult(false, "测试异常：" + e.getMessage(), duration, 0, e.getMessage());
-        }
-    }
-
-    /**
-     * 邮箱测试结果
-     */
-    public static class EmailTestResult {
-        private final boolean success;
-        private final String message;
-        private final long durationMs;
-        private final int messageCount;
-        private final String errorDetail;
-
-        public EmailTestResult(boolean success, String message, long durationMs, int messageCount, String errorDetail) {
-            this.success = success;
-            this.message = message;
-            this.durationMs = durationMs;
-            this.messageCount = messageCount;
-            this.errorDetail = errorDetail;
-        }
-
-        public boolean isSuccess() { return success; }
-        public String getMessage() { return message; }
-        public long getDurationMs() { return durationMs; }
-        public int getMessageCount() { return messageCount; }
-        public String getErrorDetail() { return errorDetail; }
+    @Override
+    public Map<Long, Map<String, Object>> status() {
+        return getListenerStatus();
     }
 
     /**
@@ -813,308 +666,7 @@ public class EmailListenerService {
         void handle(EmailMessage emailMessage);
     }
 
-    public NetworkCheckResult checkNetworkConnectivity(String host, Integer port, int timeoutMs) {
-        long start = System.currentTimeMillis();
-        try {
-            String normalizedHost = safeTrim(host);
-            int normalizedPort = (port == null || port <= 0) ? 993 : port;
-            if (normalizedHost == null || normalizedHost.isEmpty()) {
-                return new NetworkCheckResult(false, "主机地址不能为空", 0, null, "host is blank");
-            }
-
-            InetAddress address = InetAddress.getByName(normalizedHost);
-            try (Socket socket = new Socket()) {
-                socket.connect(new InetSocketAddress(address, normalizedPort), timeoutMs);
-            }
-            long duration = System.currentTimeMillis() - start;
-            return new NetworkCheckResult(
-                    true,
-                    "网络连通",
-                    duration,
-                    address.getHostAddress(),
-                    null
-            );
-        } catch (Exception e) {
-            long duration = System.currentTimeMillis() - start;
-            return new NetworkCheckResult(
-                    false,
-                    "网络不通",
-                    duration,
-                    null,
-                    e.getMessage()
-            );
-        }
-    }
-
-    public static class NetworkCheckResult {
-        private final boolean success;
-        private final String message;
-        private final long durationMs;
-        private final String resolvedIp;
-        private final String errorDetail;
-
-        public NetworkCheckResult(boolean success, String message, long durationMs, String resolvedIp, String errorDetail) {
-            this.success = success;
-            this.message = message;
-            this.durationMs = durationMs;
-            this.resolvedIp = resolvedIp;
-            this.errorDetail = errorDetail;
-        }
-
-        public boolean isSuccess() { return success; }
-        public String getMessage() { return message; }
-        public long getDurationMs() { return durationMs; }
-        public String getResolvedIp() { return resolvedIp; }
-        public String getErrorDetail() { return errorDetail; }
-    }
-
-    private void applyAuthProperties(Properties props, String protocol, AuthCredential authCredential) {
-        String prefix = "mail." + protocol + ".";
-
-        if (authCredential != null && authCredential.mode() == AuthMode.OAUTH2) {
-            props.put(prefix + "auth.mechanisms", "XOAUTH2");
-            props.put(prefix + "auth.login.disable", "true");
-            props.put(prefix + "auth.plain.disable", "true");
-        } else {
-            // 163/126/188 等国内邮箱需要显式启用 PLAIN 认证，否则会被识别为 "Unsafe Login"
-            props.put(prefix + "auth.login.disable", "false");
-            props.put(prefix + "auth.plain.disable", "false");
-        }
-    }
-
-    /**
-     * 根据邮箱服务商应用特定的连接属性
-     * 163/126/188/QQ 对 JavaMail 有客户端识别限制，需要额外配置
-     */
-    private void applyVendorSpecificProperties(Properties props, String protocol, String host) {
-        if (!StringUtils.hasText(host)) {
-            return;
-        }
-        String lowerHost = host.toLowerCase(Locale.ROOT);
-        String prefix = "mail." + protocol + ".";
-
-        // 163 / 126 / 188 / yeah 邮箱的特殊处理
-        if (lowerHost.contains("163.com") || lowerHost.contains("126.com")
-                || lowerHost.contains("188.com") || lowerHost.contains("yeah.net")) {
-            // 强制 SSL，关闭 STARTTLS 混用
-            props.put(prefix + "ssl.enable", "true");
-            props.put(prefix + "starttls.enable", "false");
-            // 信任所有证书（163 证书链有时不完整）
-            props.put(prefix + "ssl.trust", "*");
-            // socket channels 改善兼容性
-            props.put(prefix + "usesocketchannels", "true");
-            // 禁用 SASL，强制 LOGIN + PLAIN
-            props.put(prefix + "sasl.enable", "false");
-            props.put(prefix + "peek", "true");
-            props.put(prefix + "connectionpool.debug", "false");
-        }
-
-        // QQ 邮箱 / 腾讯企业邮箱
-        if (lowerHost.contains("qq.com") || lowerHost.contains("exmail.qq.com")) {
-            // QQ 邮箱 IMAP 必须使用 SSL
-            props.put(prefix + "ssl.enable", "true");
-            props.put(prefix + "starttls.enable", "false");
-            props.put(prefix + "ssl.trust", "*");
-            // QQ 对连接频率有限制，适当延长超时
-            props.put(prefix + "connectiontimeout", 15000);
-            props.put(prefix + "timeout", 15000);
-        }
-    }
-
-    private AuthCredential resolveAuthCredential(EmailConfig config, String host, String protocol) {
-        emailAuthConfigService.decodeTransientFields(config);
-        String authType = normalizeAuthType(config.getAuthType());
-
-        if (EmailAuthConfigService.AUTH_TYPE_OAUTH2_ACCESS_TOKEN.equals(authType)) {
-            String accessToken = safeTrim(config.getOauthAccessToken());
-            if (!StringUtils.hasText(accessToken)) {
-                throw new IllegalArgumentException("OAuth2 access token 不能为空");
-            }
-            return new AuthCredential(AuthMode.OAUTH2, accessToken);
-        }
-
-        if (EmailAuthConfigService.AUTH_TYPE_OAUTH2_REFRESH_TOKEN.equals(authType)) {
-            String accessToken = resolveAccessTokenByRefreshToken(config, host);
-            return new AuthCredential(AuthMode.OAUTH2, accessToken);
-        }
-
-        String password = safeTrim(config.getPassword());
-        if (!StringUtils.hasText(password)) {
-            throw new IllegalArgumentException("密码/授权码不能为空");
-        }
-        return new AuthCredential(AuthMode.PASSWORD, password);
-    }
-
-    private String resolveAccessTokenByRefreshToken(EmailConfig config, String host) {
-        String refreshToken = safeTrim(config.getOauthRefreshToken());
-        String clientId = safeTrim(config.getOauthClientId());
-        String clientSecret = safeTrim(config.getOauthClientSecret());
-        String tokenEndpoint = safeTrim(config.getOauthTokenEndpoint());
-        String scope = safeTrim(config.getOauthScope());
-
-        if (!StringUtils.hasText(refreshToken)) {
-            throw new IllegalArgumentException("OAuth2 refresh token 不能为空");
-        }
-        if (!StringUtils.hasText(clientId)) {
-            throw new IllegalArgumentException("OAuth2 clientId 不能为空");
-        }
-        if (!StringUtils.hasText(tokenEndpoint)) {
-            tokenEndpoint = defaultTokenEndpointByHost(host);
-        }
-        if (!StringUtils.hasText(tokenEndpoint)) {
-            throw new IllegalArgumentException("无法推断 OAuth2 token endpoint，请在邮箱配置中填写 oauthTokenEndpoint");
-        }
-        if (!StringUtils.hasText(scope)) {
-            scope = defaultScopeByHost(host);
-        }
-
-        try {
-            String body = buildTokenRequestBody(refreshToken, clientId, clientSecret, scope);
-            URL url = new URL(tokenEndpoint);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(10000);
-            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-            connection.setRequestProperty("Accept", "application/json");
-
-            try (OutputStream outputStream = connection.getOutputStream()) {
-                outputStream.write(body.getBytes(StandardCharsets.UTF_8));
-            }
-
-            int status = connection.getResponseCode();
-            String responseBody;
-            try (InputStream stream = status >= 200 && status < 300
-                    ? connection.getInputStream()
-                    : connection.getErrorStream()) {
-                responseBody = stream == null ? "" : new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-            }
-
-            if (status < 200 || status >= 300) {
-                throw new IllegalArgumentException(parseTokenErrorMessage(status, responseBody));
-            }
-
-            Map<String, Object> payload = objectMapper.readValue(responseBody, new TypeReference<>() {});
-            String accessToken = payload.get("access_token") == null ? null : String.valueOf(payload.get("access_token"));
-            if (!StringUtils.hasText(accessToken)) {
-                throw new IllegalArgumentException("OAuth2 token 刷新响应中缺少 access_token");
-            }
-            return accessToken;
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalArgumentException("OAuth2 token 刷新失败: " + e.getMessage(), e);
-        }
-    }
-
-    private String buildTokenRequestBody(String refreshToken, String clientId, String clientSecret, String scope) {
-        Map<String, String> params = new LinkedHashMap<>();
-        params.put("grant_type", "refresh_token");
-        params.put("refresh_token", refreshToken);
-        params.put("client_id", clientId);
-        if (StringUtils.hasText(clientSecret)) {
-            params.put("client_secret", clientSecret);
-        }
-        if (StringUtils.hasText(scope)) {
-            params.put("scope", scope);
-        }
-
-        StringBuilder builder = new StringBuilder();
-        for (Map.Entry<String, String> entry : params.entrySet()) {
-            if (builder.length() > 0) {
-                builder.append('&');
-            }
-            builder.append(urlEncode(entry.getKey()))
-                    .append('=')
-                    .append(urlEncode(entry.getValue()));
-        }
-        return builder.toString();
-    }
-
-    private String parseTokenErrorMessage(int status, String responseBody) {
-        if (!StringUtils.hasText(responseBody)) {
-            return "OAuth2 token 刷新失败，HTTP状态: " + status;
-        }
-        try {
-            Map<String, Object> payload = objectMapper.readValue(responseBody, new TypeReference<>() {});
-            Object error = payload.get("error");
-            Object description = payload.get("error_description");
-            String detail = (error == null ? "" : String.valueOf(error))
-                    + (description == null ? "" : (" - " + description));
-            if (StringUtils.hasText(detail)) {
-                return "OAuth2 token 刷新失败: " + detail.trim();
-            }
-        } catch (Exception ignored) {
-        }
-        return "OAuth2 token 刷新失败，HTTP状态: " + status;
-    }
-
-    private String defaultTokenEndpointByHost(String host) {
-        String normalized = safeTrim(host);
-        if (!StringUtils.hasText(normalized)) {
-            return null;
-        }
-        String value = normalized.toLowerCase(Locale.ROOT);
-        if (value.contains("gmail.com")) {
-            return "https://oauth2.googleapis.com/token";
-        }
-        if (value.contains("outlook") || value.contains("office365") || value.contains("hotmail") || value.contains("live.com")) {
-            return "https://login.microsoftonline.com/common/oauth2/v2.0/token";
-        }
-        return null;
-    }
-
-    private String defaultScopeByHost(String host) {
-        String normalized = safeTrim(host);
-        if (!StringUtils.hasText(normalized)) {
-            return null;
-        }
-        String value = normalized.toLowerCase(Locale.ROOT);
-        if (value.contains("gmail.com")) {
-            return "https://mail.google.com/";
-        }
-        if (value.contains("outlook") || value.contains("office365") || value.contains("hotmail") || value.contains("live.com")) {
-            return "offline_access https://outlook.office.com/IMAP.AccessAsUser.All";
-        }
-        return null;
-    }
-
-    private String normalizeAuthType(String authType) {
-        if (!StringUtils.hasText(authType)) {
-            return EmailAuthConfigService.AUTH_TYPE_PASSWORD;
-        }
-        String normalized = authType.trim().toLowerCase(Locale.ROOT);
-        return switch (normalized) {
-            case EmailAuthConfigService.AUTH_TYPE_OAUTH2_ACCESS_TOKEN -> EmailAuthConfigService.AUTH_TYPE_OAUTH2_ACCESS_TOKEN;
-            case EmailAuthConfigService.AUTH_TYPE_OAUTH2_REFRESH_TOKEN -> EmailAuthConfigService.AUTH_TYPE_OAUTH2_REFRESH_TOKEN;
-            default -> EmailAuthConfigService.AUTH_TYPE_PASSWORD;
-        };
-    }
-
-    private String urlEncode(String value) {
-        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
-    }
-
     private String safeTrim(String text) {
         return text == null ? null : text.trim();
-    }
-
-    private String normalizeProtocol(String protocol) {
-        String value = safeTrim(protocol);
-        return (value == null || value.isEmpty()) ? "imap" : value.toLowerCase();
-    }
-
-    private String normalizeFolder(String folder) {
-        String value = safeTrim(folder);
-        return (value == null || value.isEmpty()) ? "INBOX" : value;
-    }
-
-    private enum AuthMode {
-        PASSWORD,
-        OAUTH2
-    }
-
-    private record AuthCredential(AuthMode mode, String secret) {
     }
 }

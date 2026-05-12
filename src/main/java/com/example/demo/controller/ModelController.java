@@ -79,6 +79,10 @@ public class ModelController {
     public ApiResponse<Map<String, Object>> create(@RequestBody AiModelConfig config) {
         try {
             normalizeConfig(config);
+
+            // 新增模型必须先通过真实连接测试，失败时不允许入库。
+            modelManager.testConnection(config);
+
             // 编码 API Key
             config.setApiKey(encodingService.encode(config.getApiKey()));
 

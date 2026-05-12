@@ -744,7 +744,7 @@ onUnmounted(() => {
   flex-direction: column;
   justify-content: center;
   padding: 48px;
-  background: linear-gradient(135deg, #E67E22 0%, #F39C12 40%, #F7DC6F 100%);
+  background: var(--gradient-sunset);
   overflow: hidden;
 }
 
@@ -897,15 +897,15 @@ onUnmounted(() => {
   padding: 32px;
   background: var(--bg-card, #FFFBF0);
   border-radius: var(--radius-xl, 18px);
-  border: 2px solid var(--border-light, #FDE68A);
+  border: 1px solid var(--border-light, #F7E8C5);
   box-shadow: var(--shadow-lg);
-  animation: slideUp 0.5s ease-out;
+  animation: slideUp 0.36s var(--ease-ios-standard);
 }
 
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(14px) scale(0.99);
   }
   to {
     opacity: 1;
@@ -921,7 +921,7 @@ onUnmounted(() => {
 .card-kicker {
   display: inline-block;
   padding: 4px 10px;
-  background: #E67E22;
+  background: var(--primary-color);
   border-radius: 4px;
   color: #FFFFFF;
   font-size: 0.7rem;
@@ -969,18 +969,22 @@ onUnmounted(() => {
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .tab-item:hover {
-  background: rgba(230, 126, 34, 0.08);
-  color: #E67E22;
+  background: var(--bg-active);
+  color: var(--primary-color);
 }
 
 .tab-item.active {
-  background: #FFFFFF;
-  color: #E67E22;
+  background: var(--bg-card);
+  color: var(--primary-color);
   box-shadow: var(--shadow-sm);
+}
+
+.tab-item:active {
+  transform: scale(0.97);
 }
 
 .tab-icon {
@@ -1032,7 +1036,7 @@ onUnmounted(() => {
   border-radius: 10px;
   color: var(--text-primary);
   font-size: 0.95rem;
-  transition: all 0.2s ease;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 .input-field:hover {
@@ -1041,9 +1045,10 @@ onUnmounted(() => {
 
 .input-field:focus {
   outline: none;
-  border-color: #E67E22;
-  background: #FFFFFF;
+  border-color: var(--primary-color);
+  background: var(--bg-card);
   box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.15);
+  transform: translateY(-1px);
 }
 
 .input-field::placeholder {
@@ -1081,17 +1086,17 @@ onUnmounted(() => {
   background: var(--bg-input);
   border: 1px solid var(--border-light);
   border-radius: 10px;
-  color: #E67E22;
+  color: var(--primary-color);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
   white-space: nowrap;
 }
 
 .btn-code:hover:not(:disabled) {
   background: #FFFFFF;
-  border-color: #E67E22;
+  border-color: var(--primary-color);
 }
 
 .btn-code:disabled {
@@ -1120,16 +1125,16 @@ onUnmounted(() => {
 .checkbox-custom {
   width: 18px;
   height: 18px;
-  border: 2px solid var(--border-light);
+  border: 1px solid var(--border-light);
   border-radius: 4px;
   background: var(--bg-input);
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
   position: relative;
 }
 
 .checkbox-wrapper input:checked + .checkbox-custom {
-  background: #E67E22;
-  border-color: #E67E22;
+  background: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .checkbox-wrapper input:checked + .checkbox-custom::after {
@@ -1150,15 +1155,15 @@ onUnmounted(() => {
 }
 
 .forgot-link {
-  color: #E67E22;
+  color: var(--primary-color);
   font-size: 0.85rem;
   font-weight: 500;
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color var(--transition-fast);
 }
 
 .forgot-link:hover {
-  color: #D35400;
+  color: var(--primary-dark);
 }
 
 /* 按钮 */
@@ -1168,20 +1173,20 @@ onUnmounted(() => {
   justify-content: center;
   gap: 8px;
   padding: 14px 28px;
-  background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%);
+  background: var(--gradient-sunset);
   border: none;
   border-radius: 12px;
   color: #FFFFFF;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
   box-shadow: 0 4px 16px rgba(234, 88, 12, 0.35);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: linear-gradient(135deg, #FBBF24 0%, #F97316 100%);
-  transform: translateY(-2px);
+  transform: translateY(-1px) scale(0.99);
   box-shadow: 0 6px 24px rgba(234, 88, 12, 0.45);
 }
 
@@ -1189,6 +1194,13 @@ onUnmounted(() => {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+.btn-primary:active:not(:disabled),
+.btn-code:active:not(:disabled),
+.btn-capture:active:not(:disabled),
+.btn-cancel:active {
+  transform: scale(0.96);
 }
 
 .btn-full {
@@ -1240,12 +1252,16 @@ onUnmounted(() => {
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .btn-social:hover {
   border-color: var(--text-muted);
   background: var(--bg-input);
+}
+
+.btn-social:active {
+  transform: scale(0.97);
 }
 
 .social-icon {
@@ -1272,15 +1288,15 @@ onUnmounted(() => {
 .footer-link {
   background: transparent;
   border: none;
-  color: #E67E22;
+  color: var(--primary-color);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition: color var(--transition-fast);
 }
 
 .footer-link:hover {
-  color: #D35400;
+  color: var(--primary-dark);
 }
 
 /* 人脸验证样式 */
@@ -1347,7 +1363,7 @@ onUnmounted(() => {
 
 .btn-capture {
   padding: 12px 28px;
-  background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%);
+  background: var(--gradient-sunset);
   border: none;
   border-radius: 12px;
   color: #FFFFFF;
@@ -1355,11 +1371,11 @@ onUnmounted(() => {
   font-size: 0.95rem;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(234, 88, 12, 0.35);
-  transition: all 0.2s ease;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .btn-capture:hover:not(:disabled) {
-  transform: translateY(-2px);
+  transform: translateY(-1px) scale(0.99);
   box-shadow: 0 6px 20px rgba(234, 88, 12, 0.45);
 }
 
@@ -1381,7 +1397,7 @@ onUnmounted(() => {
   font-weight: 500;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .btn-cancel:hover {
@@ -1398,13 +1414,18 @@ onUnmounted(() => {
   border: 2px dashed rgba(245, 158, 11, 0.4);
   border-radius: 16px;
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(234, 88, 12, 0.03));
-  transition: all 0.3s ease;
+  transition: background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
 }
 
 .start-camera:hover {
   border-color: rgba(245, 158, 11, 0.6);
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(234, 88, 12, 0.05));
   box-shadow: 0 8px 24px rgba(245, 158, 11, 0.12);
+  transform: translateY(-1px);
+}
+
+.start-camera:active {
+  transform: scale(0.985);
 }
 
 .or-divider {
@@ -1466,13 +1487,17 @@ onUnmounted(() => {
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .btn-retake:hover {
   background: rgba(245, 158, 11, 0.2);
   border-color: rgba(245, 158, 11, 0.55);
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(0.99);
+}
+
+.btn-retake:active {
+  transform: scale(0.96);
 }
 
 .face-actions {

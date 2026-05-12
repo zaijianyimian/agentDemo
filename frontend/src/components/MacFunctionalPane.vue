@@ -232,15 +232,15 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   max-height: calc(100vh - 48px);
   padding: 14px 12px;
   background: var(--bg-card);
-  border: 2px solid var(--border-light);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   opacity: 0;
   visibility: hidden;
   transition:
     visibility 0s 0.2s,
-    opacity 0.2s ease,
-    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity var(--transition-fast),
+    transform var(--transition-slide);
   pointer-events: none;
 }
 
@@ -251,8 +251,8 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   pointer-events: auto;
   transition:
     visibility 0s 0s,
-    opacity 0.2s ease,
-    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity var(--transition-fast),
+    transform var(--transition-slide);
 }
 
 .functional-pane.animating,
@@ -267,7 +267,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 12px;
-  border-bottom: 2px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .pane-category-info {
@@ -297,7 +297,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   font-size: 0.9rem;
   font-weight: 600;
   /* Explicit color with fallback for visibility */
-  color: var(--text-primary, #1D1D1F);
+  color: var(--text-primary, #321207);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -319,7 +319,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .pane-close-btn:hover {
@@ -352,7 +352,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
   position: relative;
 }
 
@@ -367,7 +367,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
 }
 
 .pane-route-item:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 
 /* Route Icon - Fixed 20px, amber color */
@@ -378,7 +378,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   height: 20px;
   flex-shrink: 0;
   color: var(--pane-category-color);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: color var(--transition-fast);
 }
 
 .pane-route-item.active .route-icon {
@@ -399,7 +399,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   font-size: 0.85rem;
   font-weight: 500;
   /* Explicit color with fallback for visibility */
-  color: var(--text-primary, #1D1D1F);
+  color: var(--text-primary, #321207);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -407,7 +407,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
 }
 
 .pane-route-item.active .route-label {
-  color: var(--text-strong, #1D1D1F);
+  color: var(--text-strong, #321207);
 }
 
 /* Route Description - Prevent overflow */
@@ -442,7 +442,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   border-radius: var(--radius-xs);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
   flex-shrink: 0;
 }
 
@@ -474,7 +474,7 @@ watch(() => macNavStore.activeCategory, async (newCategory) => {
   display: flex;
   justify-content: space-between;
   padding-top: 10px;
-  border-top: 2px solid var(--border-light);
+  border-top: 1px solid var(--border-light);
 }
 
 .pane-brand {

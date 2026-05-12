@@ -1,7 +1,7 @@
 :root {
   /* ============================================
-   * Citrus Sunset Theme - Warm, Human, Playful
-   * Orange-yellow dominant, organic warmth
+   * Amber Console Theme - Warm, focused, production-minded
+   * Paper surfaces, amber accents, restrained motion
    * ============================================ */
 
   /* Typography - Warm, readable */
@@ -9,23 +9,27 @@
   --font-mono: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
   --font-display: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
 
-  /* Primary Accent - Citrus Orange (活力橙黄) */
-  --primary-color: #EA580C;           /* Orange-600 */
-  --primary-light: #FDBA74;           /* Orange-300 */
-  --primary-hover: #F97316;           /* Orange-500 */
-  --primary-dark: #C2410C;            /* Orange-700 */
-  --primary-glow: rgba(234, 88, 12, 0.15);
+  /* Brand Accent - Amber Console */
+  --brand-orange: #EA580C;
+  --brand-amber: #F59E0B;
+  --brand-gold: #FBBF24;
+  --primary-color: var(--brand-orange);
+  --primary-light: #FDBA74;
+  --primary-hover: #F97316;
+  --primary-dark: #C2410C;
+  --primary-glow: rgba(234, 88, 12, 0.14);
 
   /* Secondary Accent - Sun Yellow */
   --sun-color: #F59E0B;               /* Amber-500 */
   --sun-light: #FCD34D;               /* Amber-300 */
   --sun-dark: #D97706;                /* Amber-600 */
 
-  /* Warm Neutrals - Paper/Cream instead of cold gray */
-  --warm-50: #FFFBEB;
-  --warm-100: #FEF3C7;
-  --warm-200: #FDE68A;
+  /* Warm Neutrals - Paper first, amber second */
+  --warm-50: #FFFDF7;
+  --warm-100: #FFF7E6;
+  --warm-200: #FDE9B5;
   --warm-300: #FCD34D;
+  --warm-700: #92400E;
 
   /* Accent Colors - Warm palette */
   --accent-red: #EF4444;
@@ -38,17 +42,17 @@
   --accent-pink: #EC4899;
   --accent-amber: #F59E0B;
 
-  /* Background - Warm Light Mode (Cream/Paper) */
-  --bg-base: #FDF6E3;                 /* Warm cream */
-  --bg-elevated: #FFFBF0;             /* Lighter cream */
-  --bg-card: #FFFBF0;
-  --bg-glass: rgba(255, 251, 240, 0.92);
-  --bg-glass-strong: rgba(255, 251, 240, 0.96);
-  --bg-input: #FEF3C7;                /* Warm input */
-  --bg-hover: #FDE68A;
+  /* Background - Warm light surfaces */
+  --bg-base: #FFF9EC;
+  --bg-elevated: #FFFDF7;
+  --bg-card: #FFFDF7;
+  --bg-glass: rgba(255, 253, 247, 0.92);
+  --bg-glass-strong: rgba(255, 253, 247, 0.96);
+  --bg-input: #FFF7E6;
+  --bg-hover: #FFF1CC;
   --bg-active: rgba(234, 88, 12, 0.08);
-  --bg-sidebar: #FDF6E3;
-  --bg-rail: rgba(253, 246, 227, 0.92);
+  --bg-sidebar: #FFF9EC;
+  --bg-rail: rgba(255, 253, 247, 0.94);
 
   /* Sidebar Menu - Warm amber */
   --bg-menu-item: transparent;
@@ -57,16 +61,16 @@
   --menu-indicator: #EA580C;
 
   /* Text Colors - Warm hierarchy */
-  --text-primary: #431407;            /* Dark warm brown */
-  --text-secondary: #78350F;          /* Medium brown */
-  --text-muted: #A16207;              /* Amber-brown */
+  --text-primary: #321207;
+  --text-secondary: #6F3312;
+  --text-muted: #9A5A16;
   --text-strong: #431407;
   --text-accent: #EA580C;
 
   /* Border Colors - Warm, subtle */
-  --border-color: #FDE68A;
-  --border-light: #FEF3C7;
-  --border-accent: rgba(234, 88, 12, 0.24);
+  --border-color: #F3DBA4;
+  --border-light: #F7E8C5;
+  --border-accent: rgba(234, 88, 12, 0.22);
   --border-focus: #EA580C;
 
   /* Status Colors - Warm semantic */
@@ -75,12 +79,12 @@
   --error: #DC2626;
   --info: #EA580C;
 
-  /* Shadows - Warm orange tint, soft and organic */
+  /* Shadows - soft, functional depth */
   --shadow-xs: 0 1px 2px rgba(234, 88, 12, 0.04);
-  --shadow-sm: 0 2px 8px rgba(234, 88, 12, 0.06);
-  --shadow-md: 0 4px 12px rgba(234, 88, 12, 0.08);
-  --shadow-lg: 0 8px 24px rgba(234, 88, 12, 0.10);
-  --shadow-xl: 0 16px 48px rgba(234, 88, 12, 0.12);
+  --shadow-sm: 0 2px 10px rgba(84, 40, 8, 0.07);
+  --shadow-md: 0 6px 18px rgba(84, 40, 8, 0.09);
+  --shadow-lg: 0 12px 32px rgba(84, 40, 8, 0.11);
+  --shadow-xl: 0 20px 56px rgba(84, 40, 8, 0.14);
   --shadow-card: 0 2px 12px rgba(234, 88, 12, 0.06);
   --shadow-sidebar: 4px 0 16px rgba(234, 88, 12, 0.04);
   --shadow-focus: 0 0 0 4px rgba(234, 88, 12, 0.20);
@@ -92,47 +96,53 @@
   --blur-lg: 24px;
   --blur-xl: 32px;
 
-  /* Radius - Organic rounded corners */
+  /* Radius - restrained console surfaces */
   --radius-xs: 6px;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
-  --radius-2xl: 28px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
   --radius-full: 999px;
 
-  /* Transitions - Smooth, refined */
-  --transition-fast: 0.12s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slide: 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
-  --transition-bounce: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Motion - iOS-like quick settle */
+  --ease-ios-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-ios-decelerate: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-ios-accelerate: cubic-bezier(0.4, 0.0, 1, 1);
+  --ease-ios-spring: cubic-bezier(0.18, 0.89, 0.32, 1.12);
+  --transition-fast: 120ms var(--ease-ios-standard);
+  --transition-base: 210ms var(--ease-ios-standard);
+  --transition-slow: 320ms var(--ease-ios-standard);
+  --transition-slide: 340ms var(--ease-ios-spring);
+  --transition-bounce: 360ms var(--ease-ios-spring);
 
   /* Easing Curves */
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-smooth: var(--ease-ios-standard);
+  --ease-bounce: var(--ease-ios-spring);
+  --ease-out: var(--ease-ios-decelerate);
+  --ease-in-out: var(--ease-ios-standard);
 
   /* Panel backgrounds */
   --bg-panel: rgba(255, 251, 240, 0.96);
   --bg-panel-strong: rgba(255, 251, 240, 0.98);
   --bg-inspector: rgba(255, 251, 240, 0.94);
 
-  /* Gradients - Sunset/Citrus inspired */
-  --gradient-card: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, transparent 100%);
+  /* Gradients - concise amber accents */
+  --gradient-card: linear-gradient(180deg, rgba(255, 255, 255, 0.68) 0%, rgba(255, 253, 247, 0) 100%);
   --gradient-accent: linear-gradient(135deg, rgba(234, 88, 12, 0.08) 0%, rgba(245, 158, 11, 0.04) 100%);
-  --gradient-sunset: linear-gradient(135deg, #EA580C 0%, #F59E0B 50%, #FCD34D 100%);
-  --gradient-citrus: linear-gradient(180deg, #FEF3C7 0%, #FDF6E3 100%);
-  --gradient-warm-glow: radial-gradient(ellipse at top, rgba(253, 186, 116, 0.2) 0%, transparent 60%);
+  --gradient-sunset: linear-gradient(135deg, #EA580C 0%, #F59E0B 70%, #FBBF24 100%);
+  --gradient-citrus: linear-gradient(180deg, #FFF7E6 0%, #FFF9EC 100%);
+  --gradient-warm: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(234, 88, 12, 0.05));
+  --gradient-warm-glow: radial-gradient(ellipse at top, rgba(245, 158, 11, 0.14) 0%, transparent 58%);
+  --shadow-glow: 0 8px 24px rgba(234, 88, 12, 0.16);
 
   /* Border states */
   --border-glow: rgba(234, 88, 12, 0.30);
 
   /* Chat specific */
   --chat-user-bg: #F59E0B;
-  --chat-ai-bg: #FFFBF0;
-  --chat-input-bg: #FEF3C7;
+  --chat-ai-bg: #FFFDF7;
+  --chat-input-bg: #FFF7E6;
 
   /* Navigation dimensions */
   --rail-width: 72px;
@@ -164,9 +174,9 @@
   --sun-dark: #F59E0B;
 
   /* Background - Warm Dark (Coffee) */
-  --bg-base: #1C1410;                 /* Dark coffee */
-  --bg-elevated: #2A1F18;             /* Elevated coffee */
-  --bg-card: #2A1F18;
+  --bg-base: #1B140F;
+  --bg-elevated: #261B14;
+  --bg-card: #2B2018;
   --bg-glass: rgba(42, 31, 24, 0.92);
   --bg-glass-strong: rgba(42, 31, 24, 0.96);
   --bg-input: #3D2E22;                /* Warm input dark */
@@ -184,13 +194,13 @@
   /* Text Colors - Warm light */
   --text-primary: #FFF7ED;
   --text-secondary: #FED7AA;
-  --text-muted: #A16207;
+  --text-muted: #D6A45F;
   --text-strong: #FFF7ED;
   --text-accent: #FB923C;
 
   /* Border Colors */
-  --border-color: #3D2E22;
-  --border-light: #2A1F18;
+  --border-color: #4A3526;
+  --border-light: #3A2A20;
   --border-accent: rgba(251, 146, 60, 0.30);
   --border-focus: #FB923C;
 
@@ -214,8 +224,10 @@
   --gradient-card: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
   --gradient-accent: linear-gradient(135deg, rgba(251, 146, 60, 0.12) 0%, rgba(245, 158, 11, 0.06) 100%);
   --gradient-sunset: linear-gradient(135deg, #EA580C 0%, #F59E0B 50%, #FBBF24 100%);
-  --gradient-citrus: linear-gradient(180deg, #2A1F18 0%, #1C1410 100%);
+  --gradient-citrus: linear-gradient(180deg, #2B2018 0%, #1B140F 100%);
+  --gradient-warm: linear-gradient(135deg, rgba(251, 146, 60, 0.14), rgba(245, 158, 11, 0.06));
   --gradient-warm-glow: radial-gradient(ellipse at top, rgba(251, 146, 60, 0.1) 0%, transparent 60%);
+  --shadow-glow: 0 10px 28px rgba(251, 146, 60, 0.18);
 
   /* Border states */
   --border-glow: rgba(251, 146, 60, 0.35);

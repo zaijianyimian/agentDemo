@@ -7,6 +7,7 @@ import com.example.demo.mapper.ScheduleEventMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.demo.service.schedule.ScheduleFileService;
+import com.example.demo.service.schedule.conflict.ScheduleConflictService;
 import dev.langchain4j.model.chat.ChatModel;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,9 @@ public class ScheduleController {
 
     @Resource
     private ScheduleFileService scheduleFileService;
+
+    @Resource
+    private ScheduleConflictService scheduleConflictService;
 
     @Resource
     private ObjectMapper objectMapper;
@@ -231,7 +235,7 @@ public class ScheduleController {
         if (event.getStatus() == null) event.setStatus("pending");
         if (event.getReminderEnabled() == null) event.setReminderEnabled(true);
 
-        logScheduleConflicts(event, null);
+        scheduleConflictService.reviewBeforeSave(event);
         scheduleEventMapper.insert(event);
         syncScheduleFile(event.getEventDate());
         publishScheduleEvent("created", event);
@@ -251,7 +255,7 @@ public class ScheduleController {
         if (event.getEventTime() != null) {
             event.setEventDate(event.getEventTime().toLocalDate());
         }
-        logScheduleConflicts(event, id);
+        scheduleConflictService.reviewBeforeSave(event, id);
         scheduleEventMapper.updateById(event);
         syncScheduleFile(previousDate);
         syncScheduleFile(event.getEventDate());
@@ -354,7 +358,7 @@ public class ScheduleController {
                 event.setEventDate(event.getEventTime().toLocalDate());
             }
 
-            logScheduleConflicts(event, null);
+            scheduleConflictService.reviewBeforeSave(event);
             scheduleEventMapper.insert(event);
             syncScheduleFile(event.getEventDate());
             publishScheduleEvent("created_from_email", event);
@@ -461,25 +465,6 @@ public class ScheduleController {
                 item.setUpdateTime(LocalDateTime.now());
                 scheduleEventMapper.updateById(item);
             }
-        }
-    }
-
-    private void logScheduleConflicts(ScheduleEvent event, Long excludeId) {
-        if (event == null || event.getEventTime() == null) {
-            return;
-        }
-
-        QueryWrapper<ScheduleEvent> wrapper = new QueryWrapper<ScheduleEvent>()
-                .eq("event_time", event.getEventTime())
-                .ne("status", "cancelled");
-        if (excludeId != null) {
-            wrapper.ne("id", excludeId);
-        }
-
-        Long conflictCount = scheduleEventMapper.selectCount(wrapper);
-        if (conflictCount != null && conflictCount > 0) {
-            log.info("检测到 {} 条同时间日程，默认继续保存，由用户判定优先级: {} - {}",
-                    conflictCount, event.getTitle(), event.getEventTime());
         }
     }
 

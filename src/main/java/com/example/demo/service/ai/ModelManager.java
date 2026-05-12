@@ -204,6 +204,8 @@ public class ModelManager {
      * 测试模型连接（传入的 apiKey 是原始密钥，不需要解密）
      */
     public String testConnection(AiModelConfig config) {
+        validateTestConfig(config);
+
         // 直接使用传入的 API Key，不进行解密（测试连接时传入的是原始密钥）
         ChatModel testModel = OpenAiChatModel.builder()
                 .baseUrl(config.getBaseUrl())
@@ -217,7 +219,22 @@ public class ModelManager {
             String response = testModel.chat("Hello, please respond with 'OK' to confirm connection.");
             return "连接成功: " + (response != null && response.length() > 50 ? response.substring(0, 50) + "..." : response);
         } catch (Exception e) {
-            return "连接失败: " + e.getMessage();
+            throw new IllegalStateException("连接失败: " + e.getMessage(), e);
+        }
+    }
+
+    private void validateTestConfig(AiModelConfig config) {
+        if (config == null) {
+            throw new IllegalArgumentException("模型配置不能为空");
+        }
+        if (config.getBaseUrl() == null || config.getBaseUrl().isBlank()) {
+            throw new IllegalArgumentException("API 地址不能为空");
+        }
+        if (config.getApiKey() == null || config.getApiKey().isBlank()) {
+            throw new IllegalArgumentException("API Key 不能为空");
+        }
+        if (config.getModelName() == null || config.getModelName().isBlank()) {
+            throw new IllegalArgumentException("模型名称不能为空");
         }
     }
 }

@@ -382,7 +382,7 @@ const runMessageAnimations = async () => {
   await nextTick()
   messageRefs.value.forEach((el, index) => {
     setTimeout(() => {
-      animate(el, { opacity: [0, 1], transform: ['translateY(20px) scale(0.95)', 'translateY(0) scale(1)'] }, { duration: 0.4, easing: [0.34, 1.56, 0.64, 1] })
+      animate(el, { opacity: [0, 1], transform: ['translateY(14px) scale(0.98)', 'translateY(0) scale(1)'] }, { duration: 0.32, easing: [0.2, 0.8, 0.2, 1] })
     }, index * 60)
   })
 }
@@ -515,20 +515,19 @@ const sendMessage = async () => {
   }
 }
 
-// 新消息入场动画 - enhanced with spring bounce
+// 新消息入场动画 - iOS-like quick settle
 const animateNewMessage = (index: number) => {
   const el = messageRefs.value.get(index)
   if (el) {
-    // Spring bounce animation
     animate(
       el,
       {
         opacity: [0, 1],
-        transform: ['translateY(20px) scale(0.92)', 'translateY(-4px) scale(1.02)', 'translateY(0) scale(1)']
+        transform: ['translateY(14px) scale(0.98)', 'translateY(0) scale(1)']
       },
       {
-        duration: 0.5,
-        easing: [0.34, 1.56, 0.64, 1]
+        duration: 0.3,
+        easing: [0.2, 0.8, 0.2, 1]
       }
     )
   }
@@ -758,7 +757,7 @@ onMounted(async () => {
   --ds-radius-xs: var(--radius-md);
   --ds-shadow: var(--shadow-sm);
   --ds-shadow-lg: var(--shadow-lg);
-  --ds-shadow-hover: 0 6px 24px rgba(234, 88, 12, 0.12);
+  --ds-shadow-hover: 0 8px 24px rgba(84, 40, 8, 0.11);
 }
 
 .chat-page {
@@ -779,14 +778,14 @@ onMounted(async () => {
   min-width: 0;
   flex-shrink: 0;
   background: var(--ds-card);
-  border: 2px solid var(--ds-border);
+  border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius);
   height: 100%;
   overflow: hidden;
   position: relative;
   box-shadow: var(--ds-shadow);
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-              min-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width var(--transition-slide),
+              min-width var(--transition-slide);
 }
 
 .session-sidebar.collapsed {
@@ -811,7 +810,7 @@ onMounted(async () => {
   border-radius: var(--ds-radius-xs);
   cursor: pointer;
   z-index: 1000;
-  transition: all 0.25s ease;
+  transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
   box-shadow: var(--ds-shadow);
 }
 
@@ -819,6 +818,11 @@ onMounted(async () => {
   background: var(--ds-accent);
   color: var(--ds-text);
   box-shadow: var(--ds-shadow-hover);
+  transform: translateY(-50%) scale(0.98);
+}
+
+.divider-toggle-btn:active {
+  transform: translateY(-50%) scale(0.94);
 }
 
 /* 侧边栏内容 */
@@ -830,7 +834,7 @@ onMounted(async () => {
   overflow: hidden;
   opacity: 1;
   visibility: visible;
-  transition: opacity 0.25s ease, visibility 0.25s ease;
+  transition: opacity var(--transition-base), visibility var(--transition-base);
 }
 
 .session-sidebar.collapsed .sidebar-content {
@@ -853,15 +857,20 @@ onMounted(async () => {
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
   box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
   margin-bottom: 16px;
   text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .new-chat-btn:hover {
-  transform: translateY(-2px) scale(1.02);
+  transform: translateY(-1px) scale(0.99);
   box-shadow: 0 4px 16px rgba(234, 88, 12, 0.35);
+}
+
+.new-chat-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
 }
 
 .session-list {
@@ -901,7 +910,7 @@ onMounted(async () => {
   padding: 14px 16px;
   border-radius: var(--ds-radius-xs);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
   background: transparent;
   border: none;
   white-space: nowrap;
@@ -910,6 +919,10 @@ onMounted(async () => {
 
 .session-item:hover {
   background: var(--ds-bg);
+}
+
+.session-item:active {
+  transform: scale(0.985);
 }
 
 .session-item.active {
@@ -927,8 +940,8 @@ onMounted(async () => {
   background: var(--warm-100);
   color: var(--text-muted);
   flex-shrink: 0;
-  transition: all 0.2s ease;
-  border: 1.5px solid var(--border-light);
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  border: 1px solid var(--border-light);
 }
 
 .session-item.active .session-icon {
@@ -977,7 +990,7 @@ onMounted(async () => {
   color: var(--ds-text-muted);
   border-radius: var(--ds-radius-xs);
   opacity: 0;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -1080,7 +1093,7 @@ onMounted(async () => {
   display: flex;
   padding: 20px 0;
   border-bottom: 1px solid var(--ds-border);
-  animation: cardFadeIn 0.4s ease-out;
+  animation: cardFadeIn 0.32s var(--ease-ios-standard);
 }
 
 .message-wrapper:last-child {
@@ -1098,7 +1111,7 @@ onMounted(async () => {
 @keyframes cardFadeIn {
   0% {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(10px) scale(0.99);
   }
   100% {
     opacity: 1;
@@ -1177,7 +1190,7 @@ onMounted(async () => {
   font-weight: 400;
   line-height: 1.7;
   box-shadow: none;
-  border: 1.5px solid var(--ds-border);
+  border: 1px solid var(--ds-border);
 }
 
 /* 思考指示器 - 柔和风格 */
@@ -1244,12 +1257,16 @@ onMounted(async () => {
   color: var(--ds-text-muted);
   border-radius: var(--ds-radius-xs);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .action-btn:hover {
   background: var(--warm-100);
   color: var(--primary-color);
+}
+
+.action-btn:active {
+  transform: scale(0.92);
 }
 
 /* Markdown content */
@@ -1331,8 +1348,8 @@ onMounted(async () => {
   padding: 16px 20px;
   border-radius: var(--ds-radius-sm);
   background: var(--ds-card);
-  border: 2px solid var(--ds-border);
-  transition: all 0.25s ease;
+  border: 1px solid var(--ds-border);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-fast);
   box-shadow: var(--ds-shadow);
 }
 
@@ -1341,6 +1358,7 @@ onMounted(async () => {
 .input-capsule:focus-within {
   border-color: var(--primary-light);
   box-shadow: 0 4px 20px rgba(234, 88, 12, 0.1);
+  transform: translateY(-1px);
 }
 
 .input-right-actions {
@@ -1381,7 +1399,7 @@ onMounted(async () => {
   color: var(--text-muted);
   border-radius: var(--ds-radius-xs);
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .send-btn:hover:not(:disabled) {
@@ -1396,7 +1414,7 @@ onMounted(async () => {
 }
 
 .send-btn.active:hover {
-  transform: translateY(-2px) scale(1.05);
+  transform: translateY(-1px) scale(1.01);
   box-shadow: 0 6px 20px rgba(234, 88, 12, 0.35);
 }
 
@@ -1411,6 +1429,12 @@ onMounted(async () => {
   color: var(--ds-card);
 }
 
+.send-btn:active,
+.voice-btn:active,
+.mode-pill:active {
+  transform: scale(0.94);
+}
+
 /* 语音按钮 */
 .voice-btn {
   width: 40px;
@@ -1423,7 +1447,7 @@ onMounted(async () => {
   color: var(--ds-text-muted);
   border-radius: var(--ds-radius-xs);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
 .voice-btn:hover {
@@ -1459,7 +1483,7 @@ onMounted(async () => {
   font-weight: 600;
   border-radius: var(--ds-radius-xs);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
   box-shadow: none;
 }
 
@@ -1507,6 +1531,14 @@ onMounted(async () => {
     bottom: 24px;
     right: 24px;
     transform: none;
+  }
+
+  .divider-toggle-btn:hover {
+    transform: scale(0.98);
+  }
+
+  .divider-toggle-btn:active {
+    transform: scale(0.94);
   }
 
   .message-list {

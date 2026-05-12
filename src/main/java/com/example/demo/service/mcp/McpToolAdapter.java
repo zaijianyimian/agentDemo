@@ -44,6 +44,7 @@ public class McpToolAdapter {
      * 内置工具名称常量
      */
     public static final String BUILTIN_SCHEDULE_CREATE = "schedule_create";
+    public static final String BUILTIN_SCHEDULE_READ = "schedule_read";
 
     /**
      * 工具规格缓存
@@ -103,8 +104,9 @@ public class McpToolAdapter {
             specs.add(convertToToolSpecification(tool));
         }
 
-        // 2. 添加内置工具：创建日程
+        // 2. 添加内置工具：创建和读取日程
         specs.add(buildScheduleCreateToolSpec());
+        specs.add(buildScheduleReadToolSpec());
 
         return specs;
     }
@@ -130,6 +132,42 @@ public class McpToolAdapter {
                                 .description("地点，可选")
                                 .build())
                         .required(List.of("title", "eventTime"))
+                        .build())
+                .build();
+    }
+
+    /**
+     * 构建读取日程的内置工具规格
+     */
+    private ToolSpecification buildScheduleReadToolSpec() {
+        return ToolSpecification.builder()
+                .name(BUILTIN_SCHEDULE_READ)
+                .description("读取或查询日程事件。当用户询问今天、明天、某天、某段时间、某个ID、最近日程或包含某个关键词的日程时调用此工具。")
+                .parameters(JsonObjectSchema.builder()
+                        .addProperty("mode", JsonStringSchema.builder()
+                                .description("查询模式，可选值: today、tomorrow、date、range、id、keyword、latest。默认 latest。")
+                                .build())
+                        .addProperty("date", JsonStringSchema.builder()
+                                .description("mode=date 时使用，日期格式 yyyy-MM-dd。")
+                                .build())
+                        .addProperty("startDate", JsonStringSchema.builder()
+                                .description("mode=range 时使用，开始日期 yyyy-MM-dd。")
+                                .build())
+                        .addProperty("endDate", JsonStringSchema.builder()
+                                .description("mode=range 时使用，结束日期 yyyy-MM-dd。")
+                                .build())
+                        .addProperty("id", JsonIntegerSchema.builder()
+                                .description("mode=id 时使用，日程ID。")
+                                .build())
+                        .addProperty("keyword", JsonStringSchema.builder()
+                                .description("mode=keyword 时使用，按标题、描述、地点模糊查询。")
+                                .build())
+                        .addProperty("limit", JsonIntegerSchema.builder()
+                                .description("最多返回多少条，默认 10，最大 30。")
+                                .build())
+                        .addProperty("includeFile", JsonBooleanSchema.builder()
+                                .description("是否同时返回对应日程 Markdown 文件内容。查询单日或单个日程时可设为 true。")
+                                .build())
                         .build())
                 .build();
     }
@@ -284,6 +322,9 @@ public class McpToolAdapter {
         if (BUILTIN_SCHEDULE_CREATE.equals(toolName)) {
             return executeScheduleCreate(params);
         }
+        if (BUILTIN_SCHEDULE_READ.equals(toolName)) {
+            return executeScheduleRead(params);
+        }
 
         // 执行外部工具
         ToolExecutionResult result = mcpToolService.execute(toolName, params);
@@ -353,16 +394,201 @@ public class McpToolAdapter {
             }
             log.info("内置工具创建日程成功: id={}, title={}, time={}", event.getId(), title, eventTime);
 
-            return objectMapper.writeValueAsString(Map.of(
-                    "success", true,
-                    "result", "日程已创建: " + title + " (" + eventTime + ")",
-                    "scheduleId", event.getId(),
-                    "title", title,
-                    "eventTime", eventTime.toString()
-            ));
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("result", "日程已创建并写入 Markdown 文档: " + title + " (" + eventTime + ")");
+            result.put("scheduleId", event.getId());
+            result.put("title", title);
+            result.put("eventTime", eventTime.toString());
+            if (filePath != null) {
+                result.put("filePath", filePath);
+                result.put("fileName", "schedule-" + event.getEventDate() + ".md");
+            }
+            return objectMapper.writeValueAsString(result);
         } catch (Exception e) {
             log.error("内置工具创建日程失败", e);
             return "{\"success\": false, \"error\": \"" + e.getMessage() + "\"}";
         }
+    }
+
+    /**
+     * 执行内置日程读取工具
+     */
+    private String executeScheduleRead(Map<String, Object> params) {
+        try {
+            String mode = stringParam(params, "mode", "latest").toLowerCase();
+            boolean includeFile = booleanParam(params, "includeFile", false);
+            int limit = Math.min(Math.max(intParam(params, "limit", 10), 1), 30);
+
+            List<ScheduleEvent> events;
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("mode", mode);
+
+            switch (mode) {
+                case "today" -> {
+                    LocalDate date = LocalDate.now();
+                    events = selectByDate(date);
+                    response.put("date", date.toString());
+                    appendFileContent(response, includeFile, date, null);
+                }
+                case "tomorrow" -> {
+                    LocalDate date = LocalDate.now().plusDays(1);
+                    events = selectByDate(date);
+                    response.put("date", date.toString());
+                    appendFileContent(response, includeFile, date, null);
+                }
+                case "date" -> {
+                    LocalDate date = LocalDate.parse(requireString(params, "date"));
+                    events = selectByDate(date);
+                    response.put("date", date.toString());
+                    appendFileContent(response, includeFile, date, null);
+                }
+                case "range" -> {
+                    LocalDate startDate = LocalDate.parse(requireString(params, "startDate"));
+                    LocalDate endDate = LocalDate.parse(requireString(params, "endDate"));
+                    events = scheduleEventMapper.selectList(
+                            new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ScheduleEvent>()
+                                    .ge("event_date", startDate)
+                                    .le("event_date", endDate)
+                                    .orderByAsc("event_time")
+                                    .orderByDesc("create_time")
+                    );
+                    response.put("startDate", startDate.toString());
+                    response.put("endDate", endDate.toString());
+                }
+                case "id" -> {
+                    Long id = longParam(params, "id");
+                    if (id == null) {
+                        return objectMapper.writeValueAsString(Map.of(
+                                "success", false,
+                                "error", "id 不能为空"
+                        ));
+                    }
+                    ScheduleEvent event = scheduleEventMapper.selectById(id);
+                    events = event == null ? List.of() : List.of(event);
+                    response.put("id", id);
+                    appendFileContent(response, includeFile, event != null ? event.getEventDate() : null, event);
+                }
+                case "keyword" -> {
+                    String keyword = requireString(params, "keyword");
+                    events = scheduleEventMapper.selectList(
+                            new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ScheduleEvent>()
+                                    .like("title", keyword)
+                                    .or()
+                                    .like("description", keyword)
+                                    .or()
+                                    .like("location", keyword)
+                                    .orderByAsc("event_time")
+                                    .orderByDesc("create_time")
+                                    .last("LIMIT " + limit)
+                    );
+                    response.put("keyword", keyword);
+                }
+                case "latest" -> events = scheduleEventMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ScheduleEvent>()
+                                .orderByDesc("update_time")
+                                .orderByDesc("create_time")
+                                .last("LIMIT " + limit)
+                );
+                default -> {
+                    return objectMapper.writeValueAsString(Map.of(
+                            "success", false,
+                            "error", "不支持的查询模式: " + mode
+                    ));
+                }
+            }
+
+            if (!"keyword".equals(mode) && !"latest".equals(mode)) {
+                events = events.stream().limit(limit).toList();
+            }
+            response.put("count", events.size());
+            response.put("events", events);
+
+            return objectMapper.writeValueAsString(response);
+        } catch (Exception e) {
+            log.error("内置工具读取日程失败", e);
+            try {
+                return objectMapper.writeValueAsString(Map.of(
+                        "success", false,
+                        "error", e.getMessage()
+                ));
+            } catch (Exception serializationError) {
+                return "{\"success\": false, \"error\": \"读取日程失败\"}";
+            }
+        }
+    }
+
+    private List<ScheduleEvent> selectByDate(LocalDate date) {
+        return scheduleEventMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ScheduleEvent>()
+                        .eq("event_date", date)
+                        .orderByAsc("event_time")
+                        .orderByDesc("create_time")
+        );
+    }
+
+    private void appendFileContent(Map<String, Object> response, boolean includeFile, LocalDate date, ScheduleEvent event) {
+        if (!includeFile) {
+            return;
+        }
+
+        String content = null;
+        String fileName = null;
+        if (event != null && event.getFilePath() != null) {
+            content = scheduleFileService.readScheduleFileByPath(event.getFilePath());
+        }
+        if (content == null && date != null) {
+            content = scheduleFileService.readScheduleFile(date);
+            fileName = "schedule-" + date + ".md";
+        }
+        response.put("fileName", fileName);
+        response.put("fileContent", content != null ? content : "");
+    }
+
+    private String stringParam(Map<String, Object> params, String key, String defaultValue) {
+        Object value = params.get(key);
+        return value == null ? defaultValue : String.valueOf(value);
+    }
+
+    private String requireString(Map<String, Object> params, String key) {
+        String value = stringParam(params, key, "");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(key + " 不能为空");
+        }
+        return value;
+    }
+
+    private boolean booleanParam(Map<String, Object> params, String key, boolean defaultValue) {
+        Object value = params.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        return Boolean.parseBoolean(String.valueOf(value));
+    }
+
+    private int intParam(Map<String, Object> params, String key, int defaultValue) {
+        Object value = params.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return Integer.parseInt(String.valueOf(value));
+    }
+
+    private Long longParam(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value == null || String.valueOf(value).isBlank()) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.parseLong(String.valueOf(value));
     }
 }

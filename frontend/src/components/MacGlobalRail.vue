@@ -10,6 +10,8 @@
           v-for="item in topQuickAccess"
           :key="item.name"
           class="quick-access-item"
+          :title="item.label"
+          :aria-label="item.label"
           @click="handleQuickAccessClick(item)"
         >
           <div class="quick-icon-wrapper">
@@ -34,6 +36,8 @@
         v-for="category in categories"
         :key="category.id"
         :class="['dock-item', { active: activeCategory === category.id, current: isCurrentCategory(category) }]"
+        :title="category.label"
+        :aria-label="category.label"
         @click="handleCategoryClick(category.id)"
       >
         <div class="dock-icon-wrapper" :style="{ '--category-color': category.color }">
@@ -52,12 +56,16 @@
     <div class="rail-footer">
       <button
         class="user-avatar-btn"
+        :title="userDisplayName"
+        :aria-label="userDisplayName"
         @click="handleUserClick"
       >
         <span class="avatar-circle">{{ userInitial }}</span>
       </button>
       <button
         class="theme-toggle-btn"
+        :title="actualTheme === 'light' ? '切换深色主题' : '切换浅色主题'"
+        :aria-label="actualTheme === 'light' ? '切换深色主题' : '切换浅色主题'"
         @click="toggleTheme"
       >
         <n-icon size="18">
@@ -209,10 +217,10 @@ const toggleTheme = () => {
   width: 72px;
   padding: 16px 8px;
   background: var(--bg-card);
-  border: 2px solid var(--border-light);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-rail);
-  transition: all var(--transition-slide);
+  transition: width var(--transition-slide), padding var(--transition-slide), background-color var(--transition-base), border-color var(--transition-base);
   pointer-events: auto;
 }
 
@@ -261,7 +269,7 @@ const toggleTheme = () => {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .quick-access-item:hover {
@@ -270,7 +278,7 @@ const toggleTheme = () => {
 
 .quick-access-item:active {
   background: var(--bg-menu-item-active);
-  transform: scale(0.96);
+  transform: scale(0.94);
 }
 
 .quick-icon-wrapper {
@@ -281,13 +289,13 @@ const toggleTheme = () => {
   border-radius: var(--radius-sm);
   background: var(--warm-100);
   color: var(--primary-color);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1.5px solid var(--border-light);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  border: 1px solid var(--border-light);
 }
 
 .quick-access-item:hover .quick-icon-wrapper {
   background: var(--warm-200);
-  transform: scale(1.08) rotate(-3deg);
+  transform: translateY(-1px) scale(1.025);
   border-color: var(--primary-light);
 }
 
@@ -327,7 +335,7 @@ const toggleTheme = () => {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .dock-item:hover {
@@ -339,7 +347,7 @@ const toggleTheme = () => {
 }
 
 .dock-item:active {
-  transform: scale(0.92);
+  transform: scale(0.93);
 }
 
 .dock-icon-wrapper {
@@ -350,15 +358,15 @@ const toggleTheme = () => {
   border-radius: var(--radius-md);
   background: var(--warm-100);
   color: var(--primary-color);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 2px solid transparent;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  border: 1px solid transparent;
 }
 
 .dock-item:hover .dock-icon-wrapper {
   background: var(--bg-elevated);
   border-color: var(--primary-light);
   box-shadow: 0 4px 12px var(--primary-glow);
-  transform: translateY(-3px) scale(1.08) rotate(-2deg);
+  transform: translateY(-1px) scale(1.025);
 }
 
 .dock-item.active .dock-icon-wrapper {
@@ -399,7 +407,7 @@ const toggleTheme = () => {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .user-avatar-btn:hover {
@@ -416,13 +424,13 @@ const toggleTheme = () => {
   color: white;
   font-weight: 700;
   font-size: 0.85rem;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
   box-shadow: 0 2px 8px var(--primary-glow);
   text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .user-avatar-btn:hover .avatar-circle {
-  transform: scale(1.1) rotate(3deg);
+  transform: translateY(-1px) scale(1.025);
   box-shadow: 0 4px 14px rgba(234, 88, 12, 0.3);
 }
 
@@ -436,7 +444,7 @@ const toggleTheme = () => {
   border-radius: var(--radius-md);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .theme-toggle-btn:hover {
