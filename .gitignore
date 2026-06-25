@@ -1,0 +1,116 @@
+HELP.md
+.gradle/
+build/
+target/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### 不上传的文件 ###
+.claude/
+application.yaml
+src/main/resources/application.yaml
+src/main/resources/application-local.yaml
+src/main/resources/application-*.yaml
+src/main/resources/application-*.yml
+src/main/resources/application-*.properties
+!src/main/resources/application.example.yaml
+!src/main/resources/application.example.yml
+!src/main/resources/application.example.properties
+.env
+.env.*
+!.env.example
+*.local
+
+### 旧版文档（已合并到主文档）###
+API1.md
+README1.md
+TECHNICAL_DOC_OLD.md
+
+### 旧版SQL（已合并）###
+src/main/resources/sql/agent.sql
+src/main/resources/sql/search_history.sql
+src/main/resources/sql/system_settings.sql
+src/main/resources/sql/migration_*.sql
+!src/main/resources/sql/migration_increments.sql
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### 运行时数据 ###
+data/
+logs/
+*.log
+*.log.*
+*.log.gz
+*.pid
+*.seed
+*.stackdump
+generated/
+
+### 前端依赖、缓存和构建产物 ###
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.vite/
+**/.vite/
+.cache/
+**/.cache/
+coverage/
+**/coverage/
+.npm/
+.pnpm-store/
+.yarn/
+**/.yarn/cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+### 系统文件 ###
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+*.bak
+*.orig
+*.swp
+*.swo
+*~
+
+### JVM / Spring Boot 运行产物 ###
+hs_err_pid*
+replay_pid*
+*.hprof
+
+### Claude Code 会话记录 ###
+*.jsonl

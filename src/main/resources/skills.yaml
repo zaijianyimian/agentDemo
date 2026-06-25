@@ -1,0 +1,149 @@
+# 技能配置文件
+# 支持从技能市场导入或自定义技能
+
+skills:
+  # 网络搜索技能
+  - code: web_search
+    name: 网络搜索
+    description: 在互联网上搜索相关信息，返回搜索结果
+    category: search
+    icon: search
+    enabled: true
+    isBuiltin: true
+    tools:
+      - name: web_search_tool
+        displayName: 网络搜索工具
+        description: 执行网络搜索
+        toolType: http_api
+        config:
+          url: https://api.serper.dev/search
+          method: POST
+          timeout: 30
+          headers:
+            X-API-KEY: ${SERPER_API_KEY}
+        inputSchema:
+          type: object
+          properties:
+            query:
+              type: string
+              description: 搜索关键词
+          required:
+            - query
+
+  # AI对话技能
+  - code: ai_chat
+    name: AI 对话
+    description: 与 AI 进行对话，获取智能回答
+    category: ai
+    icon: chat
+    enabled: true
+    isBuiltin: true
+    tools:
+      - name: ai_chat_tool
+        displayName: AI 对话工具
+        description: 调用大模型进行对话
+        toolType: http_api
+        config:
+          url: ${AI_CHAT_URL}
+          method: POST
+          timeout: 60
+        inputSchema:
+          type: object
+          properties:
+            message:
+              type: string
+              description: 用户消息
+          required:
+            - message
+
+  # 天气查询技能
+  - code: weather_query
+    name: 天气查询
+    description: 查询指定城市的天气信息
+    category: data
+    icon: cloud
+    enabled: false
+    isBuiltin: true
+    tools:
+      - name: weather_query_tool
+        displayName: 天气查询工具
+        description: 查询城市天气
+        toolType: http_api
+        config:
+          url: https://api.openweathermap.org/data/2.5/weather
+          method: GET
+          timeout: 30
+        inputSchema:
+          type: object
+          properties:
+            city:
+              type: string
+              description: 城市名称
+          required:
+            - city
+
+  # 邮件发送技能
+  - code: send_email
+    name: 发送邮件
+    description: 发送邮件通知到指定邮箱
+    category: system
+    icon: email
+    enabled: false
+    isBuiltin: true
+    tools:
+      - name: send_email_tool
+        displayName: 邮件发送工具
+        description: 发送邮件
+        toolType: http_api
+        config:
+          url: ${EMAIL_API_URL}
+          method: POST
+          timeout: 30
+        inputSchema:
+          type: object
+          properties:
+            to:
+              type: string
+              description: 收件人邮箱
+            subject:
+              type: string
+              description: 邮件主题
+            body:
+              type: string
+              description: 邮件内容
+          required:
+            - to
+            - subject
+            - body
+
+  # 文件操作技能
+  - code: file_operations
+    name: 文件操作
+    description: 读写本地文件系统
+    category: system
+    icon: folder
+    enabled: false
+    isBuiltin: true
+    tools:
+      - name: file_operations_tool
+        displayName: 文件操作工具
+        description: 读写本地文件
+        toolType: local_script
+        config:
+          scriptPath: ./scripts/file_ops.sh
+          timeout: 30
+        inputSchema:
+          type: object
+          properties:
+            operation:
+              type: string
+              description: "操作类型: read/write"
+            path:
+              type: string
+              description: 文件路径
+            content:
+              type: string
+              description: "写入内容(写操作时需要)"
+          required:
+            - operation
+            - path

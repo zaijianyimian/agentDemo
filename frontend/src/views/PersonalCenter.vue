@@ -1,0 +1,725 @@
+<template>
+  <div class="page-shell">
+    <section class="page-hero hero-grid motion-hero">
+      <div>
+        <div class="page-eyebrow">Solo Mode</div>
+        <h2>单用户增强中心</h2>
+        <p>一站完成专注、自动化模板、备份恢复、离线缓存与知识库策略配置。</p>
+      </div>
+      <div class="hero-side">
+        <div class="hero-stat"><span>启用任务</span><strong>{{ insights?.enabledTasks ?? 0 }}</strong></div>
+        <div class="hero-stat"><span>今日日程</span><strong>{{ insights?.todaySchedules ?? 0 }}</strong></div>
+        <div class="hero-stat"><span>Token 总量</span><strong>{{ insights?.totalTokenUsage ?? 0 }}</strong></div>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="surface-panel span-6 motion-card">
+        <div class="section-head">
+          <div><div class="page-eyebrow">Templates</div><h3>自动化模板中心</h3></div>
+        </div>
+        <div class="template-list">
+          <div v-for="item in templates" :key="item.id" class="template-card">
+            <div>
+              <strong>{{ item.name }}</strong>
+              <p>{{ item.description }}</p>
+              <small>{{ item.cronExpression }}</small>
+            </div>
+            <n-button size="small" type="primary" @click="applyTemplate(item.id)">一键启用</n-button>
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-panel span-6 motion-card">
+        <div class="section-head">
+          <div><div class="page-eyebrow">Mode</div><h3>专注与缓存</h3></div>
+        </div>
+        <div class="setting-row">
+          <span>专注模式（收起侧栏，减少干扰）</span>
+          <n-switch v-model:value="focusMode" @update:value="onFocusModeToggle" />
+        </div>
+        <div class="setting-row">
+          <span>离线缓存（仪表盘/收件箱可回退）</span>
+          <n-switch v-model:value="offlineCacheEnabled" @update:value="onOfflineCacheToggle" />
+        </div>
+        <div class="setting-row">
+          <span>知识库去重上传</span>
+          <n-switch v-model:value="knowledgeDedupeEnabled" />
+        </div>
+        <div class="setting-row">
+          <span>知识库增量上传</span>
+          <n-switch v-model:value="knowledgeIncrementalEnabled" />
+        </div>
+        <n-button size="small" tertiary @click="saveKnowledgeSettings">保存知识库策略</n-button>
+      </div>
+
+      <div class="surface-panel span-6 motion-card">
+        <div class="section-head">
+          <div><div class="page-eyebrow">Face 2FA</div><h3>人脸二次验证</h3></div>
+        </div>
+        <div class="setting-row">
+          <span>已绑定人脸</span>
+          <strong>{{ faceStatus?.enrolled ? '是' : '否' }}</strong>
+        </div>
+        <div class="setting-row">
+          <span>强制登录二次验证</span>
+          <n-switch :value="faceRequired" :disabled="!faceStatus?.enrolled" @update:value="toggleFaceRequired" />
+        </div>
+        <div class="face-capture-section">
+          <div class="camera-preview" v-if="cameraActive">
+            <video ref="videoRef" autoplay playsinline muted class="video-element"></video>
+            <canvas ref="canvasRef" style="display: none;"></canvas>
+          </div>
+          <div class="capture-actions" v-if="cameraActive">
+            <n-button type="primary" size="small" @click="captureFacePhoto" :loading="capturing">
+              拍照
+            </n-button>
+            <n-button size="small" @click="stopCamera">取消</n-button>
+          </div>
+          <div v-if="!cameraActive && !faceImageBase64" class="start-camera">
+            <n-button type="primary" size="small" @click="startCamera">
+              <template #icon><n-icon><CameraIcon /></n-icon></template>
+              打开摄像头
+            </n-button>
+            <div class="or-divider">或</div>
+            <div class="file-upload">
+              <input type="file" accept="image/*" @change="onFaceFileSelect" />
+              <span>选择本地图片</span>
+            </div>
+          </div>
+          <div v-if="faceImageBase64" class="preview-section">
+            <img :src="faceImageBase64" class="face-preview" alt="人脸预览" />
+            <div class="preview-actions">
+              <n-button size="small" @click="retakeFacePhoto">重新拍摄</n-button>
+              <n-button type="primary" size="small" :loading="faceSaving" @click="saveFaceProfile">确认绑定</n-button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-panel span-6 motion-card">
+        <div class="section-head">
+          <div><div class="page-eyebrow">Backup</div><h3>数据备份与恢复</h3></div>
+        </div>
+        <div class="backup-actions">
+          <n-button type="primary" @click="exportBackup">导出备份 JSON</n-button>
+          <n-upload :show-file-list="false" accept=".json,application/json" :custom-request="handleImportUpload">
+            <n-button>导入备份 JSON</n-button>
+          </n-upload>
+          <div class="setting-row">
+            <span>导入前覆盖现有数据</span>
+            <n-switch v-model:value="replaceExisting" />
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-panel span-6 motion-card">
+        <div class="section-head">
+          <div><div class="page-eyebrow">Reminder</div><h3>提醒快速预设</h3></div>
+        </div>
+        <div class="preset-list">
+          <n-button size="small" @click="applyReminderPreset('morning')">晨间 08:00</n-button>
+          <n-button size="small" @click="applyReminderPreset('noon')">午间 12:00</n-button>
+          <n-button size="small" @click="applyReminderPreset('evening')">晚间 20:00</n-button>
+        </div>
+      </div>
+
+      <div class="surface-panel span-12 motion-card">
+        <div class="section-head">
+          <div><div class="page-eyebrow">History</div><h3>最近操作记录</h3></div>
+          <n-button text @click="clearHistory">清空</n-button>
+        </div>
+        <div v-if="recentActions.length" class="history-list">
+          <div v-for="item in recentActions" :key="`${item.time}-${item.title}`" class="history-item">
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.detail || '-' }}</p>
+            <small>{{ item.time }}</small>
+          </div>
+        </div>
+        <n-empty v-else description="暂无操作记录" />
+      </div>
+    </section>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { NButton, NEmpty, NIcon, NSwitch, NUpload, useMessage } from 'naive-ui'
+import { CameraOutline as CameraIcon } from '@vicons/ionicons5'
+import { authService, personalService, settingsService } from '@/services/api'
+import type { FaceStatusResponse, PersonalInsight, TaskTemplate } from '@/types'
+import {
+  clearRecentActions,
+  isFocusMode,
+  isOfflineCacheEnabled,
+  pushRecentAction,
+  readRecentActions,
+  setFocusMode,
+  setOfflineCacheEnabled,
+  type RecentActionItem
+} from '@/services/user-preferences'
+
+const message = useMessage()
+
+const insights = ref<PersonalInsight | null>(null)
+const templates = ref<TaskTemplate[]>([])
+const focusMode = ref(isFocusMode())
+const offlineCacheEnabled = ref(isOfflineCacheEnabled())
+const knowledgeDedupeEnabled = ref(true)
+const knowledgeIncrementalEnabled = ref(true)
+const replaceExisting = ref(false)
+const recentActions = ref<RecentActionItem[]>(readRecentActions())
+const faceStatus = ref<FaceStatusResponse | null>(null)
+const faceRequired = ref(false)
+const faceImageBase64 = ref('')
+const faceSaving = ref(false)
+
+// 摄像头相关
+const videoRef = ref<HTMLVideoElement | null>(null)
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+const cameraActive = ref(false)
+const capturing = ref(false)
+let mediaStream: MediaStream | null = null
+
+const loadData = async () => {
+  const [insightRes, templateRes, settingsRes, faceStatusRes] = await Promise.all([
+    personalService.insights(),
+    personalService.listTaskTemplates(),
+    settingsService.getSystem(),
+    authService.faceStatus()
+  ])
+
+  if (insightRes.success && insightRes.data) {
+    insights.value = insightRes.data
+  }
+  if (templateRes.success && templateRes.data) {
+    templates.value = templateRes.data
+  }
+  if (settingsRes.success && settingsRes.data) {
+    knowledgeDedupeEnabled.value = settingsRes.data.knowledge_dedupe_enabled !== 'false'
+    knowledgeIncrementalEnabled.value = settingsRes.data.knowledge_incremental_enabled !== 'false'
+  }
+  if (faceStatusRes.success && faceStatusRes.data) {
+    faceStatus.value = faceStatusRes.data
+    faceRequired.value = faceStatusRes.data.required
+  }
+}
+
+const syncRecentActions = () => {
+  recentActions.value = readRecentActions()
+}
+
+const appendAction = (title: string, detail?: string) => {
+  pushRecentAction({
+    time: new Date().toLocaleString(),
+    title,
+    detail
+  })
+  syncRecentActions()
+}
+
+const applyTemplate = async (templateId: string) => {
+  const res = await personalService.createTaskFromTemplate(templateId)
+  if (res.success) {
+    message.success('模板任务已创建')
+    appendAction('启用任务模板', templateId)
+  } else {
+    message.error(res.message || '模板创建失败')
+  }
+}
+
+const exportBackup = async () => {
+  const res = await personalService.exportBackup()
+  if (!res.success || !res.data) {
+    message.error(res.message || '导出失败')
+    return
+  }
+  const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `agent-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  message.success('备份已导出')
+  appendAction('导出备份', 'JSON 文件已下载')
+}
+
+const handleImportUpload = async ({ file }: { file: { file: File | null } }) => {
+  if (!file.file) return
+  try {
+    const raw = await file.file.text()
+    const payload = JSON.parse(raw)
+    const res = await personalService.importBackup(payload, replaceExisting.value)
+    if (res.success) {
+      message.success('备份导入成功')
+      appendAction('导入备份', `replace=${replaceExisting.value}`)
+      await loadData()
+    } else {
+      message.error(res.message || '导入失败')
+    }
+  } catch {
+    message.error('备份文件解析失败')
+  }
+}
+
+const onFocusModeToggle = (value: boolean) => {
+  setFocusMode(value)
+  window.dispatchEvent(new CustomEvent('focus-mode-changed', { detail: { enabled: value } }))
+  appendAction('切换专注模式', value ? '开启' : '关闭')
+}
+
+const onOfflineCacheToggle = (value: boolean) => {
+  setOfflineCacheEnabled(value)
+  appendAction('切换离线缓存', value ? '开启' : '关闭')
+}
+
+const saveKnowledgeSettings = async () => {
+  const res = await settingsService.updateSystem({
+    knowledge_dedupe_enabled: knowledgeDedupeEnabled.value ? 'true' : 'false',
+    knowledge_incremental_enabled: knowledgeIncrementalEnabled.value ? 'true' : 'false'
+  })
+  if (res.success) {
+    message.success('知识库策略已保存')
+    appendAction('保存知识库策略')
+  } else {
+    message.error(res.message || '保存失败')
+  }
+}
+
+const applyReminderPreset = async (type: 'morning' | 'noon' | 'evening') => {
+  const mapping = {
+    morning: '0 0 8 * * ?',
+    noon: '0 0 12 * * ?',
+    evening: '0 0 20 * * ?'
+  }
+  const cron = mapping[type]
+  const res = await settingsService.updateSchedule({
+    morning_reminder_cron: cron
+  })
+  if (res.success) {
+    message.success('提醒预设已应用')
+    appendAction('应用提醒预设', `${type} -> ${cron}`)
+  } else {
+    message.error(res.message || '应用失败')
+  }
+}
+
+const clearHistory = () => {
+  clearRecentActions()
+  syncRecentActions()
+  message.success('历史记录已清空')
+}
+
+const toBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('图片读取失败'))
+    reader.readAsDataURL(file)
+  })
+
+const onFaceFileSelect = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) {
+    faceImageBase64.value = ''
+    return
+  }
+  if (!file.type.startsWith('image/')) {
+    message.warning('请选择图片文件')
+    target.value = ''
+    return
+  }
+  faceImageBase64.value = await toBase64(file)
+}
+
+// 摄像头功能
+const startCamera = async () => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    message.error('您的浏览器不支持摄像头功能，请使用现代浏览器（Chrome/Firefox/Edge）')
+    return
+  }
+
+  const isSecureContext = window.isSecureContext || location.protocol === 'https:' ||
+                          location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+  if (!isSecureContext) {
+    message.error('摄像头功能需要 HTTPS 安全连接，请使用 https:// 访问或使用 localhost')
+    return
+  }
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+    })
+    cameraActive.value = true
+    await nextTick()
+
+    // 最多重试 5 次，确保 DOM 挂载
+    let attempts = 0
+    const tryAttach = async () => {
+      const video = videoRef.value
+      if (video && mediaStream) {
+        video.srcObject = mediaStream
+        video.muted = true
+        try {
+          await video.play()
+        } catch {
+          video.onloadedmetadata = () => {
+            video.play().catch(() => {})
+          }
+        }
+      } else if (attempts < 5) {
+        attempts++
+        await new Promise(r => setTimeout(r, 80))
+        await tryAttach()
+      } else {
+        console.warn('videoRef is null after retries')
+      }
+    }
+    await tryAttach()
+  } catch (error: any) {
+    console.error('Camera error:', error)
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      message.error('摄像头权限被拒绝，请在浏览器地址栏左侧点击允许摄像头访问')
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      message.error('未检测到摄像头设备，请确保设备已连接摄像头')
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      message.error('摄像头可能被其他应用占用，请关闭其他使用摄像头的应用后重试')
+    } else if (error.name === 'OverconstrainedError') {
+      message.error('摄像头不支持所需分辨率，请尝试使用本地图片')
+    } else if (error.name === 'NotSupportedError') {
+      message.error('浏览器不支持摄像头功能，请使用本地图片')
+    } else {
+      message.error(`无法访问摄像头: ${error.message || '未知错误'}，请使用本地图片`)
+    }
+  }
+}
+
+const stopCamera = () => {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop())
+    mediaStream = null
+  }
+  cameraActive.value = false
+}
+
+const captureFacePhoto = async () => {
+  if (!videoRef.value || !canvasRef.value) return
+
+  capturing.value = true
+  try {
+    const video = videoRef.value
+    const canvas = canvasRef.value
+    const sourceWidth = video.videoWidth || 640
+    const sourceHeight = video.videoHeight || 480
+    const square = Math.min(sourceWidth, sourceHeight)
+    const sourceX = Math.floor((sourceWidth - square) / 2)
+    const sourceY = Math.floor((sourceHeight - square) / 2)
+
+    canvas.width = 320
+    canvas.height = 320
+
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.drawImage(video, sourceX, sourceY, square, square, 0, 0, canvas.width, canvas.height)
+      faceImageBase64.value = canvas.toDataURL('image/jpeg', 0.95)
+      stopCamera()
+    }
+  } catch (error) {
+    message.error('拍照失败，请重试')
+    console.error('Capture error:', error)
+  } finally {
+    capturing.value = false
+  }
+}
+
+const retakeFacePhoto = () => {
+  faceImageBase64.value = ''
+  startCamera()
+}
+
+const saveFaceProfile = async () => {
+  if (!faceImageBase64.value) {
+    message.warning('请先选择人脸图片')
+    return
+  }
+  faceSaving.value = true
+  try {
+    const res = await authService.registerFace({ imageBase64: faceImageBase64.value })
+    if (!res.success || !res.data) {
+      throw new Error(res.message || '绑定失败')
+    }
+    faceStatus.value = res.data
+    faceRequired.value = res.data.required
+    message.success('人脸模板已更新，可按需开启登录二次验证')
+    appendAction('绑定人脸模板')
+  } catch (e: any) {
+    message.error(e?.message || '绑定失败')
+  } finally {
+    faceSaving.value = false
+  }
+}
+
+const toggleFaceRequired = async (value: boolean) => {
+  try {
+    const res = await authService.toggleFaceRequired({ required: value })
+    if (!res.success || !res.data) {
+      throw new Error(res.message || '更新失败')
+    }
+    faceStatus.value = res.data
+    faceRequired.value = res.data.required
+    message.success(value ? '已开启人脸二次验证' : '已关闭人脸二次验证')
+    appendAction('切换人脸二次验证', value ? '开启' : '关闭')
+  } catch (e: any) {
+    faceRequired.value = !!faceStatus.value?.required
+    message.error(e?.message || '更新失败')
+  }
+}
+
+onMounted(loadData)
+
+onUnmounted(() => {
+  stopCamera()
+})
+</script>
+
+<style scoped>
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, .85fr);
+  gap: 20px;
+}
+
+.motion-hero {
+  animation: riseIn .45s cubic-bezier(.22, 1, .36, 1);
+}
+
+.motion-card {
+  animation: riseIn .46s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.section-grid > .motion-card:nth-child(1) {
+  animation-delay: .06s;
+}
+
+.section-grid > .motion-card:nth-child(2) {
+  animation-delay: .11s;
+}
+
+.section-grid > .motion-card:nth-child(3) {
+  animation-delay: .16s;
+}
+
+.section-grid > .motion-card:nth-child(4) {
+  animation-delay: .21s;
+}
+
+.section-grid > .motion-card:nth-child(5) {
+  animation-delay: .26s;
+}
+
+.hero-side, .backup-actions, .template-list, .history-list {
+  display: grid;
+  gap: 12px;
+}
+.hero-stat, .template-card, .history-item, .setting-row {
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, .05);
+  border-radius: 16px;
+}
+.hero-stat, .template-card, .history-item {
+  padding: 14px 16px;
+}
+.hero-stat span, .template-card p, .history-item p, .history-item small {
+  color: var(--text-secondary);
+}
+.hero-stat strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.2rem;
+}
+.template-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.template-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(245, 158, 11, .38);
+  box-shadow: 0 10px 28px rgba(245, 158, 11, .16);
+}
+.template-card small {
+  color: var(--text-muted);
+}
+.setting-row {
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.face-capture-section {
+  margin-top: 12px;
+}
+
+.camera-preview {
+  width: min(100%, 320px);
+  margin: 0 auto;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d1f0f 100%);
+  border: 2px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.15), inset 0 0 20px rgba(245, 158, 11, 0.05);
+  position: relative;
+}
+
+.camera-preview::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 2px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.4), rgba(234, 88, 12, 0.2), transparent 60%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.video-element {
+  width: 100%;
+  display: block;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  transform: scaleX(-1);
+  border-radius: 14px;
+}
+
+.capture-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  justify-content: center;
+}
+
+.start-camera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px;
+  border: 2px dashed rgba(245, 158, 11, 0.4);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(234, 88, 12, 0.03));
+  transition: all 0.3s ease;
+}
+
+.start-camera:hover {
+  border-color: rgba(245, 158, 11, 0.6);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(234, 88, 12, 0.05));
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.12);
+}
+
+.or-divider {
+  color: #D97706;
+  font-size: 0.85rem;
+  font-weight: 500;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
+.or-divider::before,
+.or-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.35), transparent);
+}
+
+.file-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #D97706;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.file-upload input {
+  cursor: pointer;
+  color: #EA580C;
+}
+
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.face-preview {
+  width: 100%;
+  max-width: 260px;
+  border-radius: 16px;
+  border: 2px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 8px 28px rgba(245, 158, 11, 0.18);
+}
+
+.preview-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.preset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.history-item {
+  transition: transform .2s ease, border-color .2s ease;
+}
+
+.history-item:hover {
+  transform: translateX(3px);
+  border-color: rgba(245, 158, 11, .32);
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-hero,
+  .motion-card {
+    animation: none;
+  }
+
+  .template-card,
+  .history-item {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

@@ -1,0 +1,128 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: demo
+  datasource:
+    url: jdbc:mysql://localhost:3306/agent?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowPublicKeyRetrieval=true&useSSL=false
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: your_db_user
+    password: your_db_password
+    druid:
+      max-active: 10
+      initial-size: 1
+      min-idle: 1
+      max-wait: 60000
+      test-on-borrow: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+langchain4j:
+  open-ai:
+    chat-model:
+      api-key: your_llm_api_key
+      base-url: https://your-llm-compatible-endpoint.example.com/v1
+      model-name: your_model_name
+  ollama:
+    embedding-model:
+      base-url: http://localhost:11434
+      model-name: nomic-embed-text:latest
+
+server:
+  port: 8000
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+      force-response: true
+      force-request: true
+
+app:
+  memory:
+    collection-name: agent_memory
+    vector-size: 768
+    top-k: 5
+    min-score: 0.5
+  qdrant:
+    host: localhost
+    # LangChain4j/Qdrant Java 客户端使用的 gRPC/SDK 端口，REST 管理接口默认使用 6333
+    port: 6334
+    rest-port: 6333
+    api-key: ""
+    use-tls: false
+    # true 时环境变量优先于数据库 system_settings，适合 Docker/云端部署
+    prefer-env: false
+  mcp:
+    auto-sync:
+      enabled: false
+      url: ""
+      token: ""
+      cron: "0 */5 * * * ?"
+      connect-timeout-seconds: 5
+      read-timeout-seconds: 15
+      sync-enabled-state: true
+      disable-missing: true
+      missing-threshold: 2
+  search:
+    enabled: false
+    engine: serper
+    api-key: your_search_api_key
+    max-results: 3
+  mail:
+    smtp-host: smtp.example.com
+    smtp-port: 465
+    smtp-username: your_mail@example.com
+    smtp-password: your_smtp_password_or_app_password
+    smtp-ssl-enabled: true
+    from-name: AI Agent
+  schedule:
+    enabled: true
+    storage-path: ./data/schedules
+    user-email: your_mail@example.com
+    daily-summary-cron: "0 0 20 * * ?"
+    morning-reminder-cron: "0 0 8 * * ?"
+    file-sort-cron: "0 0 19 * * ?"
+  file:
+    upload-dir: ./data/documents
+    allowed-types: txt,md
+  autonomy:
+    enabled: true
+    workspace-root: .
+    output-dir: ./generated/autonomy
+    allow-backend-verify: true
+    allow-frontend-verify: true
+    allow-source-write: false
+    allow-remote-update: false
+    command-timeout-seconds: 180
+  skills:
+    config-path: skills.yaml
+    auto-load: true
+    findskills-enabled: false
+    findskills-url: ""
+    findskills-token: ""
+    findskills-timeout-seconds: 10
+    findskills-cron: "0 */10 * * * ?"
+    findskills-presync-mcp: true
+    findskills-merge-existing: true
+  security:
+    issuer: agent-demo
+    jwt-secret: ${JWT_SECRET:replace_with_a_32_plus_byte_secret}
+    data-secret: ${DATA_SECRET:${JWT_SECRET:replace_with_a_32_plus_byte_secret}}
+    access-token-minutes: 120
+    refresh-token-days: 7
+    email-code-ttl-seconds: 600
+    email-code-cooldown-seconds: 120
+    github:
+      enabled: false
+      client-id: your_github_client_id
+      client-secret: your_github_client_secret
+      authorize-uri: https://github.com/login/oauth/authorize
+      token-uri: https://github.com/login/oauth/access_token
+      user-uri: https://api.github.com/user
+      emails-uri: https://api.github.com/user/emails
+      redirect-uri: http://localhost:3000/oauth/github/callback
+      scope: "read:user user:email"
+      state-ttl-seconds: 600

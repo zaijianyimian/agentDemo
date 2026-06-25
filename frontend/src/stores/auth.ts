@@ -1,0 +1,119 @@
+import { computed, ref } from 'vue'
+import { defineStore } from 'pinia'
+import { authService, authTokenStorage } from '@/services/api'
+import type { AuthTokenResponse, AuthUserProfile, EmailCodeSendResponse } from '@/types'
+
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref<AuthUserProfile | null>(null)
+  const initialized = ref(false)
+
+  const isAuthenticated = computed(() => !!authTokenStorage.getAccessToken() && !!user.value)
+
+  const setSession = (payload: AuthTokenResponse) => {
+    if (!payload.accessToken || !payload.refreshToken || !payload.user) {
+      throw new Error('登录态数据不完整')
+    }
+    authTokenStorage.setTokens(payload.accessToken, payload.refreshToken)
+    user.value = payload.user
+  }
+
+  const clearSession = () => {
+    authTokenStorage.clearTokens()
+    user.value = null
+  }
+
+  const hydrate = async () => {
+    if (initialized.value) return
+    initialized.value = true
+    const token = authTokenStorage.getAccessToken()
+    if (!token) {
+      user.value = null
+      return
+    }
+    try {
+      const res = await authService.me()
+      if (res.success && res.data) {
+        user.value = res.data
+      } else {
+        clearSession()
+      }
+    } catch {
+      clearSession()
+    }
+  }
+
+  const loginByPassword = async (username: string, password: string): Promise<AuthTokenResponse> => {
+    return await withAuthResponse(authService.loginByPassword({ username, password }), '登录失败')
+  }
+
+  const loginByEmailCode = async (email: string, code: string): Promise<AuthTokenResponse> => {
+    return await withAuthResponse(authService.loginByEmailCode({ email, code }), '登录失败')
+  }
+
+  const verifyFaceLogin = async (preAuthToken: string, imageBase64: string): Promise<AuthTokenResponse> => {
+    return await withAuthResponse(authService.verifyFaceLogin({ preAuthToken, imageBase64 }), '人脸验证失败')
+  }
+
+  const register = async (payload: { username: string; email: string; password: string; displayName?: string }) => {
+    try {
+      const res = await authService.register(payload)
+      if (!res.success) {
+        throw new Error(res.message || '注册失败')
+      }
+      return res.data as EmailCodeSendResponse | undefined
+    } catch (e: any) {
+      throw new Error(extractErrorMessage(e, '注册失败'))
+    }
+  }
+
+  const logout = async () => {
+    try {
+      await authService.logout()
+    } finally {
+      clearSession()
+    }
+  }
+
+  const withAuthResponse = async (
+    promise: Promise<{ success: boolean; message?: string; data?: AuthTokenResponse }>,
+    fallbackMessage: string
+  ): Promise<AuthTokenResponse> => {
+    try {
+      const res = await promise
+      if (!res.success || !res.data) {
+        throw new Error(res.message || fallbackMessage)
+      }
+      if (res.data.requiresSecondFactor) {
+        return res.data
+      }
+      setSession(res.data)
+      return res.data
+    } catch (e: any) {
+      throw new Error(extractErrorMessage(e, fallbackMessage))
+    }
+  }
+
+  const extractErrorMessage = (e: any, fallbackMessage: string) => {
+    const responseData = e?.response?.data
+    const fieldErrors = responseData?.fieldErrors
+    const firstFieldError = fieldErrors && typeof fieldErrors === 'object'
+      ? Object.values(fieldErrors).find(value => typeof value === 'string')
+      : undefined
+
+    return responseData?.message || firstFieldError || e?.message || fallbackMessage
+  }
+
+  return {
+    user,
+    initialized,
+    isAuthenticated,
+    hydrate,
+    setSession,
+    clearSession,
+    loginByPassword,
+    loginByEmailCode,
+    verifyFaceLogin,
+    register,
+    logout
+  }
+})
