@@ -117,3 +117,6 @@ replay_pid*
 
 ### OpenSpec 工作产物(本地变更提案与归档,不入库)###
 openspec/
+stress-test/
+stress-test/results/*.csv
+stress-test/results/v*/*.csv
