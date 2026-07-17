@@ -1,10 +1,5 @@
 <template>
   <div class="schedule-share-page">
-    <div class="warm-bg-decoration">
-      <div class="gradient-orb orb-1"></div>
-      <div class="gradient-orb orb-2"></div>
-    </div>
-
     <div class="share-container">
       <div class="share-header">
         <n-icon size="28" class="header-icon"><CalendarIcon /></n-icon>
@@ -34,11 +29,14 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 日程分享只读页面：根据路由参数日期拉取对应日程 Markdown 供访客查看。
+ */
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { NIcon, NSpin } from 'naive-ui'
 import { CalendarOutline as CalendarIcon } from '@vicons/ionicons5'
-import { scheduleService } from '@/services/api'
+import { scheduleService } from '@/services/api/schedule'
 import { renderMarkdown } from '@/utils/markdown'
 
 const route = useRoute()
@@ -70,30 +68,6 @@ onMounted(async () => {
   background: var(--bg-base, #FFFBF0);
   position: relative;
   overflow: hidden;
-}
-
-.warm-bg-decoration {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.gradient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.12;
-  animation: float 20s ease-in-out infinite;
-}
-
-.orb-1 { width: 300px; height: 300px; background: #ea580c; top: -50px; right: -50px; }
-.orb-2 { width: 200px; height: 200px; background: #fb923c; bottom: 0; left: 30%; animation-delay: -10s; }
-
-@keyframes float {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(20px, -20px); }
 }
 
 .share-container {

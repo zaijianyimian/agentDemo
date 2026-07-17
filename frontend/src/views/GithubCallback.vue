@@ -9,10 +9,13 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * GitHub OAuth 回调页：用 code+state 与后端交换登录令牌并写入会话。
+ */
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NSpin, useMessage } from 'naive-ui'
-import { authService } from '@/services/api'
+import { authService } from '@/services/api/auth'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()

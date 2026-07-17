@@ -396,6 +396,9 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 聊天记录导入页面：上传聊天文件、管理会话、基于会话训练个性化虚拟助手。
+ */
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { NIcon, useMessage } from 'naive-ui'
 import {
@@ -418,7 +421,7 @@ import {
   AnalyticsOutline,
   RefreshOutline
 } from '@vicons/ionicons5'
-import api from '@/services/api'
+import api from '@/services/api/index'
 
 // Types
 interface ChatImportResult {
@@ -559,7 +562,7 @@ const handleFileSelect = async (e: Event) => {
   if (file) await uploadFile(file)
 }
 
-// Upload logic
+/** 通过 multipart 表单上传聊天文件并展示导入进度与结果。 */
 const uploadFile = async (file: File) => {
   uploading.value = true
   progressWidth.value = '30%'
@@ -597,7 +600,7 @@ const uploadFile = async (file: File) => {
   }
 }
 
-// Session management
+/** 加载会话列表（最多 50 条），逐条查询消息概况用于卡片展示。 */
 const loadSessions = async () => {
   loadingSessions.value = true
   try {
@@ -683,6 +686,7 @@ const openCreateModal = () => {
   showCreateAssistant.value = true
 }
 
+/** 提交选中的会话集合创建虚拟助手并触发后端训练。 */
 const createAssistant = async () => {
   if (!assistantForm.value.name || assistantForm.value.sessionIds.length === 0) {
     message.warning('请填写助手名称并选择至少一个会话')
@@ -734,6 +738,7 @@ const deleteAssistant = async (id: number) => {
   }
 }
 
+/** 触发后端对指定助手的人格分析并刷新列表。 */
 const analyzePersonality = async (id: number) => {
   try {
     await api.post('/chatimport/assistant/' + id + '/analyze')
@@ -751,6 +756,7 @@ const openAssistantChat = (assistant: VirtualAssistant) => {
   showChatModal.value = true
 }
 
+/** 向虚拟助手发送消息（仅传最近 10 条历史）并把回复追加到消息列表。 */
 const sendChatMessage = async () => {
   if (!chatInput.value.trim() || !chatAssistant.value) return
   const userMessage = chatInput.value.trim()

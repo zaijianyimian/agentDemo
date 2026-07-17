@@ -143,10 +143,15 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 个人中心页面：自动化模板、专注/缓存设置、知识库策略、人脸二次验证与备份恢复。
+ */
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { NButton, NEmpty, NIcon, NSwitch, NUpload, useMessage } from 'naive-ui'
 import { CameraOutline as CameraIcon } from '@vicons/ionicons5'
-import { authService, personalService, settingsService } from '@/services/api'
+import { authService } from '@/services/api/auth'
+import { personalService } from '@/services/api/personal'
+import { settingsService } from '@/services/api/settings'
 import type { FaceStatusResponse, PersonalInsight, TaskTemplate } from '@/types'
 import {
   clearRecentActions,
@@ -218,6 +223,7 @@ const appendAction = (title: string, detail?: string) => {
   syncRecentActions()
 }
 
+/** 一键应用指定模板：克隆为用户任务并触发刷新。 */
 const applyTemplate = async (templateId: string) => {
   const res = await personalService.createTaskFromTemplate(templateId)
   if (res.success) {
@@ -228,6 +234,7 @@ const applyTemplate = async (templateId: string) => {
   }
 }
 
+/** 导出个人数据备份到本地 ZIP 文件。 */
 const exportBackup = async () => {
   const res = await personalService.exportBackup()
   if (!res.success || !res.data) {
@@ -245,6 +252,7 @@ const exportBackup = async () => {
   appendAction('导出备份', 'JSON 文件已下载')
 }
 
+/** 自定义上传处理器：导入备份 ZIP 并可选择覆盖或合并。 */
 const handleImportUpload = async ({ file }: { file: { file: File | null } }) => {
   if (!file.file) return
   try {
@@ -439,6 +447,7 @@ const retakeFacePhoto = () => {
   startCamera()
 }
 
+/** 把采集到的人脸图像注册到当前账号。 */
 const saveFaceProfile = async () => {
   if (!faceImageBase64.value) {
     message.warning('请先选择人脸图片')

@@ -248,8 +248,20 @@
             </button>
           </div>
 
+          <div class="account-actions" v-if="accountStateLoaded && hasRegisteredUsers">
+            <button class="btn-social" @click="showResetModal = true">
+              修改密码
+            </button>
+            <button class="btn-social btn-github" @click="loginWithGithub">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="social-icon">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+              </svg>
+              绑定 GitHub
+            </button>
+          </div>
+
           <!-- 其他登录方式 -->
-          <div class="social-login">
+          <div class="social-login" v-else>
             <div class="divider">
               <span class="divider-text">其他登录方式</span>
             </div>
@@ -361,11 +373,14 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 登录/注册/二次验证页面：支持密码、邮箱验证码、人脸二次验证和 GitHub 登录。
+ */
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import PasswordResetModal from '@/components/PasswordResetModal.vue'
-import { authService } from '@/services/api'
+import { authService } from '@/services/api/auth'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -375,7 +390,9 @@ const authStore = useAuthStore()
 
 const tab = ref<'password' | 'email'>('password')
 const authMode = ref<'login' | 'register'>('login')
-const registrationAllowed = ref(true)
+const accountStateLoaded = ref(false)
+const hasRegisteredUsers = ref(false)
+const registrationAllowed = computed(() => accountStateLoaded.value && !hasRegisteredUsers.value)
 const loginLoading = ref(false)
 const registerLoading = ref(false)
 const sendingCode = ref(false)
@@ -406,6 +423,7 @@ const canSendCode = computed(() => {
   return emailPattern.test(email) && !sendingCode.value && codeCountdown.value === 0
 })
 
+/** 启动验证码倒计时（默认 120 秒），用于控制发送按钮的冷却。 */
 const startCountdown = (seconds = 120) => {
   codeCountdown.value = seconds
   if (timer) {
@@ -430,6 +448,7 @@ const goAfterLogin = async () => {
   await router.replace(redirect)
 }
 
+/** 将用户选择的图片文件转换为 base64 字符串，供人脸验证提交。 */
 const toBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -438,6 +457,7 @@ const toBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file)
   })
 
+/** 处理人脸验证图片上传事件：校验类型并转 base64。 */
 const onFaceImageChange = async (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
@@ -498,7 +518,10 @@ const startCamera = async () => {
         await new Promise(r => setTimeout(r, 80))
         await tryAttach()
       } else {
-        console.warn('videoRef is null after retries')
+        // 重试耗尽：video 元素没拿到，释放流避免摄像头被持续占用
+        console.warn('videoRef is null after retries, releasing camera')
+        stopCamera()
+        message.error('摄像头初始化失败，请重试')
       }
     }
     await tryAttach()
@@ -522,6 +545,7 @@ const stopCamera = () => {
   cameraActive.value = false
 }
 
+/** 从摄像头视频流截取正方形画面并以 JPEG 编码写入 base64。 */
 const capturePhoto = async () => {
   if (!videoRef.value || !canvasRef.value) return
 
@@ -558,6 +582,7 @@ const retakePhoto = () => {
   startCamera()
 }
 
+/** 进入人脸二次验证阶段，保存预认证 token 与有效期。 */
 const enterFaceSecondFactor = (payload: { preAuthToken?: string; preAuthExpiresIn?: number }) => {
   pendingPreAuthToken.value = payload.preAuthToken || ''
   pendingPreAuthExpiresIn.value = payload.preAuthExpiresIn || 0
@@ -573,6 +598,7 @@ const cancelFaceLogin = () => {
   faceImageName.value = ''
 }
 
+/** 提交人脸图像完成二次验证，成功后跳转至目标路由。 */
 const submitFaceLoginVerify = async () => {
   if (!pendingPreAuthToken.value) {
     message.warning('预认证已失效，请重新登录')
@@ -597,6 +623,7 @@ const submitFaceLoginVerify = async () => {
   }
 }
 
+/** 向用户邮箱发送登录验证码，并启动冷却倒计时。 */
 const sendCode = async () => {
   const email = emailForm.value.email.trim()
   emailForm.value.email = email
@@ -627,6 +654,7 @@ const sendCode = async () => {
   }
 }
 
+/** 提交账号密码登录，命中二次验证时切换到人脸验证界面。 */
 const submitPasswordLogin = async () => {
   if (!passwordForm.value.username || !passwordForm.value.password) {
     message.warning('请填写完整登录信息')
@@ -650,6 +678,7 @@ const submitPasswordLogin = async () => {
   }
 }
 
+/** 提交邮箱验证码登录，命中二次验证时切换到人脸验证界面。 */
 const submitEmailLogin = async () => {
   if (!emailForm.value.email || !emailForm.value.code) {
     message.warning('请填写邮箱和验证码')
@@ -694,6 +723,7 @@ const submitRegister = async () => {
   }
 }
 
+/** 跳转到 GitHub OAuth 授权页发起第三方登录。 */
 const loginWithGithub = async () => {
   try {
     const redirect = String(route.query.redirect || '/')
@@ -720,11 +750,15 @@ onMounted(async () => {
   }
   try {
     const res = await authService.hasUsers()
-    if (res.success && res.data === true) {
-      registrationAllowed.value = false
+    hasRegisteredUsers.value = res.success && res.data === true
+    accountStateLoaded.value = true
+    if (hasRegisteredUsers.value) {
+      authMode.value = 'login'
     }
   } catch {
-    // 检查失败时默认允许注册
+    hasRegisteredUsers.value = true
+    accountStateLoaded.value = true
+    authMode.value = 'login'
   }
 })
 
@@ -741,9 +775,15 @@ onUnmounted(() => {
 /* 页面整体布局 */
 .auth-page {
   display: grid;
-  grid-template-columns: minmax(420px, 0.95fr) minmax(420px, 1.05fr);
+  grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1.1fr);
   min-height: 100vh;
-  background: var(--bg-base, #FDF6E3);
+  background:
+    linear-gradient(var(--bg-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-grid-line) 1px, transparent 1px),
+    var(--bg-page-tint),
+    var(--bg-base, #F6F7F9);
+  background-size: 28px 28px, 28px 28px, auto, auto;
+  color: var(--text-primary);
 }
 
 /* 左侧品牌区域 */
@@ -752,17 +792,17 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 48px;
+  padding: clamp(32px, 5vw, 56px);
   background:
-    radial-gradient(circle at 72% 30%, rgba(255, 255, 255, 0.20), transparent 24%),
-    linear-gradient(135deg, #EA580C 0%, #F59E0B 54%, #FCD34D 100%);
+    radial-gradient(circle at 72% 30%, rgba(255, 255, 255, 0.24), transparent 24%),
+    linear-gradient(145deg, #C2410C 0%, #EA580C 42%, #F59E0B 78%, #FCD34D 100%);
   overflow: hidden;
 }
 
 .brand-content {
   position: relative;
   z-index: 2;
-  max-width: 480px;
+  max-width: 520px;
 }
 
 .brand-logo {
@@ -787,9 +827,10 @@ onUnmounted(() => {
 
 .brand-title h1 {
   color: rgba(255, 255, 255, 0.95);
-  font-size: 2.5rem;
+  font-size: clamp(2rem, 4.4vw, 3rem);
   line-height: 1.2;
   margin-bottom: 48px;
+  letter-spacing: 0;
 }
 
 .brand-features {
@@ -803,9 +844,10 @@ onUnmounted(() => {
   align-items: center;
   gap: 16px;
   padding: 16px 20px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-lg);
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(var(--blur-sm));
 }
 
 .feature-icon {
@@ -897,21 +939,25 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px;
+  padding: clamp(24px, 5vw, 56px);
   background:
-    radial-gradient(circle at 50% 8%, rgba(234, 88, 12, 0.06), transparent 34%),
+    radial-gradient(circle at 50% 8%, rgba(234, 88, 12, 0.08), transparent 34%),
     var(--bg-base, #F6F7F9);
 }
 
 /* 登录卡片 */
 .auth-card {
   width: 100%;
-  max-width: 420px;
-  padding: 32px;
-  background: var(--bg-card, #FFFBF0);
-  border-radius: var(--radius-xl, 18px);
-  border: 1px solid var(--border-color, #E2E8F0);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+  max-width: 440px;
+  padding: 30px;
+  background:
+    var(--gradient-card),
+    var(--bg-panel, #FFFFFF);
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--surface-border, #E2E8F0);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    0 24px 70px rgba(15, 23, 42, 0.12);
   color: var(--text-primary);
   animation: slideUp 0.5s ease-out;
 }
@@ -936,7 +982,7 @@ onUnmounted(() => {
   display: inline-block;
   padding: 4px 10px;
   background: rgba(234, 88, 12, 0.12);
-  border-radius: 4px;
+  border-radius: var(--radius-full);
   color: var(--primary-color);
   font-size: 0.7rem;
   font-weight: 600;
@@ -947,7 +993,7 @@ onUnmounted(() => {
 .card-title {
   margin-top: 12px;
   color: var(--text-primary);
-  font-size: 1.75rem;
+  font-size: 1.65rem;
   font-weight: 600;
   line-height: 1.2;
 }
@@ -966,8 +1012,8 @@ onUnmounted(() => {
   margin-bottom: 24px;
   padding: 4px;
   background: color-mix(in srgb, var(--bg-input) 76%, var(--bg-card) 24%);
-  border-radius: 10px;
-  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--surface-border);
 }
 
 .tab-item {
@@ -979,7 +1025,7 @@ onUnmounted(() => {
   padding: 12px 16px;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 0.85rem;
   font-weight: 500;
@@ -988,14 +1034,14 @@ onUnmounted(() => {
 }
 
 .tab-item:hover {
-  background: rgba(230, 126, 34, 0.08);
-  color: #E67E22;
+  background: var(--bg-active);
+  color: var(--primary-color);
 }
 
 .tab-item.active {
   background: var(--bg-card, #FFFFFF);
   color: var(--primary-color);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
 }
 
 .tab-icon {
@@ -1043,22 +1089,22 @@ onUnmounted(() => {
   width: 100%;
   padding: 12px 14px 12px 44px;
   background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 0.95rem;
   transition: all 0.2s ease;
 }
 
 .input-field:hover {
-  border-color: var(--text-muted);
+  border-color: var(--surface-border-strong);
 }
 
 .input-field:focus {
   outline: none;
-  border-color: #E67E22;
+  border-color: var(--primary-color);
   background: var(--bg-card, #FFFFFF);
-  box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.15);
+  box-shadow: var(--shadow-focus);
 }
 
 .input-field::placeholder {
@@ -1094,9 +1140,9 @@ onUnmounted(() => {
 .btn-code {
   padding: 12px 16px;
   background: var(--bg-input);
-  border: 1px solid var(--border-light);
-  border-radius: 10px;
-  color: #E67E22;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  color: var(--primary-color);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
@@ -1106,7 +1152,7 @@ onUnmounted(() => {
 
 .btn-code:hover:not(:disabled) {
   background: var(--bg-card, #FFFFFF);
-  border-color: #E67E22;
+  border-color: var(--primary-color);
 }
 
 .btn-code:disabled {
@@ -1143,8 +1189,8 @@ onUnmounted(() => {
 }
 
 .checkbox-wrapper input:checked + .checkbox-custom {
-  background: #E67E22;
-  border-color: #E67E22;
+  background: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .checkbox-wrapper input:checked + .checkbox-custom::after {
@@ -1165,7 +1211,7 @@ onUnmounted(() => {
 }
 
 .forgot-link {
-  color: #E67E22;
+  color: var(--primary-color);
   font-size: 0.85rem;
   font-weight: 500;
   text-decoration: none;
@@ -1173,7 +1219,7 @@ onUnmounted(() => {
 }
 
 .forgot-link:hover {
-  color: #D35400;
+  color: var(--primary-dark);
 }
 
 /* 按钮 */
@@ -1185,7 +1231,7 @@ onUnmounted(() => {
   padding: 14px 28px;
   background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%);
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   color: #FFFFFF;
   font-size: 0.95rem;
   font-weight: 600;
@@ -1201,8 +1247,10 @@ onUnmounted(() => {
 }
 
 :global([data-theme="dark"]) .auth-card {
-  background: #202633;
-  border-color: #3A4556;
+  background:
+    var(--gradient-card),
+    var(--bg-panel);
+  border-color: var(--surface-border);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.30);
 }
 
@@ -1256,6 +1304,12 @@ onUnmounted(() => {
   margin-top: 24px;
 }
 
+.account-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
 .divider {
   display: flex;
   align-items: center;
@@ -1285,8 +1339,8 @@ onUnmounted(() => {
   width: 100%;
   padding: 12px 24px;
   background: var(--bg-card, #FFFFFF);
-  border: 1px solid var(--border-light);
-  border-radius: 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 0.9rem;
   font-weight: 500;
@@ -1295,7 +1349,7 @@ onUnmounted(() => {
 }
 
 .btn-social:hover {
-  border-color: var(--text-muted);
+  border-color: var(--surface-border-strong);
   background: var(--bg-input);
 }
 
@@ -1323,7 +1377,7 @@ onUnmounted(() => {
 .footer-link {
   background: transparent;
   border: none;
-  color: #E67E22;
+  color: var(--primary-color);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -1331,7 +1385,7 @@ onUnmounted(() => {
 }
 
 .footer-link:hover {
-  color: #D35400;
+  color: var(--primary-dark);
 }
 
 /* 人脸验证样式 */
@@ -1348,7 +1402,7 @@ onUnmounted(() => {
   text-align: center;
   padding: 8px 16px;
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(234, 88, 12, 0.04));
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(245, 158, 11, 0.15);
 }
 
@@ -1362,7 +1416,7 @@ onUnmounted(() => {
   width: min(100%, 340px);
   margin: 0 auto;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(135deg, #1a1a1a 0%, #2d1f0f 100%);
   border: 2px solid rgba(245, 158, 11, 0.35);
   box-shadow: 0 8px 32px rgba(245, 158, 11, 0.15), inset 0 0 20px rgba(245, 158, 11, 0.05);
@@ -1448,7 +1502,7 @@ onUnmounted(() => {
   gap: 16px;
   padding: 32px;
   border: 2px dashed rgba(245, 158, 11, 0.4);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(234, 88, 12, 0.03));
   transition: all 0.3s ease;
 }
@@ -1556,6 +1610,7 @@ onUnmounted(() => {
   .brand-section {
     padding: 32px;
     min-height: auto;
+    min-height: 38vh;
   }
 
   .brand-title h1 {
@@ -1591,7 +1646,8 @@ onUnmounted(() => {
   }
 
   .auth-card {
-    padding: 24px;
+    padding: 22px;
+    border-radius: var(--radius-md);
   }
 
   .card-title {
@@ -1600,6 +1656,14 @@ onUnmounted(() => {
 
   .login-tabs {
     flex-direction: column;
+  }
+
+  .code-input-wrapper {
+    flex-direction: column;
+  }
+
+  .btn-code {
+    width: 100%;
   }
 
   .tab-item {

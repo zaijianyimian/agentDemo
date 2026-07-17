@@ -1,5 +1,5 @@
 <template>
-  <div class="page-shell">
+  <UiPage>
     <section class="page-hero hero-grid">
       <div>
         <div class="page-eyebrow">Model Registry</div>
@@ -104,10 +104,13 @@
         </n-space>
       </template>
     </n-modal>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 模型管理页面：维护 AI 模型连接、API Key、默认模型与启用切换。
+ */
 import { computed, h, onMounted, ref } from 'vue'
 import {
   NButton,
@@ -134,7 +137,8 @@ import {
 } from '@vicons/ionicons5'
 import dayjs from 'dayjs'
 import type { AiModelConfig } from '@/types'
-import { modelService } from '@/services/api'
+import { modelService } from '@/services/api/model'
+import { UiPage } from '@/components/ui'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -217,11 +221,13 @@ const loadModels = async () => {
   }
 }
 
+/** 拉取可选提供商列表（用于表单下拉与默认 baseUrl 推断）。 */
 const loadProviders = async () => {
   const res = await modelService.providers()
   providerOptions.value = res.data || []
 }
 
+/** 提供商切换时自动回填默认 baseUrl，避免手工输入错误。 */
 const onProviderChange = (value: string) => {
   const provider = providerOptions.value.find(item => item.value === value)
   if (provider?.baseUrl) form.value.baseUrl = provider.baseUrl
@@ -251,6 +257,7 @@ const editModel = (model: AiModelConfig) => {
   showCreateModal.value = true
 }
 
+/** 校验表单后调用测试接口验证当前填写模型是否可用。 */
 const testConnection = async () => {
   await formRef.value?.validate()
   testLoading.value = true
@@ -264,6 +271,7 @@ const testConnection = async () => {
   }
 }
 
+/** 提交新增或编辑的模型配置，调用 create 或 update 接口。 */
 const submitForm = async () => {
   await formRef.value?.validate()
   submitLoading.value = true
@@ -283,6 +291,7 @@ const submitForm = async () => {
   }
 }
 
+/** 切换模型启用状态：后端会保证只有一个模型处于启用。 */
 const toggleEnabled = async (model: AiModelConfig) => {
   const res = await modelService.toggle(model.id)
   if (res.success) {
@@ -291,6 +300,7 @@ const toggleEnabled = async (model: AiModelConfig) => {
   } else message.error(res.message || '操作失败')
 }
 
+/** 将指定模型设置为全局默认模型（用于默认对话入口）。 */
 const setDefault = async (model: AiModelConfig) => {
   const res = await modelService.setDefault(model.id)
   if (res.success) {

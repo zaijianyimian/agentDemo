@@ -216,6 +216,9 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 自治中心页面：项目扫描、构建验证、补全草稿、历史产物与差异对比的统一工作台。
+ */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { NButton, NEmpty, NTag, useMessage } from 'naive-ui'
 import type {
@@ -225,7 +228,7 @@ import type {
   AutonomyScanReport,
   AutonomyVerificationResult
 } from '@/types'
-import { autonomyService } from '@/services/api'
+import { autonomyService } from '@/services/api/autonomy'
 import dayjs from 'dayjs'
 
 const message = useMessage()
@@ -302,6 +305,7 @@ const loadCapabilities = async () => {
   }
 }
 
+/** 触发后端项目扫描并刷新历史与差异数据。 */
 const runScan = async () => {
   runningScan.value = true
   try {
@@ -317,6 +321,7 @@ const runScan = async () => {
   }
 }
 
+/** 执行后端 + 前端构建验证流程并展示结果。 */
 const runVerify = async () => {
   runningVerify.value = true
   try {
@@ -331,6 +336,7 @@ const runVerify = async () => {
   }
 }
 
+/** 根据扫描结果生成补全草稿（默认目标 autonomy-and-inbox）。 */
 const runDraft = async () => {
   runningDraft.value = true
   try {
@@ -364,6 +370,7 @@ const loadDiff = async () => {
   }
 }
 
+/** 通过产物路径读取并展示历史报告/草稿的原文。 */
 const openArtifact = async (path: string) => {
   const current = history.value.find(item => item.path === path)
   activeArtifactName.value = current?.name || path

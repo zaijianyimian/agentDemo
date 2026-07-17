@@ -201,6 +201,9 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 智能对话页面：多会话管理与流式/普通/MCP 三种模式，支持语音输入、消息转笔记/任务/记忆。
+ */
 import { ref, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import {
@@ -226,7 +229,8 @@ import {
   ChevronForwardOutline as ChevronForwardIcon
 } from '@vicons/ionicons5'
 import type { ChatMessage, ChatSession, AiModelConfig } from '@/types'
-import { chatActionService, chatHistoryService } from '@/services/api'
+import { chatActionService } from '@/services/api/chat-action'
+import { chatHistoryService } from '@/services/api/chat-history'
 import { fetchWithAuth } from '@/services/auth-fetch'
 import { renderMarkdown } from '@/utils/markdown'
 import { formatTime, formatSessionTime } from '@/utils/date-format'
@@ -243,6 +247,7 @@ const chatModes = [
   { label: 'Agent', value: 'mcp' }
 ]
 
+/** 解析 SSE 事件原始文本，仅保留 data 行（跳过事件元行和 [DONE]）。 */
 const parseSseEvents = (rawEvent: string): string[] => {
   const lines = rawEvent.replace(/\r/g, '').split('\n')
   const chunks: string[] = []
@@ -318,6 +323,7 @@ const autoResize = () => {
 }
 
 // 加载会话列表
+/** 从后端加载当前用户全部会话列表。 */
 const loadSessions = async () => {
   try {
     const res = await chatHistoryService.getSessions()
@@ -342,6 +348,7 @@ const createNewSession = async () => {
 }
 
 // 切换会话 - 自动清理空会话
+/** 切换到指定会话：先清理空旧会话，再加载消息并触发入场动画。 */
 const switchSession = async (session: ChatSession) => {
   // 如果当前会话存在且没有消息，自动删除空会话
   if (currentSession.value && messages.value.length === 0 && currentSession.value.id !== session.id) {
@@ -395,6 +402,7 @@ const getSessionMenuOptions = () => [
 ]
 
 // 处理会话菜单
+/** 处理会话菜单操作：编辑标题 / 清空消息 / 删除会话。 */
 const handleSessionMenu = async (key: string, session: ChatSession) => {
   try {
     switch (key) {
@@ -425,6 +433,7 @@ const handleSessionMenu = async (key: string, session: ChatSession) => {
 }
 
 // 保存标题
+/** 持久化更新后的会话标题到本地与后端。 */
 const saveSessionTitle = async () => {
   if (!currentSession.value) return
   try {
@@ -442,6 +451,7 @@ const saveSessionTitle = async () => {
 }
 
 // 发送消息
+/** 发送用户消息：自动创建会话，根据 chatMode 走流式或普通接口。 */
 const sendMessage = async () => {
   if (!inputText.value.trim() || loading.value) return
 
@@ -535,6 +545,7 @@ const animateNewMessage = (index: number) => {
 }
 
 // 流式聊天
+/** 通过 SSE 流式读取 AI 回复，逐块追加到 messageObj.content 并滚动到底部。 */
 const streamChat = async (query: string, messageObj: ChatMessage) => {
   abortController = new AbortController()
   const apiPath = chatMode.value === 'mcp'
@@ -587,6 +598,7 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
 }
 
 // 普通聊天
+/** 非流式一次性获取 AI 回复并填充到 messageObj.content。 */
 const normalChat = async (query: string, messageObj: ChatMessage) => {
   const apiPath = chatMode.value === 'mcp'
     ? `/api/mcp/agent/chat?message=${encodeURIComponent(query)}`
@@ -598,6 +610,7 @@ const normalChat = async (query: string, messageObj: ChatMessage) => {
 }
 
 // 停止流式响应
+/** 中止正在进行的流式请求并标记当前消息为已停止。 */
 const stopStreaming = () => {
   if (abortController) {
     abortController.abort()
@@ -622,6 +635,7 @@ const copyMessage = async (content: string) => {
 }
 
 // 转换消息
+/** 将 AI 消息转换为笔记、任务、日程或记忆条目（由 chatActionService 路由）。 */
 const captureMessage = async (target: 'note' | 'task' | 'schedule' | 'memory', msg: ChatMessage) => {
   try {
     const payload = {
@@ -652,6 +666,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 let speechRecognition: any = null
 const isVoiceActive = ref(false)
 
+/** 切换语音输入开关：启动/关闭 Web SpeechRecognition 并把识别结果填入输入框。 */
 const toggleVoiceInput = () => {
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
   if (!SpeechRecognition) {
@@ -747,17 +762,17 @@ onMounted(async () => {
 /* Warm Citrus Chat Variables */
 .chat-page {
   --ds-accent: #F59E0B;
-  --ds-bg: var(--bg-base);
-  --ds-card: var(--bg-card);
+  --ds-bg: transparent;
+  --ds-card: var(--bg-panel);
   --ds-text: var(--text-primary);
   --ds-text-secondary: var(--text-secondary);
   --ds-text-muted: var(--text-muted);
   --ds-border: var(--border-light);
-  --ds-radius: var(--radius-xl);
-  --ds-radius-sm: var(--radius-lg);
+  --ds-radius: var(--radius-lg);
+  --ds-radius-sm: var(--radius-md);
   --ds-radius-xs: var(--radius-md);
-  --ds-shadow: var(--shadow-sm);
-  --ds-shadow-lg: var(--shadow-lg);
+  --ds-shadow: var(--shadow-card);
+  --ds-shadow-lg: var(--shadow-card-hover);
   --ds-shadow-hover: 0 6px 24px rgba(234, 88, 12, 0.12);
 }
 
@@ -767,8 +782,8 @@ onMounted(async () => {
   height: 100%;
   background: var(--ds-bg);
   overflow: hidden;
-  gap: 24px;
-  padding: 24px;
+  gap: 16px;
+  padding: 0;
 }
 
 /* ========== 侧边栏卡片 ========== */
@@ -778,13 +793,17 @@ onMounted(async () => {
   width: 280px;
   min-width: 0;
   flex-shrink: 0;
-  background: var(--ds-card);
-  border: 2px solid var(--ds-border);
+  background:
+    var(--gradient-card),
+    var(--ds-card);
+  border: 1px solid var(--surface-border);
   border-radius: var(--ds-radius);
   height: 100%;
   overflow: hidden;
   position: relative;
-  box-shadow: var(--ds-shadow);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    var(--ds-shadow);
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
               min-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -806,9 +825,10 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   border: none;
-  background: var(--ds-card);
+  background: var(--bg-glass-strong);
   color: var(--ds-text-secondary);
-  border-radius: var(--ds-radius-xs);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-full);
   cursor: pointer;
   z-index: 1000;
   transition: all 0.25s ease;
@@ -816,8 +836,8 @@ onMounted(async () => {
 }
 
 .divider-toggle-btn:hover {
-  background: var(--ds-accent);
-  color: var(--ds-text);
+  background: var(--primary-color);
+  color: white;
   box-shadow: var(--ds-shadow-hover);
 }
 
@@ -847,7 +867,7 @@ onMounted(async () => {
   height: 48px;
   padding: 0 20px;
   border: none;
-  border-radius: var(--ds-radius-sm);
+  border-radius: var(--ds-radius-xs);
   background: var(--gradient-sunset);
   color: white;
   font-weight: 700;
@@ -898,33 +918,34 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 12px;
   border-radius: var(--ds-radius-xs);
   cursor: pointer;
   transition: all 0.2s ease;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   white-space: nowrap;
   overflow: hidden;
 }
 
 .session-item:hover {
-  background: var(--ds-bg);
+  background: var(--bg-hover);
+  border-color: var(--surface-border);
 }
 
 .session-item.active {
   background: var(--bg-menu-item-active);
-  border: 1.5px solid var(--border-accent);
+  border-color: var(--border-accent);
 }
 
 .session-icon {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--ds-radius-xs);
-  background: var(--warm-100);
+  background: var(--bg-input);
   color: var(--text-muted);
   flex-shrink: 0;
   transition: all 0.2s ease;
@@ -939,7 +960,7 @@ onMounted(async () => {
 
 .session-item:hover .session-icon {
   color: var(--text-primary);
-  background: var(--warm-200);
+  background: var(--bg-active);
 }
 
 .session-info {
@@ -1011,9 +1032,14 @@ onMounted(async () => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--ds-card);
+  background:
+    var(--gradient-card),
+    var(--ds-card);
   border-radius: var(--ds-radius);
-  box-shadow: var(--ds-shadow);
+  border: 1px solid var(--surface-border);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    var(--ds-shadow);
   position: relative;
 }
 
@@ -1023,7 +1049,7 @@ onMounted(async () => {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 28px 32px;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -1035,15 +1061,16 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 32px;
+  min-height: 100%;
+  padding: 48px 32px;
   text-align: center;
 }
 
 .welcome-logo {
   position: relative;
-  width: 80px;
-  height: 80px;
-  margin-bottom: 28px;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 24px;
   border-radius: var(--ds-radius-sm);
   background: var(--gradient-sunset);
   display: flex;
@@ -1062,11 +1089,11 @@ onMounted(async () => {
 .logo-glow { display: none; }
 
 .welcome-title {
-  font-size: 1.75rem;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
   font-weight: 700;
   color: var(--ds-text);
   margin-bottom: 12px;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .welcome-subtitle {
@@ -1078,7 +1105,7 @@ onMounted(async () => {
 /* ========== 消息卡片流 - 无气泡设计 ========== */
 .message-wrapper {
   display: flex;
-  padding: 20px 0;
+  padding: 18px 0;
   border-bottom: 1px solid var(--ds-border);
   animation: cardFadeIn 0.4s ease-out;
 }
@@ -1117,7 +1144,7 @@ onMounted(async () => {
 
 .bubble-content {
   padding: 16px 20px;
-  border-radius: var(--ds-radius-sm);
+  border-radius: 14px 14px 4px 14px;
   background: var(--gradient-sunset);
   color: white;
   font-size: 0.95rem;
@@ -1148,7 +1175,7 @@ onMounted(async () => {
   height: 40px;
   border-radius: var(--ds-radius-xs);
   overflow: hidden;
-  background: var(--ds-bg);
+  background: var(--bg-input);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1170,14 +1197,14 @@ onMounted(async () => {
 
 .ai-content {
   padding: 16px 20px;
-  border-radius: var(--ds-radius-sm);
-  background: var(--warm-50);
+  border-radius: 14px 14px 14px 4px;
+  background: var(--surface-hover);
   color: var(--ds-text);
   font-size: 0.95rem;
   font-weight: 400;
   line-height: 1.7;
   box-shadow: none;
-  border: 1.5px solid var(--ds-border);
+  border: 1px solid var(--surface-border);
 }
 
 /* 思考指示器 - 柔和风格 */
@@ -1248,7 +1275,7 @@ onMounted(async () => {
 }
 
 .action-btn:hover {
-  background: var(--warm-100);
+  background: var(--bg-active);
   color: var(--primary-color);
 }
 
@@ -1277,7 +1304,7 @@ onMounted(async () => {
 .markdown-content :deep(li) { margin: 6px 0; }
 
 .markdown-content :deep(code) {
-  background: var(--warm-100);
+  background: var(--bg-input);
   padding: 3px 8px;
   border-radius: 6px;
   font-family: var(--font-mono);
@@ -1286,7 +1313,7 @@ onMounted(async () => {
 }
 
 .markdown-content :deep(pre) {
-  background: var(--warm-50);
+  background: var(--bg-panel-strong);
   padding: 16px 20px;
   border-radius: var(--ds-radius-sm);
   margin: 16px 0;
@@ -1312,14 +1339,14 @@ onMounted(async () => {
   margin: 16px 0;
   padding: 12px 20px;
   border-left: 3px solid var(--primary-color);
-  background: var(--warm-50);
+  background: var(--bg-active);
   border-radius: 0 var(--ds-radius-xs) var(--ds-radius-xs) 0;
 }
 
 /* ========== 输入区域 - 悬浮卡片 ========== */
 .input-area {
   flex-shrink: 0;
-  padding: 24px;
+  padding: 18px 20px 20px;
   background: transparent;
 }
 
@@ -1330,17 +1357,23 @@ onMounted(async () => {
   gap: 12px;
   padding: 16px 20px;
   border-radius: var(--ds-radius-sm);
-  background: var(--ds-card);
-  border: 2px solid var(--ds-border);
+  background: var(--bg-glass-strong);
+  border: 1px solid var(--surface-border);
   transition: all 0.25s ease;
-  box-shadow: var(--ds-shadow);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    var(--ds-shadow);
+  backdrop-filter: blur(var(--blur-md));
 }
 
 .input-capsule::before { display: none; }
 
 .input-capsule:focus-within {
-  border-color: var(--primary-light);
-  box-shadow: 0 4px 20px rgba(234, 88, 12, 0.1);
+  border-color: var(--border-accent);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    0 0 0 4px var(--primary-glow),
+    var(--ds-shadow);
 }
 
 .input-right-actions {
@@ -1381,7 +1414,7 @@ onMounted(async () => {
   display: grid;
   place-items: center;
   border: none;
-  background: var(--warm-100);
+  background: var(--bg-input);
   color: var(--text-muted);
   border-radius: var(--ds-radius-xs);
   cursor: pointer;
@@ -1389,7 +1422,7 @@ onMounted(async () => {
 }
 
 .send-btn:hover:not(:disabled) {
-  background: var(--warm-200);
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
@@ -1431,13 +1464,13 @@ onMounted(async () => {
 }
 
 .voice-btn:hover {
-  background: var(--warm-100);
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
 .voice-btn.active {
-  background: var(--warm-200);
-  color: var(--warm-700);
+  background: var(--bg-active);
+  color: var(--primary-color);
 }
 
 /* Mode pills - warm style */
@@ -1468,15 +1501,15 @@ onMounted(async () => {
 }
 
 .mode-pill:hover {
-  background: var(--warm-50);
+  background: var(--bg-hover);
   color: var(--ds-text);
   border-color: var(--primary-light);
 }
 
 .mode-pill.active {
-  background: var(--warm-100);
+  background: var(--bg-active);
   border-color: var(--primary-color);
-  color: var(--primary-dark);
+  color: var(--text-accent);
 }
 
 .mode-pill:disabled {
@@ -1489,14 +1522,14 @@ onMounted(async () => {
   .chat-page {
     flex-direction: column;
     height: 100%;
-    padding: 16px;
-    gap: 16px;
+    padding: 0;
+    gap: 12px;
   }
 
   .session-sidebar {
     width: 100%;
     height: auto;
-    max-height: 240px;
+    max-height: 220px;
     border-radius: var(--ds-radius-sm);
   }
 
@@ -1508,17 +1541,17 @@ onMounted(async () => {
 
   .divider-toggle-btn {
     top: auto;
-    bottom: 24px;
-    right: 24px;
+    bottom: 18px;
+    right: 18px;
     transform: none;
   }
 
   .message-list {
-    padding: 20px;
+    padding: 18px;
   }
 
   .input-area {
-    padding: 16px;
+    padding: 14px;
   }
 
   .user-bubble, .ai-bubble {
@@ -1533,8 +1566,7 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .chat-page {
-    padding: 12px;
-    gap: 12px;
+    gap: 10px;
   }
 
   .session-sidebar,
@@ -1564,7 +1596,6 @@ onMounted(async () => {
 
 @media (max-width: 640px) {
   .chat-page {
-    padding: 8px;
     gap: 8px;
   }
 
@@ -1575,6 +1606,24 @@ onMounted(async () => {
   .bubble-content, .ai-content {
     font-size: 0.9rem;
     padding: 12px 16px;
+  }
+
+  .user-bubble,
+  .ai-bubble {
+    max-width: 100%;
+  }
+
+  .ai-bubble {
+    gap: 10px;
+  }
+
+  .input-capsule {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .input-right-actions {
+    justify-content: flex-end;
   }
 
   .chat-textarea {

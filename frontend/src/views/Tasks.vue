@@ -207,6 +207,9 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 定时任务页面：基于 Cron 表达式的技能/对话/提醒任务，支持模板创建与撤销删除。
+ */
 import { ref, onMounted, computed } from 'vue'
 import {
   NButton,
@@ -243,7 +246,8 @@ import {
   CloudOutline as CloudIcon,
   TrashOutline as TrashIcon
 } from '@vicons/ionicons5'
-import { personalService, taskService } from '@/services/api'
+import { personalService } from '@/services/api/personal'
+import { taskService } from '@/services/api/task'
 import { formatArrayTime as formatTime } from '@/utils/date-format'
 import { pushRecentAction } from '@/services/user-preferences'
 
@@ -443,6 +447,7 @@ const confirmDelete = (task: ScheduledTask) => {
   })
 }
 
+/** 恢复最近一次删除的任务，重新创建并刷新列表。 */
 const undoDelete = async () => {
   if (!lastDeletedTask.value) {
     message.warning('当前没有可撤销的删除项')
@@ -462,6 +467,7 @@ const undoDelete = async () => {
   }
 }
 
+/** 通过模板快速创建任务：内置模板预填表单，自定义模板走后端模板接口。 */
 const createByTemplate = async (templateId: string, templateName: string) => {
   // For built-in templates, create directly
   if (templateId.startsWith('daily-report') || templateId.startsWith('knowledge-check')) {

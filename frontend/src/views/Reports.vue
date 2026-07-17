@@ -1,5 +1,17 @@
 <template>
-  <div class="page-shell reports-page">
+  <UiPage class="reports-page">
+    <UiPageHeader
+      eyebrow="Reports"
+      title="报告中心"
+      subtitle="生成日报、周报并回看历史报告，用统一视图跟踪近期工作沉淀。"
+    >
+      <template #actions>
+        <n-button type="primary" @click="generate('daily')" :loading="generatingDaily">生成日报</n-button>
+        <n-button secondary @click="generate('weekly')" :loading="generatingWeekly">生成周报</n-button>
+        <n-button tertiary @click="loadHistory">刷新</n-button>
+      </template>
+    </UiPageHeader>
+
     <section class="metrics-grid">
       <article class="metric-card">
         <span>历史报告</span>
@@ -14,26 +26,12 @@
     </section>
 
     <section class="section-grid">
-      <div class="surface-panel span-4">
-        <div class="section-head">
-          <div>
-            <div class="page-eyebrow">Generate</div>
-            <h3>生成报告</h3>
-          </div>
-        </div>
-        <div class="report-actions">
-          <n-button type="primary" size="large" @click="generate('daily')" :loading="generatingDaily">生成日报</n-button>
-          <n-button size="large" @click="generate('weekly')" :loading="generatingWeekly">生成周报</n-button>
-        </div>
-      </div>
-
-      <div class="surface-panel span-8">
+      <div class="surface-panel span-12">
         <div class="section-head">
           <div>
             <div class="page-eyebrow">History</div>
             <h3>报告历史</h3>
           </div>
-          <n-button tertiary @click="loadHistory">刷新</n-button>
         </div>
         <div v-if="history.length" class="history-list">
           <button
@@ -74,17 +72,21 @@
         <n-empty v-else description="生成或打开一份报告开始查看" />
       </div>
     </section>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 报告中心：生成日报 / 周报并查看历史报告的 Markdown 内容与指标。
+ */
 import { computed, onMounted, ref } from 'vue'
 import { NButton, NEmpty, NTag, useMessage } from 'naive-ui'
 import type { GeneratedReport, ReportArtifact } from '@/types'
-import { reportService } from '@/services/api'
+import { reportService } from '@/services/api/report'
 import { sanitizeHtml } from '@/utils/sanitize-html'
 import dayjs from 'dayjs'
 import { marked } from 'marked'
+import { UiPage, UiPageHeader } from '@/components/ui'
 
 const message = useMessage()
 const history = ref<ReportArtifact[]>([])
@@ -114,6 +116,7 @@ const loadHistory = async () => {
   }
 }
 
+/** 调用后端生成指定周期（日/周）的报告并刷新历史列表。 */
 const generate = async (period: 'daily' | 'weekly') => {
   const loadingRef = period === 'daily' ? generatingDaily : generatingWeekly
   loadingRef.value = true
@@ -129,6 +132,7 @@ const generate = async (period: 'daily' | 'weekly') => {
   }
 }
 
+/** 打开历史报告：通过 artifact path 拉取完整 Markdown 并渲染到预览区。 */
 const openArtifact = async (item: ReportArtifact) => {
   const res = await reportService.readArtifact(item.path)
   if (res.success && res.data) {
@@ -180,7 +184,6 @@ onMounted(loadHistory)
   font-size: 1.8rem;
 }
 
-.report-actions,
 .history-list {
   display: flex;
   flex-direction: column;

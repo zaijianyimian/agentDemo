@@ -1,5 +1,18 @@
 <template>
-  <div class="page-shell inbox-page">
+  <UiPage class="inbox-page">
+    <UiPageHeader
+      eyebrow="Inbox"
+      title="统一收件箱"
+      subtitle="聚合日程、任务、笔记、搜索与自治发现，集中处理今日需要关注的事项。"
+    >
+      <template #actions>
+        <n-tag size="small" type="warning">
+          {{ lastUpdated }}
+        </n-tag>
+        <n-button type="primary" @click="loadInbox" :loading="loading">刷新</n-button>
+      </template>
+    </UiPageHeader>
+
     <section class="metrics-grid">
       <article
         v-for="card in metricCards"
@@ -23,12 +36,6 @@
           <div>
             <div class="page-eyebrow">Inbox Feed</div>
             <h3>统一收件箱</h3>
-          </div>
-          <div class="head-actions">
-            <n-tag size="small" type="warning">
-              {{ lastUpdated }}
-            </n-tag>
-            <n-button tertiary @click="loadInbox" :loading="loading">刷新</n-button>
           </div>
         </div>
 
@@ -152,10 +159,13 @@
         </div>
       </div>
     </section>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 统一收件箱：聚合日程/任务/笔记/搜索/自治发现，支持单项与批量操作，失败时回退到本地缓存。
+ */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NCheckbox, NIcon, NTag, useMessage } from 'naive-ui'
@@ -169,11 +179,16 @@ import {
   TimeOutline as TaskIcon
 } from '@vicons/ionicons5'
 import type { InboxSummary } from '@/types'
-import { autonomyService, inboxService, noteService, scheduleService, taskService } from '@/services/api'
+import { autonomyService } from '@/services/api/autonomy'
+import { inboxService } from '@/services/api/inbox'
+import { noteService } from '@/services/api/note'
+import { scheduleService } from '@/services/api/schedule'
+import { taskService } from '@/services/api/task'
 import { formatShortDateTime as formatTime } from '@/utils/date-format'
 import { readCachedPayload, writeCachedPayload } from '@/services/user-preferences'
 import EmptyStateWithGlow from '@/components/EmptyStateWithGlow.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import { UiPage, UiPageHeader } from '@/components/ui'
 
 const router = useRouter()
 const message = useMessage()
@@ -252,6 +267,7 @@ const toggleSelected = (item: any) => {
   }
 }
 
+/** 根据条目 category 动态返回可执行的操作按钮列表。 */
 const itemActions = (item: any) => {
   const id = item?.meta?.id
   if (item.category === 'task' && id) {
@@ -293,6 +309,7 @@ const runAutonomyScan = async () => {
   await loadInbox()
 }
 
+/** 批量标记选中项中的日程为已完成。 */
 const batchCompleteSchedules = async () => {
   for (const item of selectedItems.value.filter(item => item.category === 'schedule' && item.meta?.id)) {
     const id = item.meta?.id
@@ -303,6 +320,7 @@ const batchCompleteSchedules = async () => {
   await loadInbox()
 }
 
+/** 批量执行选中项中的任务。 */
 const batchExecuteTasks = async () => {
   for (const item of selectedItems.value.filter(item => item.category === 'task' && item.meta?.id)) {
     const id = item.meta?.id
@@ -323,6 +341,7 @@ const batchToggleNotes = async () => {
   await loadInbox()
 }
 
+/** 对选中的自治发现项触发一次项目结构重新扫描。 */
 const batchRescanAutonomy = async () => {
   const autonomyCount = selectedItems.value.filter(item => item.category === 'autonomy').length
   if (autonomyCount > 0) {
@@ -388,12 +407,6 @@ onMounted(loadInbox)
 
 .metric-card__copy strong {
   font-size: 1.8rem;
-}
-
-.head-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
 }
 
 .feed-list,
@@ -572,4 +585,3 @@ onMounted(loadInbox)
   }
 }
 </style>
-

@@ -1,10 +1,5 @@
 <template>
   <div class="knowledge-search-page">
-    <div class="warm-bg-decoration">
-      <div class="gradient-orb orb-1"></div>
-      <div class="gradient-orb orb-2"></div>
-    </div>
-
     <div class="search-container">
       <!-- 搜索栏 -->
       <div class="search-bar">
@@ -88,13 +83,16 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 知识库语义检索页面：在指定知识库内通过向量相似度匹配 topK 个片段。
+ */
 import { ref, computed, onMounted } from 'vue'
 import { NIcon, NButton, NInput, NSelect, useMessage } from 'naive-ui'
 import {
   SearchOutline as SearchIcon,
   DocumentTextOutline as DocumentIcon
 } from '@vicons/ionicons5'
-import { knowledgeService } from '@/services/api'
+import { knowledgeService } from '@/services/api/knowledge'
 import type { KnowledgeBase } from '@/types'
 
 const message = useMessage()
@@ -170,30 +168,6 @@ onMounted(() => {
   height: calc(100vh - 112px);
   position: relative;
   overflow: hidden;
-}
-
-.warm-bg-decoration {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.gradient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.12;
-  animation: float 20s ease-in-out infinite;
-}
-
-.orb-1 { width: 300px; height: 300px; background: var(--primary-color); top: -50px; right: -50px; }
-.orb-2 { width: 200px; height: 200px; background: var(--primary-light); bottom: 0; left: 30%; animation-delay: -10s; }
-
-@keyframes float {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(20px, -20px); }
 }
 
 .search-container {

@@ -776,6 +776,9 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 系统设置页面：系统参数、模型、向量库、搜索、日程、文件与备份的统一配置。
+ */
 import { ref, onMounted } from 'vue'
 import {
   NInput,
@@ -817,7 +820,10 @@ import {
   PulseOutline as PulseIcon,
   CloseOutline as CloseIcon
 } from '@vicons/ionicons5'
-import { embeddingService, searchService, settingsService, backupService } from '@/services/api'
+import { embeddingService } from '@/services/api/embedding'
+import { searchService } from '@/services/api/search'
+import { settingsService } from '@/services/api/settings'
+import { backupService } from '@/services/api/backup'
 import type { BackupFileInfo } from '@/types'
 import { useThemeStore } from '@/stores/theme'
 
@@ -948,6 +954,7 @@ const selectTheme = (theme: 'light' | 'dark' | 'auto') => {
 }
 
 // Logo上传处理
+/** 把用户选择的图片上传并写入 site_logo 字段。 */
 const handleLogoUpload = async ({ file }: { file: { file: File | null } }) => {
   if (!file.file) return
   try {
@@ -1010,6 +1017,7 @@ const saveQdrantSettings = async () => {
 }
 
 // 测试 Qdrant 连接
+/** 触发后端对 Qdrant 向量库的连通性测试。 */
 const testQdrantConnection = async () => {
   testing.value = true
   try {
@@ -1040,6 +1048,7 @@ const saveSearchSettings = async () => {
 }
 
 // 测试搜索
+/** 触发后端对搜索引擎 API Key 的连通性测试。 */
 const testSearchConnection = async () => {
   testing.value = true
   try {
@@ -1097,6 +1106,7 @@ const resetArchiveSelection = () => {
   }
 }
 
+/** 导出完整数据归档为 ZIP 包到本地。 */
 const exportDataArchive = async () => {
   exportingData.value = true
   try {
@@ -1118,6 +1128,7 @@ const exportDataArchive = async () => {
   }
 }
 
+/** 导入本地 ZIP 归档，可选覆盖现有数据。 */
 const importDataArchive = async () => {
   if (!selectedArchiveFile.value) {
     message.warning('请先选择 ZIP 文件')
@@ -1150,6 +1161,7 @@ onMounted(() => {
   loadBackupList()
 })
 
+/** 在服务端创建一份数据快照备份。 */
 const createBackupToServer = async () => {
   creatingBackup.value = true
   try {
@@ -1221,6 +1233,7 @@ const deleteBackupFile = async (fileName: string) => {
   })
 }
 
+/** 清理过期的服务端备份文件。 */
 const cleanupBackups = async () => {
   cleaningBackups.value = true
   try {
@@ -1243,19 +1256,25 @@ const cleanupBackups = async () => {
 .settings-page {
   min-height: 100%;
   display: grid;
-  gap: 24px;
-  padding: 4px;
+  gap: 18px;
+  padding: 0;
+  color: var(--text-primary);
 }
 
 /* Page Header - Warm solid */
 .page-header {
   position: relative;
   overflow: hidden;
-  padding: 32px 34px;
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  background: var(--bg-card);
-  box-shadow: var(--shadow-sm);
+  padding: 26px 28px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  background:
+    var(--gradient-accent),
+    var(--gradient-workbench),
+    var(--bg-panel);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    var(--shadow-card);
 }
 
 .page-header::before {
@@ -1327,17 +1346,17 @@ const cleanupBackups = async () => {
 }
 
 .header-badge {
-  padding: 16px 18px;
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  background: var(--warm-50);
-  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  padding: 14px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-hover);
+  transition: all var(--transition-base);
 }
 
 .header-badge:hover {
-  border-color: var(--primary-light);
+  border-color: var(--border-accent);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
 }
 
 .header-badge span {
@@ -1358,8 +1377,8 @@ const cleanupBackups = async () => {
 
 .settings-container {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
 }
 
@@ -1370,26 +1389,30 @@ const cleanupBackups = async () => {
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  background: var(--bg-card);
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  background:
+    var(--gradient-card),
+    var(--bg-panel);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    var(--shadow-card);
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid transparent;
-  border-radius: 18px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   color: var(--text-secondary);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.76rem;
   font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   transition: all var(--transition-base);
 }
 
@@ -1404,7 +1427,7 @@ const cleanupBackups = async () => {
 
 .nav-item:hover {
   background: var(--bg-menu-item-hover);
-  border-color: var(--border-light);
+  border-color: var(--surface-border);
   color: var(--text-strong);
 }
 
@@ -1412,7 +1435,7 @@ const cleanupBackups = async () => {
   background: var(--bg-menu-item-active);
   border-color: var(--border-accent);
   color: var(--text-strong);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
 }
 
 .settings-content {
@@ -1423,11 +1446,15 @@ const cleanupBackups = async () => {
 .section-wrapper {
   position: relative;
   overflow: hidden;
-  padding: 24px;
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  background: var(--bg-card);
-  box-shadow: var(--shadow-sm);
+  padding: 22px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  background:
+    var(--gradient-card),
+    var(--bg-panel);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    var(--shadow-card);
   animation: fadeIn 0.25s ease;
 }
 
@@ -1473,18 +1500,18 @@ const cleanupBackups = async () => {
 .setting-card {
   position: relative;
   overflow: hidden;
-  padding: 20px;
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  background: var(--bg-card);
+  padding: 18px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-hover);
   box-shadow: var(--shadow-xs);
   transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
 .setting-card:hover {
   transform: translateY(-2px);
-  border-color: var(--border-glow);
-  box-shadow: var(--shadow-sm);
+  border-color: var(--surface-border-strong);
+  box-shadow: var(--shadow-card);
 }
 
 .setting-card.full-width { grid-column: span 2; }
@@ -1527,8 +1554,8 @@ const cleanupBackups = async () => {
   align-items: center;
   gap: 6px;
   padding: 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-base);
 }
@@ -1566,8 +1593,8 @@ const cleanupBackups = async () => {
 .upload-btn {
   width: 100%;
   height: 44px;
-  border: 1px dashed var(--border-strong);
-  border-radius: 16px;
+  border: 1px dashed var(--surface-border-strong);
+  border-radius: var(--radius-md);
   background: var(--bg-card);
   color: var(--text-secondary);
 }
@@ -1598,8 +1625,8 @@ const cleanupBackups = async () => {
 
 .zip-file-input {
   width: 100%;
-  border: 1px dashed var(--border-color);
-  border-radius: 16px;
+  border: 1px dashed var(--surface-border);
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   color: var(--text-secondary);
   background: var(--bg-card);
@@ -1610,8 +1637,8 @@ const cleanupBackups = async () => {
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
 }
 
 .backup-action-row {
@@ -1638,8 +1665,8 @@ const cleanupBackups = async () => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
   background: var(--bg-hover);
   transition: border-color 0.2s;
 }

@@ -1,8 +1,11 @@
 <template>
-  <div class="skills-page">
-    <!-- 操作栏 -->
-    <div class="action-bar">
-      <div class="action-left">
+  <UiPage>
+    <UiPageHeader
+      eyebrow="Skill Catalog"
+      title="技能管理"
+      subtitle="维护技能目录、分类、启用状态和执行入口。"
+    >
+      <template #actions>
         <n-button type="primary" @click="showAddModal = true">
           <template #icon><n-icon><AddIcon /></n-icon></template>
           添加技能
@@ -15,18 +18,16 @@
           <template #icon><n-icon><RefreshIcon /></n-icon></template>
           重新加载
         </n-button>
-      </div>
-      <div class="action-right">
         <n-input v-model:value="searchText" placeholder="搜索技能..." clearable style="width: 200px">
           <template #prefix>
             <n-icon><SearchIcon /></n-icon>
           </template>
         </n-input>
-      </div>
-    </div>
+      </template>
+    </UiPageHeader>
 
-    <!-- 分类标签 -->
-    <div class="category-bar">
+    <UiPanel title="分类筛选">
+      <div class="category-bar">
       <div
         v-for="cat in categories"
         :key="cat"
@@ -36,9 +37,10 @@
         {{ cat }}
         <span class="count">{{ getCategoryCount(cat) }}</span>
       </div>
-    </div>
+      </div>
+    </UiPanel>
 
-    <!-- 技能卡片 -->
+    <UiPanel title="技能卡片" :subtitle="`当前显示 ${filteredSkills.length} 个技能`">
     <div class="skills-grid">
       <div v-for="skill in filteredSkills" :key="skill.id" class="skill-card">
         <div class="skill-header">
@@ -83,6 +85,7 @@
 
       <n-empty v-if="filteredSkills.length === 0" description="暂无技能" />
     </div>
+    </UiPanel>
 
     <!-- 添加技能弹窗 -->
     <n-modal v-model:show="showAddModal" preset="card" title="添加技能" style="width: 600px">
@@ -184,10 +187,13 @@
         <n-button @click="showResultModal = false">关闭</n-button>
       </template>
     </n-modal>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 技能管理页面：分类筛选、启停、JSON 导入与执行，支持 search 过滤。
+ */
 import { ref, computed, onMounted } from 'vue'
 import {
   NButton,
@@ -221,8 +227,9 @@ import {
   RocketOutline as RocketIcon,
   StorefrontOutline as StoreIcon
 } from '@vicons/ionicons5'
-import { skillService } from '@/services/api'
+import { skillService } from '@/services/api/skill'
 import type { Skill } from '@/types'
+import { UiPage, UiPageHeader, UiPanel } from '@/components/ui'
 
 const message = useMessage()
 const skills = ref<Skill[]>([])
@@ -333,7 +340,7 @@ const getMoreOptions = () => [
   { label: '删除', key: 'delete', props: { style: 'color: var(--error)' } }
 ]
 
-// 处理更多操作
+// 处理技能卡片的导出 / 复制编码 / 删除菜单操作
 const handleMoreAction = async (key: string, skill: Skill) => {
   switch (key) {
     case 'export':
@@ -369,7 +376,7 @@ const loadSkills = async () => {
   }
 }
 
-// 重新加载技能
+/** 调用后端 reload 重新发现技能目录并刷新列表。 */
 const reloadSkills = async () => {
   reloading.value = true
   try {
@@ -436,7 +443,7 @@ const executeSkill = (skill: Skill) => {
   showExecuteModal.value = true
 }
 
-// 执行技能
+/** 解析用户输入的参数 JSON 后调用后端执行技能并展示结果弹窗。 */
 const doExecute = async () => {
   if (!currentSkill.value) return
   executing.value = true
@@ -457,7 +464,7 @@ const doExecute = async () => {
   }
 }
 
-// 从JSON导入
+/** 把用户粘贴的技能 JSON 字符串提交给后端导入。 */
 const importFromJson = async () => {
   if (!importJson.value.trim()) {
     message.warning('请输入技能JSON')

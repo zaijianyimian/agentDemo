@@ -36,18 +36,7 @@
           <n-radio-group v-model="activeFilter" class="filter-tabs">
             <n-radio-button value="all">全部</n-radio-button>
             <n-radio-button value="unread">未读</n-radio-button>
-            <n-radio-button value="high">高优先级</n-radio-button>
           </n-radio-group>
-          <n-select
-            v-model="selectedType"
-            placeholder="筛选类型"
-            class="type-select"
-          >
-            <n-option value="">全部类型</n-option>
-            <n-option v-for="type in notificationTypes" :key="type.value" :value="type.value">
-              {{ type.label }}
-            </n-option>
-          </n-select>
         </div>
 
         <div v-if="filteredNotifications.length" class="notification-list">
@@ -173,10 +162,12 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 通知中心页面：通知列表/筛选、已读管理、监听器启停，并通过 SSE 实时接收新通知。
+ */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton, NIcon, NRadioGroup, NRadioButton, NSelect, NTag, NPagination, useMessage } from 'naive-ui'
-import NOption from 'naive-ui'
+import { NButton, NIcon, NRadioGroup, NRadioButton, NTag, NPagination, useMessage } from 'naive-ui'
 import {
   NotificationsOutline,
   CalendarOutline,
@@ -184,14 +175,12 @@ import {
   TimeOutline,
   AlertCircleOutline,
   ChatbubblesOutline,
-  DocumentTextOutline,
-  PinOutline,
   RocketOutline,
   SettingsOutline
 } from '@vicons/ionicons5'
-import type { NotificationDTO, NotificationStatsDTO, ListenerStatusDTO } from '@/types'
-import api from '@/services/api'
-import { getAccessToken } from '@/services/auth-token'
+import type { NotificationDTO, ListenerStatusDTO } from '@/types'
+import { connectEmailEventStream, type EmailNotificationEvent } from '@/services/email-events'
+import { emailService } from '@/services/api/email'
 import EmptyStateWithGlow from '@/components/EmptyStateWithGlow.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
@@ -199,37 +188,28 @@ const router = useRouter()
 const message = useMessage()
 const loading = ref(false)
 const notifications = ref<NotificationDTO[]>([])
-const stats = ref<NotificationStatsDTO>({ totalCount: 0, unreadCount: 0, todayCount: 0 })
 const listenerStatus = ref<ListenerStatusDTO[]>([])
 
 const activeFilter = ref('all')
-const selectedType = ref('')
 const currentPage = ref(1)
 const pageSize = 10
+let notificationSeq = 0
 
-const notificationTypes = [
-  { value: 'SCHEDULE', label: '日程' },
-  { value: 'EMAIL', label: '邮件' },
-  { value: 'TASK', label: '任务' },
-  { value: 'SYSTEM', label: '系统' },
-  { value: 'CHAT', label: '聊天' },
-  { value: 'KNOWLEDGE', label: '知识库' }
-]
+// 通知统计由本地列表派生（后端无 /notification/stats 接口）
+const stats = computed(() => {
+  const todayPrefix = new Date().toISOString().slice(0, 10)
+  return {
+    totalCount: notifications.value.length,
+    unreadCount: notifications.value.filter((n) => !n.isRead).length,
+    todayCount: notifications.value.filter((n) => (n.createTime || '').startsWith(todayPrefix)).length
+  }
+})
 
 const filteredNotifications = computed(() => {
-  let result = notifications.value
-
   if (activeFilter.value === 'unread') {
-    result = result.filter((n: NotificationDTO) => !n.isRead)
-  } else if (activeFilter.value === 'high') {
-    result = result.filter((n: NotificationDTO) => n.priority === 'HIGH')
+    return notifications.value.filter((n: NotificationDTO) => !n.isRead)
   }
-
-  if (selectedType.value) {
-    result = result.filter((n: NotificationDTO) => n.type === selectedType.value)
-  }
-
-  return result
+  return notifications.value
 })
 
 const totalPages = computed(() => {
@@ -260,28 +240,12 @@ const metricCards = computed(() => [
   }
 ])
 
-function getTypeIcon(type: string) {
-  const icons: Record<string, any> = {
-    SCHEDULE: CalendarOutline,
-    EMAIL: MailOutline,
-    TASK: TimeOutline,
-    SYSTEM: SettingsOutline,
-    CHAT: ChatbubblesOutline,
-    KNOWLEDGE: DocumentTextOutline
-  }
-  return icons[type] || PinOutline
+function getTypeIcon(_type: string) {
+  return MailOutline
 }
 
-function getTypeLabel(type: string) {
-  const labels: Record<string, string> = {
-    SCHEDULE: '日程',
-    EMAIL: '邮件',
-    TASK: '任务',
-    SYSTEM: '系统',
-    CHAT: '聊天',
-    KNOWLEDGE: '知识库'
-  }
-  return labels[type] || type
+function getTypeLabel(_type: string) {
+  return '邮件'
 }
 
 function getListenerIcon(type: string) {
@@ -309,87 +273,73 @@ function formatTime(time: string) {
   return time.substring(0, 10)
 }
 
+/** 刷新监听器状态。通知历史由后端 SSE 实时推送，无法回溯拉取。 */
 async function loadNotifications() {
   loading.value = true
   try {
-    const response = await api.get('/notification', { params: { page: 1, size: 100 } })
-    if (response.data.success && response.data.data) {
-      notifications.value = response.data.data.content || []
-    }
-    await loadStats()
-  } catch (error) {
-    console.error('加载通知失败:', error)
+    await loadListenerStatus()
   } finally {
     loading.value = false
   }
 }
 
-async function loadStats() {
-  try {
-    const response = await api.get('/notification/stats')
-    if (response.data.success && response.data.data) {
-      stats.value = response.data.data
-    }
-  } catch (error) {
-    console.error('加载统计失败:', error)
-  }
-}
-
 async function loadListenerStatus() {
   try {
-    const response = await api.get('/listener/status')
-    if (response.data.success && response.data.data) {
-      listenerStatus.value = response.data.data
-    }
+    const map = ((await emailService.getListenerStatus()) ?? {}) as unknown as Record<
+      string,
+      { connected?: boolean; status?: string; email?: string; host?: string }
+    >
+    listenerStatus.value = Object.entries(map).map(([id, v]) => ({
+      type: id,
+      name: v.email || `#${id}`,
+      running: Boolean(v.connected),
+      configured: true,
+      statusDescription: v.status || (v.connected ? '已连接' : '未连接')
+    }))
   } catch (error) {
     console.error('加载监听器状态失败:', error)
   }
 }
 
-async function markAsRead(notification: NotificationDTO) {
-  try {
-    await api.put(`/notification/${notification.id}/read`)
-    notification.isRead = true
-    stats.value.unreadCount = Math.max(0, stats.value.unreadCount - 1)
-    message.success('已标记为已读')
-  } catch (error) {
-    console.error('标记已读失败:', error)
-    message.error('标记已读失败')
+function markAsRead(notification: NotificationDTO) {
+  notification.isRead = !notification.isRead
+  // 邮件类型通知点击直接跳详情页（如果后端推送了 messageId）
+  if (notification.type === 'EMAIL' && notification.sourceId) {
+    router.push(`/email/detail/${encodeURIComponent(notification.sourceId)}`)
   }
 }
 
-async function markAllAsRead() {
-  try {
-    await api.put('/notification/all/read')
-    notifications.value.forEach((n: NotificationDTO) => n.isRead = true)
-    stats.value.unreadCount = 0
-    message.success('全部已标记为已读')
-  } catch (error) {
-    console.error('全部已读失败:', error)
-    message.error('全部已读失败')
-  }
+function markAllAsRead() {
+  notifications.value.forEach((n: NotificationDTO) => (n.isRead = true))
+  message.success('全部已标记为已读')
 }
 
-async function startListener(type: string) {
+async function startListener(id: string | number) {
+  const numericId = Number(id)
+  if (!Number.isFinite(numericId)) {
+    message.error('无效的监听器 ID')
+    return
+  }
   try {
-    const response = await api.post(`/listener/${type}/start`)
-    if (response.data.success) {
-      await loadListenerStatus()
-      message.success('监听器启动成功')
-    }
+    await emailService.startListener(numericId)
+    await loadListenerStatus()
+    message.success('监听器启动成功')
   } catch (error) {
     console.error('启动监听器失败:', error)
     message.error('启动监听器失败')
   }
 }
 
-async function stopListener(type: string) {
+async function stopListener(id: string | number) {
+  const numericId = Number(id)
+  if (!Number.isFinite(numericId)) {
+    message.error('无效的监听器 ID')
+    return
+  }
   try {
-    const response = await api.post(`/listener/${type}/stop`)
-    if (response.data.success) {
-      await loadListenerStatus()
-      message.success('监听器已停止')
-    }
+    await emailService.stopListener(numericId)
+    await loadListenerStatus()
+    message.success('监听器已停止')
   } catch (error) {
     console.error('停止监听器失败:', error)
     message.error('停止监听器失败')
@@ -398,18 +348,21 @@ async function stopListener(type: string) {
 
 async function startAllListeners() {
   try {
-    await api.post('/listener/start-all')
+    await emailService.reloadListeners()
     await loadListenerStatus()
-    message.success('已启动全部监听器')
+    message.success('已重载全部监听器')
   } catch (error) {
-    console.error('启动全部监听器失败:', error)
-    message.error('启动全部监听器失败')
+    console.error('重载监听器失败:', error)
+    message.error('重载监听器失败')
   }
 }
 
 async function stopAllListeners() {
   try {
-    await api.post('/listener/stop-all')
+    await Promise.all(listenerStatus.value
+        .map((l) => Number(l.type))
+        .filter(Number.isFinite)
+        .map((nid) => emailService.stopListener(nid)))
     await loadListenerStatus()
     message.success('已停止全部监听器')
   } catch (error) {
@@ -422,73 +375,73 @@ function goToPage(path: string) {
   router.push(path)
 }
 
-let eventSource: EventSource | null = null
+let streamController: AbortController | null = null
+let reconnectTimer: number | null = null
 let reconnectDelay = 1000
 const MAX_DELAY = 30000
 
-function connectNotificationStream() {
-  if (eventSource) return
-
-  const token = getAccessToken()
-  if (!token) return
-
-  const base = api.defaults.baseURL || '/api'
-  const url = `${base}/notification/stream?token=${encodeURIComponent(token)}`
-  eventSource = new EventSource(url)
-
-  eventSource.addEventListener('connected', () => {
-    console.log('[通知SSE] 连接已建立')
-    reconnectDelay = 1000 // 重置重连延迟
-  })
-
-  eventSource.addEventListener('notification', (event: MessageEvent) => {
-    try {
-      const notification: NotificationDTO = JSON.parse(event.data)
-      // 避免重复添加通知
-      const exists = notifications.value.some((n: NotificationDTO) => n.id === notification.id)
-      if (!exists) {
-        notifications.value.unshift(notification)
-        stats.value.unreadCount += 1
-        stats.value.totalCount += 1
-      }
-    } catch (e) {
-      console.error('[通知SSE] 解析通知数据失败', e)
-    }
-  })
-
-  eventSource.addEventListener('unread-count', (event: MessageEvent) => {
-    try {
-      const data = JSON.parse(event.data)
-      stats.value.unreadCount = data.unreadCount ?? stats.value.unreadCount
-    } catch (e) {
-      console.error('[通知SSE] 解析未读数失败', e)
-    }
-  })
-
-  eventSource.addEventListener('ping', () => {
-    // heartbeat, no action needed
-  })
-
-  eventSource.onerror = () => {
-    console.warn('[通知SSE] 连接断开，将在', reconnectDelay / 1000, '秒后重连...')
-    eventSource?.close()
-    eventSource = null
-    setTimeout(connectNotificationStream, reconnectDelay)
-    // 指数退避
-    reconnectDelay = Math.min(reconnectDelay * 2, MAX_DELAY)
+/** 把新邮件事件映射成通知列表项（沿用 NotificationDTO 形状）。 */
+function toNotification(event: EmailNotificationEvent): NotificationDTO {
+  const sender = event.fromName?.trim() || event.from?.trim() || '未知发件人'
+  return {
+    id: ++notificationSeq,
+    type: 'EMAIL',
+    title: event.subject?.trim() || '无主题邮件',
+    content: event.accountEmail ? `${sender} → ${event.accountEmail}` : sender,
+    source: event.accountEmail,
+    sourceId: event.messageId,
+    isRead: false,
+    priority: 'MEDIUM',
+    createTime: event.detectedAt || event.receivedDate || event.sentDate || ''
   }
+}
+
+/** 打开邮件通知 SSE 长连接（fetch + Authorization 头），断线时按指数退避自动重连。 */
+function connectNotificationStream() {
+  if (streamController) return
+
+  streamController = connectEmailEventStream({
+    onEmail: (event) => {
+      const item = toNotification(event)
+      const key = `${item.title}|${item.createTime}`
+      const exists = notifications.value.some((n) => `${n.title}|${n.createTime}` === key)
+      if (!exists) {
+        notifications.value.unshift(item)
+        // 限制列表长度防止长时间运行后内存膨胀
+        const MAX_NOTIFICATIONS = 200
+        if (notifications.value.length > MAX_NOTIFICATIONS) {
+          notifications.value = notifications.value.slice(0, MAX_NOTIFICATIONS)
+        }
+      }
+    },
+    onDisconnect: scheduleReconnect
+  })
+
+  if (streamController) {
+    reconnectDelay = 1000
+  }
+}
+
+function scheduleReconnect() {
+  streamController = null
+  if (reconnectTimer != null) return
+  reconnectTimer = window.setTimeout(() => {
+    reconnectTimer = null
+    connectNotificationStream()
+  }, reconnectDelay)
+  reconnectDelay = Math.min(reconnectDelay * 2, MAX_DELAY)
 }
 
 function disconnectNotificationStream() {
-  if (eventSource) {
-    eventSource.close()
-    eventSource = null
-    console.log('[通知SSE] 连接已关闭')
+  if (reconnectTimer != null) {
+    window.clearTimeout(reconnectTimer)
+    reconnectTimer = null
   }
+  streamController?.abort()
+  streamController = null
 }
 
 onMounted(() => {
-  loadNotifications()
   loadListenerStatus()
   connectNotificationStream()
 })

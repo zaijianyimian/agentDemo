@@ -1,9 +1,11 @@
 <template>
-  <div class="tools-page">
-    <!-- 操作栏 -->
-    <n-card class="action-card" :bordered="false">
-      <n-space justify="space-between">
-        <n-space>
+  <UiPage>
+    <UiPageHeader
+      eyebrow="Tool Registry"
+      title="工具管理"
+      subtitle="管理 MCP 工具、HTTP API 和本地脚本执行入口。"
+    >
+      <template #actions>
           <n-button type="primary" @click="showAddModal = true">
             <template #icon><n-icon><AddIcon /></n-icon></template>
             添加工具
@@ -16,50 +18,23 @@
             <template #icon><n-icon><RefreshIcon /></n-icon></template>
             刷新
           </n-button>
-        </n-space>
         <n-button type="warning" tag="a" href="https://mcp.so/zh" target="_blank">
           <template #icon><n-icon><GlobeIcon /></n-icon></template>
           MCP工具市场
         </n-button>
-      </n-space>
-    </n-card>
+      </template>
+    </UiPageHeader>
 
-    <!-- 工具统计 -->
-    <n-grid :cols="5" :x-gap="16">
-      <n-gi>
-        <div class="stat-box">
-          <div class="stat-title">总工具数</div>
-          <div class="stat-number">{{ tools.length }}</div>
-        </div>
-      </n-gi>
-      <n-gi>
-        <div class="stat-box enabled">
-          <div class="stat-title">已启用</div>
-          <div class="stat-number">{{ tools.filter(t => t.enabled).length }}</div>
-        </div>
-      </n-gi>
-      <n-gi>
-        <div class="stat-box http">
-          <div class="stat-title">HTTP API</div>
-          <div class="stat-number">{{ tools.filter(t => t.toolType === 'HTTP_API').length }}</div>
-        </div>
-      </n-gi>
-      <n-gi>
-        <div class="stat-box script">
-          <div class="stat-title">本地脚本</div>
-          <div class="stat-number">{{ tools.filter(t => t.toolType === 'LOCAL_SCRIPT').length }}</div>
-        </div>
-      </n-gi>
-      <n-gi>
-        <div class="stat-box mcp">
-          <div class="stat-title">MCP 客户端</div>
-          <div class="stat-number">{{ tools.filter(t => t.toolType === 'MCP_CLIENT').length }}</div>
-        </div>
-      </n-gi>
-    </n-grid>
+    <div class="ui-stat-grid">
+      <UiStat label="总工具数" :value="tools.length" />
+      <UiStat label="已启用" :value="tools.filter(t => t.enabled).length" />
+      <UiStat label="HTTP API" :value="tools.filter(t => t.toolType === 'HTTP_API').length" />
+      <UiStat label="本地脚本" :value="tools.filter(t => t.toolType === 'LOCAL_SCRIPT').length" />
+      <UiStat label="MCP 客户端" :value="tools.filter(t => t.toolType === 'MCP_CLIENT').length" />
+    </div>
 
-    <!-- 工具列表 -->
-    <n-card class="list-card" :bordered="false">
+    <UiPanel title="工具列表" subtitle="统一查看、启用、测试和维护工具定义。">
+      <div class="ui-table-wrap">
       <n-data-table
         :columns="columns"
         :data="tools"
@@ -67,7 +42,8 @@
         :row-key="(row: McpTool) => row.id"
         striped
       />
-    </n-card>
+      </div>
+    </UiPanel>
 
     <!-- 添加工具弹窗 -->
     <n-modal v-model:show="showAddModal" preset="card" title="添加工具" style="width: 600px">
@@ -170,15 +146,15 @@
         </n-tab-pane>
       </n-tabs>
     </n-modal>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 工具管理页面：MCP 工具、HTTP API 与本地脚本的增删改、启用与导入导出。
+ */
 import { ref, h, onMounted } from 'vue'
 import {
-  NCard,
-  NGrid,
-  NGi,
   NButton,
   NIcon,
   NSpace,
@@ -203,8 +179,9 @@ import {
   DownloadOutline as DownloadIcon,
   GlobeOutline as GlobeIcon
 } from '@vicons/ionicons5'
-import { mcpToolService } from '@/services/api'
+import { mcpToolService } from '@/services/api/mcp'
 import type { McpTool } from '@/types'
+import { UiPage, UiPageHeader, UiPanel, UiStat } from '@/components/ui'
 
 const message = useMessage()
 const loading = ref(false)
@@ -309,6 +286,7 @@ const loadTools = async () => {
   }
 }
 
+/** 切换工具启用开关。 */
 const toggleTool = async (tool: McpTool, enabled: boolean) => {
   try {
     await mcpToolService.toggle(tool.id)
@@ -368,6 +346,7 @@ const saveEditTool = async () => {
   }
 }
 
+/** 解析用户粘贴的 JSON：支持 mcpServers 与传统工具两种格式并批量入库。 */
 const importTool = async () => {
   if (!importJson.value.trim()) {
     message.warning('请输入工具JSON配置')
@@ -437,6 +416,7 @@ const importTool = async () => {
   }
 }
 
+/** 把工具定义转为 JSON 写入剪贴板，失败时回退到下载文件。 */
 const exportTool = (tool: McpTool) => {
   const exportData = {
     name: tool.name,

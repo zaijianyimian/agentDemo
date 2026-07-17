@@ -1,10 +1,5 @@
 <template>
   <div class="schedule-reader-page">
-    <div class="warm-bg-decoration">
-      <div class="gradient-orb orb-1"></div>
-      <div class="gradient-orb orb-2"></div>
-    </div>
-
     <div class="reader-container">
       <!-- 左侧文件列表 -->
       <div class="file-sidebar">
@@ -82,6 +77,9 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * 日程 Markdown 阅读页面：浏览后端生成的日程文件，提供分享二维码。
+ */
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { NIcon, NButton, NScrollbar, NEmpty, NModal, useMessage } from 'naive-ui'
 import {
@@ -93,7 +91,7 @@ import {
   CopyOutline as CopyIcon
 } from '@vicons/ionicons5'
 import QRCode from 'qrcode'
-import { scheduleService } from '@/services/api'
+import { scheduleService } from '@/services/api/schedule'
 import { renderMarkdown } from '@/utils/markdown'
 
 const message = useMessage()
@@ -164,6 +162,7 @@ const selectFile = async (fileName: string) => {
   }
 }
 
+/** 打开分享弹窗并基于当前选中文件渲染二维码到 canvas。 */
 const showShareModal = async () => {
   shareModalVisible.value = true
   await nextTick()
@@ -200,30 +199,6 @@ onMounted(() => {
   height: calc(100vh - 112px);
   position: relative;
   overflow: hidden;
-}
-
-.warm-bg-decoration {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.gradient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.12;
-  animation: float 20s ease-in-out infinite;
-}
-
-.orb-1 { width: 300px; height: 300px; background: var(--primary-color); top: -50px; right: -50px; }
-.orb-2 { width: 200px; height: 200px; background: var(--primary-light); bottom: 0; left: 30%; animation-delay: -10s; }
-
-@keyframes float {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(20px, -20px); }
 }
 
 .reader-container {

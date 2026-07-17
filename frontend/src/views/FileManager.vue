@@ -1,7 +1,25 @@
 <template>
-  <div class="file-manager">
-    <!-- 上传区域 -->
-    <n-card class="upload-card" :bordered="false">
+  <UiPage>
+    <UiPageHeader
+      eyebrow="File Workspace"
+      title="文件管理"
+      subtitle="上传、检索和分析本地文件资产，集中查看文件摘要、重要度和处理状态。"
+    >
+      <template #actions>
+        <n-button @click="loadFiles">
+          <template #icon><n-icon><RefreshIcon /></n-icon></template>
+          刷新
+        </n-button>
+      </template>
+    </UiPageHeader>
+
+    <div class="ui-stat-grid">
+      <UiStat label="文件总数" :value="files.length" hint="当前可管理资产" />
+      <UiStat label="高重要度" :value="files.filter(file => file.importance >= 8).length" hint="重要度 8-10" />
+      <UiStat label="筛选结果" :value="filteredFiles.length" hint="匹配当前条件" />
+    </div>
+
+    <UiPanel title="上传文件" subtitle="支持 txt、md 格式，上传后自动进入内容分析流程。">
       <n-upload
         :custom-request="handleUpload"
         :show-file-list="false"
@@ -16,11 +34,10 @@
           </div>
         </n-upload-dragger>
       </n-upload>
-    </n-card>
+    </UiPanel>
 
-    <!-- 筛选和搜索 -->
-    <n-card class="filter-card" :bordered="false">
-      <n-space>
+    <UiPanel title="筛选与搜索">
+      <UiToolbar>
         <n-input v-model:value="searchText" placeholder="搜索文件名..." clearable style="width: 200px">
           <template #prefix>
             <n-icon><SearchIcon /></n-icon>
@@ -44,19 +61,20 @@
           <template #icon><n-icon><RefreshIcon /></n-icon></template>
           刷新
         </n-button>
-      </n-space>
-    </n-card>
+      </UiToolbar>
+    </UiPanel>
 
-    <!-- 文件列表 -->
-    <n-card class="file-list-card" :bordered="false">
-      <n-data-table
-        :columns="columns"
-        :data="filteredFiles"
-        :loading="loading"
-        :row-key="(row: Document) => row.id"
-        striped
-      />
-    </n-card>
+    <UiPanel title="文件列表" :subtitle="`共 ${filteredFiles.length} 个文件`">
+      <div class="ui-table-wrap">
+        <n-data-table
+          :columns="columns"
+          :data="filteredFiles"
+          :loading="loading"
+          :row-key="(row: Document) => row.id"
+          striped
+        />
+      </div>
+    </UiPanel>
 
     <!-- 文件详情弹窗 -->
     <n-modal v-model:show="showDetail" preset="card" title="文件详情" style="width: 600px">
@@ -95,15 +113,17 @@
         <pre class="file-content">{{ currentFile?.content }}</pre>
       </n-scrollbar>
     </n-modal>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 文件管理页面：上传 txt/md 并自动分析，按名称/重要度/类型筛选，查看详情。
+ */
 import { ref, computed, h, onMounted } from 'vue'
 import { formatFileSize as formatSize } from '@/utils/file-format'
 import { formatDateTime as formatTime } from '@/utils/date-format'
 import {
-  NCard,
   NUpload,
   NUploadDragger,
   NIcon,
@@ -129,8 +149,9 @@ import {
   EyeOutline as EyeIcon,
   TrashOutline as TrashIcon
 } from '@vicons/ionicons5'
-import { fileService } from '@/services/api'
+import { fileService } from '@/services/api/file'
 import type { Document } from '@/types'
+import { UiPage, UiPageHeader, UiPanel, UiStat, UiToolbar } from '@/components/ui'
 
 const message = useMessage()
 const loading = ref(false)
@@ -252,7 +273,7 @@ const loadFiles = async () => {
   }
 }
 
-// 上传文件
+/** 自定义上传请求：调用文件服务上传并触发后端的内容分析流程。 */
 const handleUpload = async ({ file }: UploadCustomRequestOptions) => {
   if (!file.file) return
   try {

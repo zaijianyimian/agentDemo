@@ -1,11 +1,21 @@
 <template>
-  <div class="snippets-page">
-    <!-- 温暖背景装饰 -->
-    <div class="warm-bg-decoration">
-      <div class="gradient-orb orb-1"></div>
-      <div class="gradient-orb orb-2"></div>
-    </div>
+  <UiPage wide>
+    <UiPageHeader
+      eyebrow="Snippets"
+      title="代码片段"
+      subtitle="管理常用代码、说明和 AI 解释结果，用统一工作台承载检索与编辑。"
+    >
+      <template #actions>
+        <n-button type="primary" @click="createNewSnippet">
+          <template #icon>
+            <n-icon><AddIcon /></n-icon>
+          </template>
+          新片段
+        </n-button>
+      </template>
+    </UiPageHeader>
 
+  <div class="snippets-page">
     <div class="snippets-container">
       <!-- 左侧片段列表 -->
       <div class="snippets-sidebar">
@@ -14,17 +24,6 @@
             <n-icon size="24" class="header-icon"><CodeIcon /></n-icon>
             <span>代码片段</span>
           </div>
-          <n-button
-            type="primary"
-            size="small"
-            @click="createNewSnippet"
-            class="new-snippet-btn"
-          >
-            <template #icon>
-              <n-icon><AddIcon /></n-icon>
-            </template>
-            新片段
-          </n-button>
         </div>
 
         <!-- 搜索框 -->
@@ -143,9 +142,13 @@
       </div>
     </div>
   </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 代码片段页面：搜索、创建、编辑与 AI 解释常用代码片段。
+ */
 import { ref, onMounted } from 'vue'
 import {
   NInput,
@@ -163,10 +166,11 @@ import {
   TrashOutline as TrashIcon
 } from '@vicons/ionicons5'
 import type { CodeSnippet } from '@/types'
-import { snippetService } from '@/services/api'
+import { snippetService } from '@/services/api/snippet'
 import { sanitizeHtml } from '@/utils/sanitize-html'
 import dayjs from 'dayjs'
 import { marked } from 'marked'
+import { UiPage, UiPageHeader } from '@/components/ui'
 
 const message = useMessage()
 const snippets = ref<CodeSnippet[]>([])
@@ -300,7 +304,7 @@ const copyCode = async () => {
   }
 }
 
-// AI 解释
+/** 调用后端 AI 接口为当前片段生成解释说明。 */
 const explainSnippet = async () => {
   if (!currentSnippet.value || !currentSnippet.value.code) {
     message.warning('请先添加代码')
@@ -351,50 +355,11 @@ onMounted(() => {
 
 <style scoped>
 .snippets-page {
-  height: calc(100vh - 112px);
+  width: 100%;
+  height: calc(100vh - 220px);
+  min-height: 620px;
   position: relative;
   overflow: hidden;
-}
-
-.warm-bg-decoration {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.gradient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.12;
-  animation: float 20s ease-in-out infinite;
-}
-
-.orb-1 {
-  width: 300px;
-  height: 300px;
-  background: var(--primary-color);
-  top: -50px;
-  right: 20%;
-}
-
-.orb-2 {
-  width: 200px;
-  height: 200px;
-  background: var(--primary-light);
-  bottom: 0;
-  left: -50px;
-  animation-delay: -10s;
-}
-
-@keyframes float {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(20px, -20px); }
 }
 
 .snippets-container {
@@ -433,13 +398,6 @@ onMounted(() => {
 
 .header-icon {
   color: var(--primary-color);
-}
-
-.new-snippet-btn {
-  background: var(--gradient-warm) !important;
-  border: none !important;
-  box-shadow: var(--shadow-md);
-  font-weight: 600;
 }
 
 .search-area {

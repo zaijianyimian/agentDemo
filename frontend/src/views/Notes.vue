@@ -1,33 +1,35 @@
 <template>
-  <div class="notes-page">
-    <!-- 温暖背景装饰 -->
-    <div class="warm-bg-decoration">
-      <div class="gradient-orb orb-1"></div>
-      <div class="gradient-orb orb-2"></div>
-    </div>
+  <UiPage wide>
+    <UiPageHeader
+      eyebrow="Notebook"
+      title="笔记"
+      subtitle="沉淀日程、想法和资料摘要，并支持语义检索与 AI 总结。"
+    >
+      <template #actions>
+        <n-button type="primary" @click="createNewNote">
+          <template #icon>
+            <n-icon><AddIcon /></n-icon>
+          </template>
+          新笔记
+        </n-button>
+        <n-button secondary :loading="reindexing" @click="reindexNotes">
+          重建向量
+        </n-button>
+      </template>
+    </UiPageHeader>
 
-    <div class="notes-container">
-      <!-- 左侧笔记列表 -->
-      <div class="notes-sidebar">
-        <div class="sidebar-header">
-          <div class="header-title">
-            <n-icon size="24" class="header-icon"><NotebookIcon /></n-icon>
-            <span>笔记</span>
+    <div class="notes-page">
+      <div class="notes-container">
+        <!-- 左侧笔记列表 -->
+        <div class="notes-sidebar">
+          <div class="sidebar-header">
+            <div class="header-title">
+              <n-icon size="24" class="header-icon"><NotebookIcon /></n-icon>
+              <span>笔记</span>
+            </div>
           </div>
-          <n-button
-            type="primary"
-            size="small"
-            @click="createNewNote"
-            class="new-note-btn"
-          >
-            <template #icon>
-              <n-icon><AddIcon /></n-icon>
-            </template>
-            新笔记
-          </n-button>
-        </div>
 
-        <div class="notes-list">
+          <div class="notes-list">
           <div class="search-toolbar">
             <n-input
               v-model:value="semanticQuery"
@@ -154,11 +156,15 @@
           <div class="preview-content" v-html="renderMarkdown(currentNote.content)"></div>
         </div>
       </div>
+      </div>
     </div>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 笔记页面：左侧列表 + 右侧编辑预览，支持置顶、AI 总结与语义检索。
+ */
 import { ref, computed, onMounted } from 'vue'
 import {
   NInput,
@@ -176,10 +182,11 @@ import {
   EyeOutline as EyeIcon
 } from '@vicons/ionicons5'
 import type { Note } from '@/types'
-import { noteService } from '@/services/api'
+import { noteService } from '@/services/api/note'
 import { renderMarkdown } from '@/utils/markdown'
 import { formatUpdateTime } from '@/utils/date-format'
 import { formatScore } from '@/utils/file-format'
+import { UiPage, UiPageHeader } from '@/components/ui'
 
 const message = useMessage()
 const notes = ref<Note[]>([])
@@ -271,7 +278,7 @@ const togglePin = async (note: Note) => {
   }
 }
 
-// AI 总结
+/** 调用 AI 为当前笔记生成摘要并写回。 */
 const summarizeNote = async () => {
   if (!currentNote.value || !currentNote.value.content) {
     message.warning('请先编写笔记内容')
@@ -316,6 +323,7 @@ const runSemanticSearch = async () => {
   }
 }
 
+/** 调用后端重建所有笔记的向量索引，便于语义检索。 */
 const reindexNotes = async () => {
   reindexing.value = true
   try {
@@ -367,50 +375,10 @@ onMounted(() => {
 <style scoped>
 .notes-page {
   width: 100%;
-  height: calc(100vh - 112px);
+  height: calc(100vh - 220px);
+  min-height: 620px;
   position: relative;
   overflow: hidden;
-}
-
-.warm-bg-decoration {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.gradient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.12;
-  animation: float 20s ease-in-out infinite;
-}
-
-.orb-1 {
-  width: 300px;
-  height: 300px;
-  background: var(--primary-color);
-  top: -50px;
-  right: -50px;
-}
-
-.orb-2 {
-  width: 200px;
-  height: 200px;
-  background: var(--primary-light);
-  bottom: 0;
-  left: 30%;
-  animation-delay: -10s;
-}
-
-@keyframes float {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(20px, -20px); }
 }
 
 .notes-container {
@@ -452,13 +420,6 @@ onMounted(() => {
 
 .header-icon {
   color: var(--primary-color);
-}
-
-.new-note-btn {
-  background: var(--gradient-warm) !important;
-  border: none !important;
-  box-shadow: var(--shadow-md);
-  font-weight: 600;
 }
 
 .notes-list {

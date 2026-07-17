@@ -1,8 +1,11 @@
 <template>
-  <div class="email-page">
-    <!-- 操作栏 -->
-    <n-card class="action-card" :bordered="false">
-      <n-space>
+  <UiPage>
+    <UiPageHeader
+      eyebrow="Mail Listener"
+      title="邮件配置"
+      subtitle="维护邮箱连接、认证方式、监听窗口和网络检测状态。"
+    >
+      <template #actions>
         <n-button type="primary" @click="openAddConfig">
           <template #icon><n-icon><AddIcon /></n-icon></template>
           添加邮箱
@@ -11,11 +14,11 @@
           <template #icon><n-icon><RefreshIcon /></n-icon></template>
           刷新
         </n-button>
-      </n-space>
-    </n-card>
+      </template>
+    </UiPageHeader>
 
     <!-- 邮箱列表 -->
-    <n-grid :cols="2" :x-gap="16" :y-gap="16">
+    <n-grid :cols="2" :x-gap="16" :y-gap="16" responsive="screen">
       <n-gi v-for="config in configs" :key="config.id">
         <n-card class="email-card" :bordered="false">
           <div class="email-header">
@@ -23,7 +26,7 @@
               <n-icon size="24" class="email-icon"><MailIcon /></n-icon>
               <div>
                 <div class="email-address">{{ config.email }}</div>
-                <div class="email-host">{{ config.host }}:{{ config.port }}</div>
+                <div class="email-host">{{ formatEndpoint(config) }}</div>
               </div>
             </div>
             <n-switch
@@ -39,6 +42,11 @@
               {{ config.enabled ? '已启用' : '已禁用' }}
             </n-tag>
             <n-tag v-if="config.sslEnabled" type="info" size="small">SSL</n-tag>
+            <n-tag type="info" size="small">{{ providerLabel(config.provider) }}</n-tag>
+            <n-tag type="default" size="small">{{ listenModeLabel(config.listenMode) }}</n-tag>
+            <n-tag v-if="statusDetails[config.id]?.fallbackListenMode" type="warning" size="small">
+              降级: {{ listenModeLabel(statusDetails[config.id]?.fallbackListenMode) }}
+            </n-tag>
             <n-tag v-if="config.authType && config.authType !== 'password'" type="warning" size="small">
               {{ config.authType === 'oauth2_refresh_token' ? 'OAuth2-Refresh' : 'OAuth2-Access' }}
             </n-tag>
@@ -47,6 +55,9 @@
             </n-tag>
             <n-tag :type="connectionStatus[config.id]?.success ? 'success' : (connectionStatus[config.id] ? 'error' : 'default')" size="small">
               {{ connectionStatus[config.id]?.message || '未测试' }}
+            </n-tag>
+            <n-tag v-if="statusDetails[config.id]?.lastError" type="error" size="small">
+              {{ statusDetails[config.id]?.lastError }}
             </n-tag>
           </div>
 
@@ -96,6 +107,12 @@
         <n-form-item label="认证方式" path="authType">
           <n-select v-model:value="formData.authType" :options="authTypeOptions" />
         </n-form-item>
+        <n-form-item label="邮箱来源" path="provider">
+          <n-select v-model:value="formData.provider" :options="providerOptions" @update:value="onProviderChanged" />
+        </n-form-item>
+        <n-form-item label="监听模式" path="listenMode">
+          <n-select v-model:value="formData.listenMode" :options="listenModeOptions" />
+        </n-form-item>
         <n-form-item v-if="formData.authType === 'password'" label="密码/授权码" path="password">
           <n-input
             v-model:value="formData.password"
@@ -139,13 +156,13 @@
             placeholder="可选，留空使用默认scope"
           />
         </n-form-item>
-        <n-form-item label="IMAP服务器" path="host">
+        <n-form-item v-if="requiresHost(formData)" label="邮件服务器" path="host">
           <n-input v-model:value="formData.host" placeholder="imap.example.com" />
         </n-form-item>
-        <n-form-item label="IMAP端口" path="port">
+        <n-form-item v-if="requiresHost(formData)" label="服务器端口" path="port">
           <n-input-number v-model:value="formData.port" :min="1" :max="65535" />
         </n-form-item>
-        <n-form-item label="启用SSL" path="sslEnabled">
+        <n-form-item v-if="requiresHost(formData)" label="启用SSL" path="sslEnabled">
           <n-switch v-model:value="formData.sslEnabled" />
         </n-form-item>
         <n-form-item label="监听文件夹" path="folder">
@@ -155,6 +172,14 @@
           <n-input-number v-model:value="formData.pollInterval" :min="10" :max="3600">
             <template #suffix>秒</template>
           </n-input-number>
+        </n-form-item>
+        <n-form-item label="Provider配置" path="providerSettings">
+          <n-input
+            v-model:value="formData.providerSettings"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 6 }"
+            placeholder='JSON，例如 {"topicName":"projects/x/topics/gmail","notificationUrl":"https://..."}'
+          />
         </n-form-item>
         <n-form-item label="监听时间段">
           <n-switch v-model:value="formData.listenWindowEnabled">
@@ -181,10 +206,10 @@
       </n-form>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="checkNewConfigNetwork" :loading="checkingNewNetwork">
+          <n-button v-if="requiresHost(formData)" @click="checkNewConfigNetwork" :loading="checkingNewNetwork">
             网络检测
           </n-button>
-          <n-button @click="testNewConfig" :loading="testingNew">
+          <n-button v-if="requiresHost(formData)" @click="testNewConfig" :loading="testingNew">
             <template #icon><n-icon><TestIcon /></n-icon></template>
             测试连接
           </n-button>
@@ -214,10 +239,13 @@
         </template>
       </n-result>
     </n-modal>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 邮件监听配置页面：维护邮箱账号、认证方式、监听模式、测试连接与网络检测。
+ */
 import { ref, onMounted } from 'vue'
 import {
   NCard,
@@ -248,12 +276,14 @@ import {
   MailOutline as MailIcon,
   BuildOutline as TestIcon
 } from '@vicons/ionicons5'
-import { emailService } from '@/services/api'
+import { emailService } from '@/services/api/email'
 import type { EmailConfig } from '@/types'
+import { UiPage, UiPageHeader } from '@/components/ui'
 
 const message = useMessage()
 const configs = ref<EmailConfig[]>([])
 const listenerStatus = ref<Record<number, boolean>>({})
+const statusDetails = ref<Record<number, any>>({})
 const connectionStatus = ref<Record<number, { success: boolean; message: string }>>({})
 const testingIds = ref<number[]>([])
 const checkingNetworkIds = ref<number[]>([])
@@ -269,6 +299,10 @@ const formData = ref({
   oauthAccessToken: '',
   oauthTokenEndpoint: '',
   oauthScope: '',
+  provider: 'GENERIC_IMAP' as NonNullable<EmailConfig['provider']>,
+  listenMode: 'POLLING' as NonNullable<EmailConfig['listenMode']>,
+  fallbackListenMode: null as EmailConfig['fallbackListenMode'],
+  providerSettings: '',
   host: '',
   port: 993,
   sslEnabled: true,
@@ -291,24 +325,35 @@ const testResult = ref<{
 } | null>(null)
 
 // 邮箱模板
-const emailTemplates = [
-  { name: 'QQ邮箱', host: 'imap.qq.com', port: 993, ssl: true },
-  { name: '163邮箱', host: 'imap.163.com', port: 993, ssl: true },
-  { name: 'Gmail', host: 'imap.gmail.com', port: 993, ssl: true },
-  { name: 'Outlook', host: 'outlook.office365.com', port: 993, ssl: true }
-]
+const emailTemplates = ref<any[]>([])
 
 const templateColumns = [
   { title: '邮箱', key: 'name' },
-  { title: 'IMAP服务器', key: 'host' },
+  { title: 'Provider', key: 'provider', render: (row: any) => providerLabel(row.provider) },
+  { title: '监听', key: 'listenMode', render: (row: any) => listenModeLabel(row.listenMode) },
+  { title: '服务器', key: 'host', render: (row: any) => row.host || '-' },
   { title: '端口', key: 'port' },
-  { title: 'SSL', key: 'ssl', render: (row: any) => row.ssl ? '是' : '否' }
+  { title: 'SSL', key: 'sslEnabled', render: (row: any) => row.sslEnabled ? '是' : '否' }
 ]
 
 const authTypeOptions = [
   { label: '密码/授权码', value: 'password' },
   { label: 'OAuth2 Access Token', value: 'oauth2_access_token' },
   { label: 'OAuth2 Refresh Token', value: 'oauth2_refresh_token' }
+]
+
+const providerOptions = [
+  { label: '通用 IMAP', value: 'GENERIC_IMAP' },
+  { label: '通用 POP3', value: 'GENERIC_POP3' },
+  { label: 'Gmail API', value: 'GMAIL_API' },
+  { label: 'Microsoft Graph', value: 'MICROSOFT_GRAPH' }
+]
+
+const listenModeOptions = [
+  { label: '轮询', value: 'POLLING' },
+  { label: 'IMAP IDLE', value: 'IMAP_IDLE' },
+  { label: 'Webhook', value: 'WEBHOOK' },
+  { label: 'Delta Sync', value: 'DELTA_SYNC' }
 ]
 
 const parseConfigList = (payload: any): EmailConfig[] => {
@@ -325,6 +370,10 @@ const normalizeConfigPayload = (payload: Partial<EmailConfig>): Partial<EmailCon
   password: payload.password == null ? payload.password : trimText(payload.password),
   host: payload.host == null ? payload.host : trimText(payload.host),
   protocol: payload.protocol == null ? payload.protocol : trimText(payload.protocol).toLowerCase(),
+  provider: payload.provider == null ? payload.provider : trimText(payload.provider) as any,
+  listenMode: payload.listenMode == null ? payload.listenMode : trimText(payload.listenMode) as any,
+  fallbackListenMode: payload.fallbackListenMode == null ? payload.fallbackListenMode : trimText(payload.fallbackListenMode) as any,
+  providerSettings: payload.providerSettings == null ? payload.providerSettings : trimText(payload.providerSettings),
   authType: payload.authType == null ? 'password' : trimText(payload.authType) as any,
   oauthClientId: payload.oauthClientId == null ? payload.oauthClientId : trimText(payload.oauthClientId),
   oauthClientSecret: payload.oauthClientSecret == null ? payload.oauthClientSecret : trimText(payload.oauthClientSecret),
@@ -343,11 +392,53 @@ const buildSavePayload = () => {
     ...formData.value,
     folder: formData.value.folder || 'INBOX',
     pollInterval: formData.value.pollInterval || 30,
+    provider: formData.value.provider,
+    listenMode: formData.value.listenMode,
+    fallbackListenMode: formData.value.listenMode === 'IMAP_IDLE' ? 'POLLING' : formData.value.fallbackListenMode,
+    providerSettings: formData.value.providerSettings,
     listenStartTime: formData.value.listenWindowEnabled ? formData.value.listenStartTime : null,
     listenEndTime: formData.value.listenWindowEnabled ? formData.value.listenEndTime : null
   }) as Partial<EmailConfig>
   delete (payload as any).listenWindowEnabled
   return payload
+}
+
+const requiresHost = (config: Partial<EmailConfig> | typeof formData.value): boolean => {
+  const provider = (config.provider || 'GENERIC_IMAP').toString()
+  return provider === 'GENERIC_IMAP' || provider === 'GENERIC_POP3'
+}
+
+const providerLabel = (provider?: string | null): string => {
+  const option = providerOptions.find(item => item.value === provider)
+  return option?.label || provider || '通用 IMAP'
+}
+
+const listenModeLabel = (mode?: string | null): string => {
+  const option = listenModeOptions.find(item => item.value === mode)
+  return option?.label || mode || '轮询'
+}
+
+const formatEndpoint = (config: EmailConfig): string => {
+  if (!requiresHost(config)) return providerLabel(config.provider)
+  return `${config.host || '-'}:${config.port || '-'}`
+}
+
+const onProviderChanged = (value: string) => {
+  if (value === 'GENERIC_POP3') {
+    formData.value.protocol = 'pop3'
+    formData.value.listenMode = 'POLLING'
+    formData.value.port = 995
+  } else if (value === 'GENERIC_IMAP') {
+    formData.value.protocol = 'imap'
+    formData.value.listenMode = formData.value.listenMode === 'WEBHOOK' || formData.value.listenMode === 'DELTA_SYNC' ? 'POLLING' : formData.value.listenMode
+    formData.value.port = formData.value.port || 993
+  } else if (value === 'GMAIL_API' || value === 'MICROSOFT_GRAPH') {
+    formData.value.protocol = 'imap'
+    formData.value.listenMode = 'WEBHOOK'
+    formData.value.authType = 'oauth2_refresh_token'
+    formData.value.host = ''
+    formData.value.port = 0
+  }
 }
 
 const formatListeningWindow = (config: EmailConfig): string => {
@@ -383,6 +474,10 @@ const resetFormData = () => {
     oauthAccessToken: '',
     oauthTokenEndpoint: '',
     oauthScope: '',
+    provider: 'GENERIC_IMAP',
+    listenMode: 'POLLING',
+    fallbackListenMode: null,
+    providerSettings: '',
     host: '',
     port: 993,
     sslEnabled: true,
@@ -415,9 +510,11 @@ const loadConfigs = async () => {
     const statusRes = await emailService.getListenerStatus()
     const statusPayload = parseObjectPayload(statusRes)
     listenerStatus.value = {}
+    statusDetails.value = {}
     for (const [key, value] of Object.entries(statusPayload)) {
       const item = value as any
-      listenerStatus.value[Number(key)] = item === '已连接' || item?.connected === true || item?.status === '已连接'
+      statusDetails.value[Number(key)] = item
+      listenerStatus.value[Number(key)] = item === '已连接' || item?.connected === true || item?.status === '已连接' || item?.status === 'RUNNING' || item?.status === 'FALLBACK'
     }
   } catch (error) {
     message.error('加载失败')
@@ -462,10 +559,10 @@ const testConnection = async (config: EmailConfig) => {
   }
 }
 
-// 测试新配置（未保存的）
+/** 对尚未保存的表单配置直接调用测试连接接口。 */
 const testNewConfig = async () => {
   formData.value = normalizeConfigPayload(formData.value) as typeof formData.value
-  if (!formData.value.email || !formData.value.host) {
+  if (!formData.value.email || (requiresHost(formData.value) && !formData.value.host)) {
     message.warning('请填写邮箱地址和服务器')
     return
   }
@@ -493,6 +590,10 @@ const testNewConfig = async () => {
       oauthAccessToken: formData.value.oauthAccessToken,
       oauthTokenEndpoint: formData.value.oauthTokenEndpoint,
       oauthScope: formData.value.oauthScope,
+      provider: formData.value.provider,
+      listenMode: formData.value.listenMode,
+      fallbackListenMode: formData.value.listenMode === 'IMAP_IDLE' ? 'POLLING' : formData.value.fallbackListenMode,
+      providerSettings: formData.value.providerSettings,
       host: formData.value.host,
       port: formData.value.port,
       sslEnabled: formData.value.sslEnabled,
@@ -524,6 +625,7 @@ const testNewConfig = async () => {
   }
 }
 
+/** 检测已保存邮箱到邮件服务器的网络连通性（DNS+端口）。 */
 const checkNetwork = async (config: EmailConfig) => {
   checkingNetworkIds.value.push(config.id)
   try {
@@ -551,8 +653,13 @@ const checkNetwork = async (config: EmailConfig) => {
   }
 }
 
+/** 检测新配置（未保存）的网络可达性，仅对需要 host 的提供商有效。 */
 const checkNewConfigNetwork = async () => {
   formData.value = normalizeConfigPayload(formData.value) as typeof formData.value
+  if (!requiresHost(formData.value)) {
+    message.info('API provider 不需要邮件服务器网络检测')
+    return
+  }
   if (!formData.value.host || !formData.value.port) {
     message.warning('请先填写主机和端口')
     return
@@ -584,6 +691,16 @@ const checkNewConfigNetwork = async () => {
     message.error(error?.response?.data?.message || '网络检测失败')
   } finally {
     checkingNewNetwork.value = false
+  }
+}
+
+const loadTemplates = async () => {
+  try {
+    const res = await emailService.getTemplates()
+    const payload = Array.isArray(res) ? res : (Array.isArray((res as any)?.data) ? (res as any).data : [])
+    emailTemplates.value = payload
+  } catch {
+    emailTemplates.value = []
   }
 }
 
@@ -629,6 +746,10 @@ const editConfig = (config: EmailConfig) => {
     oauthAccessToken: '',
     oauthTokenEndpoint: trimText(config.oauthTokenEndpoint),
     oauthScope: trimText(config.oauthScope),
+    provider: config.provider || 'GENERIC_IMAP',
+    listenMode: config.listenMode || 'POLLING',
+    fallbackListenMode: config.fallbackListenMode || null,
+    providerSettings: trimText(config.providerSettings),
     host: trimText(config.host),
     port: config.port,
     sslEnabled: config.sslEnabled,
@@ -681,6 +802,7 @@ const deleteConfig = async (config: EmailConfig) => {
 
 onMounted(() => {
   loadConfigs()
+  loadTemplates()
 })
 </script>
 

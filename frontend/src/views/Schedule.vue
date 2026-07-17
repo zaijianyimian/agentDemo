@@ -1,8 +1,11 @@
 <template>
-  <div class="schedule-page">
-    <!-- 操作栏 -->
-    <n-card class="action-card" :bordered="false">
-      <n-space>
+  <UiPage>
+    <UiPageHeader
+      eyebrow="Schedule Butler"
+      title="日程管理"
+      subtitle="统一查看事件、解析邮件来源日程，并在列表和日历视图之间快速切换。"
+    >
+      <template #actions>
         <n-button type="primary" @click="showAddModal = true">
           <template #icon><n-icon><AddIcon /></n-icon></template>
           添加日程
@@ -15,37 +18,22 @@
           <template #icon><n-icon><RefreshIcon /></n-icon></template>
           刷新
         </n-button>
+      </template>
+    </UiPageHeader>
+
+    <div class="ui-stat-grid">
+      <UiStat label="今日日程" :value="todaySchedules.length" hint="当天待处理事项" />
+      <UiStat label="明日日程" :value="tomorrowSchedules.length" hint="次日安排" />
+      <UiStat label="总日程" :value="schedules.length" hint="全部记录" />
+    </div>
+
+    <UiPanel title="日程视图" subtitle="列表适合处理事项，日历适合查看时间分布。">
+      <template #actions>
         <n-radio-group v-model:value="viewMode" size="small">
           <n-radio-button value="list">列表</n-radio-button>
           <n-radio-button value="calendar">日历</n-radio-button>
         </n-radio-group>
-      </n-space>
-    </n-card>
-
-    <!-- 日程统计 -->
-    <n-grid :cols="3" :x-gap="16">
-      <n-gi>
-        <div class="stat-box today">
-          <div class="stat-title">今日日程</div>
-          <div class="stat-number">{{ todaySchedules.length }}</div>
-        </div>
-      </n-gi>
-      <n-gi>
-        <div class="stat-box tomorrow">
-          <div class="stat-title">明日日程</div>
-          <div class="stat-number">{{ tomorrowSchedules.length }}</div>
-        </div>
-      </n-gi>
-      <n-gi>
-        <div class="stat-box total">
-          <div class="stat-title">总日程</div>
-          <div class="stat-number">{{ schedules.length }}</div>
-        </div>
-      </n-gi>
-    </n-grid>
-
-    <!-- 日程列表 -->
-    <n-card class="list-card" :bordered="false">
+      </template>
       <!-- 列表视图 -->
       <n-list v-if="viewMode === 'list'" bordered>
         <n-list-item v-for="event in filteredSchedules" :key="event.id">
@@ -98,7 +86,7 @@
           </div>
         </n-calendar>
       </div>
-    </n-card>
+    </UiPanel>
 
     <!-- 添加日程弹窗 -->
     <n-modal v-model:show="showAddModal" preset="card" title="添加日程" style="width: 500px">
@@ -193,15 +181,15 @@
         </n-space>
       </template>
     </n-modal>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 日程管理页面：列表/日历双视图，AI 自然语言解析创建，支持完成与删除。
+ */
 import { ref, computed, onMounted } from 'vue'
 import {
-  NCard,
-  NGrid,
-  NGi,
   NButton,
   NIcon,
   NSpace,
@@ -219,6 +207,8 @@ import {
   NDescriptions,
   NDescriptionsItem,
   NCalendar,
+  NRadioButton,
+  NRadioGroup,
   useMessage
 } from 'naive-ui'
 import {
@@ -229,10 +219,11 @@ import {
   LocationOutline as LocationIcon,
   MailOutline as MailIcon
 } from '@vicons/ionicons5'
-import { scheduleService } from '@/services/api'
+import { scheduleService } from '@/services/api/schedule'
 import type { ScheduleEvent } from '@/types'
 import dayjs from 'dayjs'
 import { formatDateTime as formatTime } from '@/utils/date-format'
+import { UiPage, UiPageHeader, UiPanel, UiStat } from '@/components/ui'
 
 const message = useMessage()
 const viewMode = ref('list')
@@ -277,7 +268,7 @@ const getActionOptions = () => [
   { label: '删除', key: 'delete' }
 ]
 
-// 处理操作
+// 处理日程下拉操作（详情 / 完成 / 删除）
 const handleAction = async (key: string, event: ScheduleEvent) => {
   switch (key) {
     case 'detail':
@@ -297,7 +288,7 @@ const handleAction = async (key: string, event: ScheduleEvent) => {
   }
 }
 
-// 完成当前日程
+/** 在详情弹窗中标记当前日程完成。 */
 const completeCurrentEvent = async () => {
   if (!currentEvent.value) return
   await scheduleService.complete(currentEvent.value.id)
@@ -306,7 +297,7 @@ const completeCurrentEvent = async () => {
   loadSchedules()
 }
 
-// 加载日程
+/** 从后端拉取日程列表。 */
 const loadSchedules = async () => {
   try {
     const res = await scheduleService.list()
@@ -316,7 +307,7 @@ const loadSchedules = async () => {
   }
 }
 
-// 添加日程
+/** 提交新增日程表单，成功后刷新列表。 */
 const addEvent = async () => {
   if (!newEvent.value.title) {
     message.warning('请输入标题')
@@ -339,7 +330,7 @@ const addEvent = async () => {
   }
 }
 
-// 根据日期获取日程
+/** 返回指定 (year, month, date) 当天的事件列表，供日历单元格渲染。 */
 const getEventsByDate = (year: number, month: number, date: number) => {
   const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`
   return schedules.value.filter(s => s.eventDate === dateStr)
@@ -351,7 +342,7 @@ const showEventDetail = (event: ScheduleEvent) => {
   showDetailModal.value = true
 }
 
-// AI添加日程
+/** 调用 AI 接口从自然语言描述中解析并保存日程。 */
 const aiAddSchedule = async () => {
   if (!aiInput.value.trim()) {
     message.warning('请输入日程描述')

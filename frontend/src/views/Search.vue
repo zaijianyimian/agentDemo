@@ -1,5 +1,11 @@
 <template>
-  <div class="search-page">
+  <UiPage>
+    <UiPageHeader
+      eyebrow="Web Search"
+      title="网络搜索"
+      subtitle="搜索、总结、流式问答和兴趣追踪统一入口。"
+    />
+
     <!-- 搜索区域 -->
     <n-card class="search-card" :bordered="false">
       <div class="search-box">
@@ -145,10 +151,13 @@
         </div>
       </div>
     </n-modal>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 网络搜索页面：支持普通搜索、AI 总结与流式问答，整合搜索历史与兴趣分析。
+ */
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import {
   NCard,
@@ -169,7 +178,7 @@ import {
   useDialog
 } from 'naive-ui'
 import { SearchOutline as SearchIcon } from '@vicons/ionicons5'
-import { searchService } from '@/services/api'
+import { searchService } from '@/services/api/search'
 import { fetchWithAuth } from '@/services/auth-fetch'
 import type { SearchResult } from '@/types'
 import { sanitizeHtml } from '@/utils/sanitize-html'
@@ -180,6 +189,7 @@ import typescript from 'highlight.js/lib/languages/typescript'
 import json from 'highlight.js/lib/languages/json'
 import xml from 'highlight.js/lib/languages/xml'
 import bash from 'highlight.js/lib/languages/bash'
+import { UiPage, UiPageHeader } from '@/components/ui'
 
 hljs.registerLanguage('javascript', javascript)
 hljs.registerLanguage('js', javascript)
@@ -234,7 +244,9 @@ const topInterests = ref<any[]>([])
 const interestReport = ref<any>(null)
 const showInterestReport = ref(false)
 
-let abortController: AbortController | null = null
+// summary 和 chat 各持一个 controller，避免互相覆盖导致旧请求误中断新请求
+let summaryAbortController: AbortController | null = null
+let chatAbortController: AbortController | null = null
 
 // 加载侧边栏数据
 const loadSidebarData = async () => {
@@ -263,7 +275,7 @@ const loadInterestReport = async () => {
   }
 }
 
-// 执行搜索
+/** 根据 searchMode 分发到普通搜索、AI 总结或流式问答。 */
 const doSearch = async () => {
   if (!searchQuery.value.trim()) {
     message.warning('请输入搜索内容')
@@ -314,13 +326,15 @@ const searchFromHistory = (query: string) => {
   doSearch()
 }
 
-// AI总结（SSE流式）
+/** 通过 SSE 拉取 AI 总结与搜索结果并增量写入 summary/results。 */
 const doStreamSummary = async () => {
-  abortController = new AbortController()
+  // 先取消上一次未结束的 summary
+  summaryAbortController?.abort()
+  summaryAbortController = new AbortController()
   isStreamingSummary.value = true
 
   const response = await fetchWithAuth(`/api/search/summary?query=${encodeURIComponent(searchQuery.value)}`, {
-    signal: abortController.signal,
+    signal: summaryAbortController.signal,
     headers: {
       'Accept': 'text/event-stream'
     }
@@ -372,13 +386,14 @@ const doStreamSummary = async () => {
   loadSidebarData()
 }
 
-// 流式问答
+/** 通过 SSE 流式获取问答结果并逐片段拼接到 chatAnswer。 */
 const doStreamChat = async () => {
-  abortController = new AbortController()
+  chatAbortController?.abort()
+  chatAbortController = new AbortController()
   isStreamingChat.value = true
 
   const response = await fetchWithAuth(`/api/search/chat/stream?message=${encodeURIComponent(searchQuery.value)}`, {
-    signal: abortController.signal,
+    signal: chatAbortController.signal,
     headers: {
       'Accept': 'text/event-stream'
     }
@@ -430,12 +445,12 @@ const doStreamChat = async () => {
   loadSidebarData()
 }
 
-// 停止流式响应
+// 停止流式响应（同时停掉 summary 与 chat）
 const stopStreaming = () => {
-  if (abortController) {
-    abortController.abort()
-    abortController = null
-  }
+  summaryAbortController?.abort()
+  summaryAbortController = null
+  chatAbortController?.abort()
+  chatAbortController = null
 }
 
 // 清空历史确认

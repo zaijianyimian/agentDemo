@@ -1,5 +1,5 @@
 <template>
-  <div class="page-shell">
+  <UiPage>
     <section class="page-hero hero-grid">
       <div>
         <div class="page-eyebrow">Knowledge Workspace</div>
@@ -142,10 +142,13 @@
         </n-upload-dragger>
       </n-upload>
     </n-modal>
-  </div>
+  </UiPage>
 </template>
 
 <script setup lang="ts">
+/**
+ * 知识库管理页面：创建知识库、上传文档、维护启用状态，并提供 RAG 语义检索。
+ */
 import { ref, h, onMounted } from 'vue'
 import {
   NButton,
@@ -174,7 +177,8 @@ import {
 } from '@vicons/ionicons5'
 import dayjs from 'dayjs'
 import type { KnowledgeBase, KnowledgeDocument } from '@/types'
-import { knowledgeService } from '@/services/api'
+import { knowledgeService } from '@/services/api/knowledge'
+import { UiPage } from '@/components/ui'
 
 interface SearchResult {
   score: number
@@ -251,7 +255,7 @@ const loadKnowledgeBases = async () => {
   }
 }
 
-// 选择知识库
+/** 选中知识库后立即拉取其下的文档列表。 */
 const selectKb = async (kb: KnowledgeBase) => {
   selectedKb.value = kb
   await loadDocuments(kb.id)
@@ -291,7 +295,7 @@ const createKb = async () => {
   }
 }
 
-// 上传文档
+/** 自定义上传：把文档追加到当前选中知识库并触发分块向量化。 */
 const handleUpload = async ({ file }: UploadCustomRequestOptions) => {
   if (!selectedKb.value) return
   try {
@@ -353,7 +357,7 @@ const deleteKb = async () => {
   }
 }
 
-// RAG 搜索
+/** 向当前知识库发送检索请求并展示 topK 个匹配片段。 */
 const executeQuery = async () => {
   if (!selectedKb.value || !queryText.value) return
   queryLoading.value = true
