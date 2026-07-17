@@ -3,6 +3,8 @@ spring:
     import: optional:file:.env[.properties]
   application:
     name: demo
+  modulith:
+    detection-strategy: explicitly-annotated
   datasource:
     url: jdbc:mysql://localhost:3306/agent?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowPublicKeyRetrieval=true&useSSL=false
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -45,7 +47,7 @@ app:
     collection-name: agent_memory
     vector-size: 768
     top-k: 5
-    min-score: 0.5
+    min-score: 0.6
   qdrant:
     host: localhost
     # LangChain4j/Qdrant Java 客户端使用的 gRPC/SDK 端口，REST 管理接口默认使用 6333
@@ -85,6 +87,28 @@ app:
     daily-summary-cron: "0 0 20 * * ?"
     morning-reminder-cron: "0 0 8 * * ?"
     file-sort-cron: "0 0 19 * * ?"
+  task:
+    scheduler:
+      enabled: true
+      scan-interval-seconds: 1
+      batch-size: 50
+    executor:
+      pool-size: 5
+      queue-capacity: 200
+      await-seconds: 60
+  markdown-skills:
+    # 总开关；false 时整个 markdown-skills 模块不装配
+    enabled: true
+    # skill 文件根目录，支持相对路径（相对 JVM 工作目录）
+    dir: ./skills
+    # 自动注入阈值（Jaccard 相似度），0~1，越大越严格
+    match-threshold: 0.15
+    # tag 完全命中时的额外加权
+    tag-match-bonus: 0.2
+    # 是否在 QwenChatService 调用前自动注入 skill 正文
+    auto-inject: true
+    # 注入时 body 最大字符数
+    inject-body-limit: 4000
   file:
     upload-dir: ./data/documents
     allowed-types: txt,md
@@ -97,6 +121,19 @@ app:
     allow-source-write: false
     allow-remote-update: false
     command-timeout-seconds: 180
+  dispatch:
+    enabled: false
+    workspace-root: ./data/workspaces
+    dispatched-root: ./data/dispatched
+    poll-interval-ms: 5000
+    poll-grace-seconds: 0
+    executor-timeout-seconds: 600
+    recall-timeout-seconds: 2
+    default-executor-hint: claude-code
+    default-sandbox-level: workspace-write
+    default-tool-allowlist: "Read,Edit,Write,Glob,Grep,Bash"
+    decision-layer-fallback-timeout-seconds: 120
+    push-retry-max: 3
   skills:
     config-path: skills.yaml
     auto-load: true
@@ -107,6 +144,17 @@ app:
     findskills-cron: "0 */10 * * * ?"
     findskills-presync-mcp: true
     findskills-merge-existing: true
+  backup:
+    # 服务端数据快照备份目录（相对项目根或绝对路径）
+    directory: ./data/backups
+    # 单次清理时按 mtime 倒序保留的最大份数
+    keep-most-recent: 10
+    # 备份保留天数，超过则会被清理
+    retention-days: 30
+    # 备份目录的总大小上限（MB），0 表示不限制
+    max-total-size-mb: 0
+    # 备份文件名前缀
+    file-name-prefix: agent-data-backup
   security:
     issuer: agent-demo
     jwt-secret: ${JWT_SECRET:replace_with_a_32_plus_byte_secret}

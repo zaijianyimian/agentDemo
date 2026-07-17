@@ -101,10 +101,12 @@ CREATE TABLE IF NOT EXISTS `ai_model_config` (
     `api_key` VARCHAR(500) NOT NULL COMMENT 'API Key(加密存储)',
     `is_default` TINYINT(1) DEFAULT 0 COMMENT '是否为默认模型',
     `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    `purpose` VARCHAR(32) NOT NULL DEFAULT 'chat' COMMENT '模型用途: chat / attachment',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX `idx_enabled` (`enabled`),
-    INDEX `idx_is_default` (`is_default`)
+    INDEX `idx_is_default` (`is_default`),
+    INDEX `idx_purpose` (`purpose`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型配置表';
 
 -- ============================================
@@ -114,9 +116,14 @@ CREATE TABLE IF NOT EXISTS `ai_model_config` (
 CREATE TABLE IF NOT EXISTS `email_config` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `email` VARCHAR(100) NOT NULL COMMENT '邮箱地址',
-    `password` VARCHAR(255) NOT NULL COMMENT '邮箱授权码/密码(加密存储)',
+    `password` VARCHAR(255) DEFAULT NULL COMMENT '邮箱授权码/密码(加密存储)',
     `host` VARCHAR(100) NOT NULL COMMENT '邮箱服务器主机',
     `protocol` VARCHAR(20) DEFAULT 'imap' COMMENT '协议类型: imap, pop3',
+    `provider` VARCHAR(40) DEFAULT NULL COMMENT '邮箱提供商: GENERIC_IMAP/GENERIC_POP3/GMAIL_API/MICROSOFT_GRAPH',
+    `listen_mode` VARCHAR(40) DEFAULT NULL COMMENT '监听模式: POLLING/IMAP_IDLE/WEBHOOK/DELTA_SYNC',
+    `fallback_listen_mode` VARCHAR(40) DEFAULT NULL COMMENT '监听失败后的降级监听模式',
+    `provider_settings` TEXT DEFAULT NULL COMMENT '提供商非敏感扩展配置JSON',
+    `max_attachment_size_bytes` BIGINT NULL COMMENT '单附件大小阈值（字节），null 表示使用全局默认',
     `port` INT DEFAULT 993 COMMENT '端口号',
     `ssl_enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用SSL',
     `enabled` TINYINT(1) DEFAULT 0 COMMENT '是否启用监听',
@@ -125,11 +132,37 @@ CREATE TABLE IF NOT EXISTS `email_config` (
     `listen_start_time` TIME DEFAULT NULL COMMENT '监听开始时间，为空表示全天监听',
     `listen_end_time` TIME DEFAULT NULL COMMENT '监听结束时间，为空表示全天监听',
     `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    `agent_default_hint` TEXT DEFAULT NULL COMMENT '派发执行时该邮箱的默认 agent hint',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_email` (`email`)
+    UNIQUE KEY `uk_email` (`email`),
+    INDEX `idx_email_config_provider_mode` (`provider`, `listen_mode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮箱配置表';
+
+CREATE TABLE IF NOT EXISTS `email_listener_state` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `config_id` BIGINT NOT NULL COMMENT '邮箱配置ID',
+    `provider` VARCHAR(40) NOT NULL COMMENT '邮箱提供商',
+    `listen_mode` VARCHAR(40) NOT NULL COMMENT '监听模式',
+    `fallback_listen_mode` VARCHAR(40) DEFAULT NULL COMMENT '降级监听模式',
+    `cursor_type` VARCHAR(40) DEFAULT NULL COMMENT '游标类型: UID/MESSAGE_COUNT/GMAIL_HISTORY_ID/GRAPH_DELTA_LINK等',
+    `cursor_value` LONGTEXT DEFAULT NULL COMMENT '游标值',
+    `subscription_id` VARCHAR(255) DEFAULT NULL COMMENT 'Webhook/订阅ID',
+    `subscription_expire_time` DATETIME DEFAULT NULL COMMENT '订阅过期时间',
+    `webhook_resource` VARCHAR(500) DEFAULT NULL COMMENT 'Webhook资源或scope',
+    `recent_message_keys` LONGTEXT DEFAULT NULL COMMENT '近期已处理消息key JSON',
+    `status` VARCHAR(40) DEFAULT 'STOPPED' COMMENT '监听状态',
+    `last_success_time` DATETIME DEFAULT NULL COMMENT '最后成功时间',
+    `last_error_time` DATETIME DEFAULT NULL COMMENT '最后错误时间',
+    `last_error` TEXT DEFAULT NULL COMMENT '最后错误信息',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_email_listener_state_config` (`config_id`),
+    INDEX `idx_email_listener_state_provider_mode` (`provider`, `listen_mode`),
+    INDEX `idx_email_listener_state_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮箱监听状态表';
 
 -- ============================================
 -- 4. 文件管理模块
@@ -464,7 +497,7 @@ INSERT INTO `system_settings` (`category`, `config_key`, `config_value`, `descri
 ('qdrant', 'collection_name', 'agent_memory', '向量集合名称'),
 ('qdrant', 'vector_size', '768', '向量维度'),
 ('qdrant', 'top_k', '5', '返回结果数量'),
-('qdrant', 'min_score', '0.5', '最小相似度分数'),
+('qdrant', 'min_score', '0.6', '最小相似度分数'),
 ('search', 'enabled', 'true', '是否启用搜索'),
 ('search', 'engine', 'serper', '搜索引擎: serper/tavily/bing'),
 ('search', 'api_key', '', '搜索API密钥'),
@@ -492,8 +525,82 @@ ON DUPLICATE KEY UPDATE `update_time` = CURRENT_TIMESTAMP;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================
+-- 派发执行（dispatch）模块表
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS `dispatched_task` (
+  `id`                 BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `email_id`           BIGINT       NOT NULL                COMMENT '关联邮箱配置 id',
+  `email_uid`          VARCHAR(128)                         COMMENT '邮件唯一标识 (message-id 或 folder/uid)',
+  `subject`            VARCHAR(512)                         COMMENT '邮件主题',
+  `body_excerpt`       TEXT                                 COMMENT '邮件正文摘要',
+  `importance`         VARCHAR(16)                          COMMENT '重要性: high / medium / low',
+  `executor_hint`      VARCHAR(32)                          COMMENT '主执行器: claude-code / codex',
+  `fallback_executor`  VARCHAR(32)                          COMMENT '备用执行器: claude-code / codex',
+  `sandbox_level`      VARCHAR(32)                          COMMENT '沙箱: read-only / workspace-write / danger-full-access',
+  `tool_allowlist`     JSON                                 COMMENT '工具白名单 (JSON 数组)',
+  `workspace_path`     VARCHAR(1024)                        COMMENT '当前工作区绝对路径',
+  `user_hint`          TEXT                                 COMMENT '邮件中识别的 hint',
+  `final_hint`         TEXT                                 COMMENT '合并后的 hint',
+  `status`             VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT '状态: PENDING / RUNNING / DONE / FAILED / CANCELLED',
+  `retries`            INT          NOT NULL DEFAULT 0     COMMENT '当前执行器已重试次数',
+  `executor_used`      VARCHAR(32)                          COMMENT '实际执行过的执行器 (claude-code / codex / decision-layer-self)',
+  `result`             MEDIUMTEXT                           COMMENT '执行结果 (md 内容)',
+  `result_path`        VARCHAR(1024)                        COMMENT '结果 md 文件绝对路径',
+  `push_status`        VARCHAR(16)  NOT NULL DEFAULT 'pending' COMMENT '推送状态: pending / sent / PUSH_FAILED',
+  `pushed_at`          DATETIME                             COMMENT '推送时间',
+  `error_message`      TEXT                                 COMMENT '最后一次失败的错误信息',
+  `created_at`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `finished_at`        DATETIME                             COMMENT '任务结束时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_disp_status_created` (`status`, `created_at`),
+  KEY `idx_disp_email_created`  (`email_id`, `created_at`),
+  KEY `idx_disp_push_status`    (`push_status`, `pushed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='派发任务主表';
+
+CREATE TABLE IF NOT EXISTS `push_config` (
+  `id`                          INT          NOT NULL DEFAULT 1 COMMENT '单行配置主键，固定为 1',
+  `push_email`                  VARCHAR(256)                  COMMENT '推送目标邮箱',
+  `push_threshold`              VARCHAR(16)  NOT NULL DEFAULT 'medium' COMMENT '重要性阈值: high/medium/low',
+  `batch_cron`                  VARCHAR(64)  NOT NULL DEFAULT '0 0 9 * * ?' COMMENT '批量推送 cron 表达式',
+  `immediate_enabled`           TINYINT(1)   NOT NULL DEFAULT 1  COMMENT '是否启用实时推送',
+  `workspace_max_count`         INT          NOT NULL DEFAULT 50 COMMENT '每邮箱归档工作区最大数量',
+  `workspace_max_age_days`      INT          NOT NULL DEFAULT 30 COMMENT '归档保留天数',
+  `retry_max`                   INT          NOT NULL DEFAULT 2  COMMENT '每个执行器最大重试次数',
+  `executor_timeout_seconds`    INT          NOT NULL DEFAULT 600 COMMENT '执行器超时时间（秒）',
+  `updated_at`                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推送与执行器全局配置（单行）';
+
+INSERT IGNORE INTO `push_config` (`id`) VALUES (1);
+
+-- 邮件附件 AI 解析结果
+CREATE TABLE IF NOT EXISTS `email_attachment_analysis` (
+  `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `message_id`      VARCHAR(512) NOT NULL                COMMENT '邮件 Message-ID',
+  `account_email`   VARCHAR(255)                         COMMENT '所属邮箱账号',
+  `file_name`       VARCHAR(500)                         COMMENT '原始文件名',
+  `content_type`    VARCHAR(255)                         COMMENT 'MIME 类型',
+  `size_bytes`      BIGINT                               COMMENT '字节数',
+  `file_path`       VARCHAR(1024)                        COMMENT '落盘路径',
+  `status`          VARCHAR(32)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/RUNNING/SUCCESS/FAILED/SKIPPED_SIZE/SKIPPED_TYPE',
+  `skip_reason`     VARCHAR(500)                         COMMENT '跳过原因或失败原因',
+  `summary`         MEDIUMTEXT                           COMMENT 'AI 摘要',
+  `raw_text`        MEDIUMTEXT                           COMMENT '文档类附件抽取出的原始文本',
+  `model_name`      VARCHAR(128)                         COMMENT '实际调用的模型名',
+  `error_detail`    TEXT                                 COMMENT '失败时异常信息',
+  `analyzed_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '解析时间',
+  `update_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_eaa_message`  (`message_id`),
+  KEY `idx_eaa_status`   (`status`),
+  KEY `idx_eaa_analyzed` (`analyzed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮件附件 AI 解析结果';
+
+-- ============================================
 -- 完成提示
 -- ============================================
 -- 数据库初始化完成！
--- 包含模块：用户认证、AI模型、邮件、文件、日程、任务、聊天、知识库、笔记、工具技能、搜索、设置
+-- 包含模块：用户认证、AI模型、邮件、文件、日程、任务、聊天、知识库、笔记、工具技能、搜索、设置、派发执行、附件 AI 解析
 -- ============================================

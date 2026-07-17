@@ -51,6 +51,131 @@ PREPARE stmt FROM @sql_email_listen_end_time;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+SET @has_email_provider = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = @db_name
+      AND table_name = 'email_config'
+      AND column_name = 'provider'
+);
+
+SET @sql_email_provider = IF(
+    @has_email_provider = 0,
+    'ALTER TABLE `email_config` ADD COLUMN `provider` VARCHAR(40) DEFAULT NULL COMMENT ''邮箱提供商: GENERIC_IMAP/GENERIC_POP3/GMAIL_API/MICROSOFT_GRAPH'' AFTER `protocol`',
+    'SELECT ''email_config.provider exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_email_provider;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_email_listen_mode = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = @db_name
+      AND table_name = 'email_config'
+      AND column_name = 'listen_mode'
+);
+
+SET @sql_email_listen_mode = IF(
+    @has_email_listen_mode = 0,
+    'ALTER TABLE `email_config` ADD COLUMN `listen_mode` VARCHAR(40) DEFAULT NULL COMMENT ''监听模式: POLLING/IMAP_IDLE/WEBHOOK/DELTA_SYNC'' AFTER `provider`',
+    'SELECT ''email_config.listen_mode exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_email_listen_mode;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_email_fallback_listen_mode = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = @db_name
+      AND table_name = 'email_config'
+      AND column_name = 'fallback_listen_mode'
+);
+
+SET @sql_email_fallback_listen_mode = IF(
+    @has_email_fallback_listen_mode = 0,
+    'ALTER TABLE `email_config` ADD COLUMN `fallback_listen_mode` VARCHAR(40) DEFAULT NULL COMMENT ''监听失败后的降级监听模式'' AFTER `listen_mode`',
+    'SELECT ''email_config.fallback_listen_mode exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_email_fallback_listen_mode;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @has_email_provider_settings = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = @db_name
+      AND table_name = 'email_config'
+      AND column_name = 'provider_settings'
+);
+
+SET @sql_email_provider_settings = IF(
+    @has_email_provider_settings = 0,
+    'ALTER TABLE `email_config` ADD COLUMN `provider_settings` TEXT DEFAULT NULL COMMENT ''提供商非敏感扩展配置JSON'' AFTER `fallback_listen_mode`',
+    'SELECT ''email_config.provider_settings exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_email_provider_settings;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+UPDATE `email_config`
+SET `provider` = CASE
+    WHEN LOWER(COALESCE(`protocol`, 'imap')) = 'pop3' THEN 'GENERIC_POP3'
+    ELSE 'GENERIC_IMAP'
+END
+WHERE `provider` IS NULL OR `provider` = '';
+
+UPDATE `email_config`
+SET `listen_mode` = 'POLLING'
+WHERE `listen_mode` IS NULL OR `listen_mode` = '';
+
+SET @has_email_config_provider_mode_idx = (
+    SELECT COUNT(*)
+    FROM information_schema.statistics
+    WHERE table_schema = @db_name
+      AND table_name = 'email_config'
+      AND index_name = 'idx_email_config_provider_mode'
+);
+
+SET @sql_email_config_provider_mode_idx = IF(
+    @has_email_config_provider_mode_idx = 0,
+    'ALTER TABLE `email_config` ADD INDEX `idx_email_config_provider_mode` (`provider`, `listen_mode`)',
+    'SELECT ''email_config.idx_email_config_provider_mode exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_email_config_provider_mode_idx;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS `email_listener_state` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `config_id` BIGINT NOT NULL COMMENT '邮箱配置ID',
+    `provider` VARCHAR(40) NOT NULL COMMENT '邮箱提供商',
+    `listen_mode` VARCHAR(40) NOT NULL COMMENT '监听模式',
+    `fallback_listen_mode` VARCHAR(40) DEFAULT NULL COMMENT '降级监听模式',
+    `cursor_type` VARCHAR(40) DEFAULT NULL COMMENT '游标类型',
+    `cursor_value` LONGTEXT DEFAULT NULL COMMENT '游标值',
+    `subscription_id` VARCHAR(255) DEFAULT NULL COMMENT 'Webhook/订阅ID',
+    `subscription_expire_time` DATETIME DEFAULT NULL COMMENT '订阅过期时间',
+    `webhook_resource` VARCHAR(500) DEFAULT NULL COMMENT 'Webhook资源或scope',
+    `recent_message_keys` LONGTEXT DEFAULT NULL COMMENT '近期已处理消息key JSON',
+    `status` VARCHAR(40) DEFAULT 'STOPPED' COMMENT '监听状态',
+    `last_success_time` DATETIME DEFAULT NULL COMMENT '最后成功时间',
+    `last_error_time` DATETIME DEFAULT NULL COMMENT '最后错误时间',
+    `last_error` TEXT DEFAULT NULL COMMENT '最后错误信息',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_email_listener_state_config` (`config_id`),
+    INDEX `idx_email_listener_state_provider_mode` (`provider`, `listen_mode`),
+    INDEX `idx_email_listener_state_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮箱监听状态表';
+
+SET @sql_email_password_nullable = 'ALTER TABLE `email_config` MODIFY COLUMN `password` VARCHAR(255) DEFAULT NULL COMMENT ''邮箱授权码/密码(加密存储)''';
+PREPARE stmt FROM @sql_email_password_nullable;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- ============================================
 -- 1. user_account 表增量迁移
 -- ============================================
@@ -348,7 +473,7 @@ INSERT IGNORE INTO `system_settings` (`category`, `config_key`, `config_value`, 
 ('qdrant', 'collection_name', 'agent_memory', '向量集合名称'),
 ('qdrant', 'vector_size', '768', '向量维度'),
 ('qdrant', 'top_k', '5', '返回结果数量'),
-('qdrant', 'min_score', '0.5', '最小相似度分数'),
+('qdrant', 'min_score', '0.6', '最小相似度分数'),
 ('search', 'enabled', 'true', '是否启用搜索'),
 ('search', 'engine', 'serper', '搜索引擎'),
 ('search', 'max_results', '3', '最大搜索结果数'),
@@ -359,8 +484,170 @@ INSERT IGNORE INTO `system_settings` (`category`, `config_key`, `config_value`, 
 ('file', 'max_file_size', '10MB', '最大文件大小');
 
 -- ============================================
+-- 8. 派发执行：email_config.agent_default_hint + dispatched_task + push_config
+-- ============================================
+
+-- email_config 新增 agent_default_hint 列（幂等）
+SET @has_agent_default_hint = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = @db_name
+      AND table_name = 'email_config'
+      AND column_name = 'agent_default_hint'
+);
+
+SET @sql_agent_default_hint = IF(
+    @has_agent_default_hint = 0,
+    'ALTER TABLE `email_config` ADD COLUMN `agent_default_hint` TEXT DEFAULT NULL COMMENT ''派发执行时该邮箱的默认 agent hint'' AFTER `remark`',
+    'SELECT ''email_config.agent_default_hint exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_agent_default_hint;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS `dispatched_task` (
+  `id`                 BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `email_id`           BIGINT       NOT NULL                COMMENT '关联邮箱配置 id',
+  `email_uid`          VARCHAR(128)                         COMMENT '邮件唯一标识 (message-id 或 folder/uid)',
+  `subject`            VARCHAR(512)                         COMMENT '邮件主题',
+  `body_excerpt`       TEXT                                 COMMENT '邮件正文摘要',
+  `importance`         VARCHAR(16)                          COMMENT '重要性: high / medium / low',
+  `executor_hint`      VARCHAR(32)                          COMMENT '主执行器: claude-code / codex',
+  `fallback_executor`  VARCHAR(32)                          COMMENT '备用执行器: claude-code / codex',
+  `sandbox_level`      VARCHAR(32)                          COMMENT '沙箱: read-only / workspace-write / danger-full-access',
+  `tool_allowlist`     JSON                                 COMMENT '工具白名单 (JSON 数组)',
+  `workspace_path`     VARCHAR(1024)                        COMMENT '当前工作区绝对路径',
+  `user_hint`          TEXT                                 COMMENT '邮件中识别的 hint',
+  `final_hint`         TEXT                                 COMMENT '合并后的 hint',
+  `status`             VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT '状态: PENDING / RUNNING / DONE / FAILED / CANCELLED',
+  `retries`            INT          NOT NULL DEFAULT 0     COMMENT '当前执行器已重试次数',
+  `executor_used`      VARCHAR(32)                          COMMENT '实际执行过的执行器 (claude-code / codex / decision-layer-self)',
+  `result`             MEDIUMTEXT                           COMMENT '执行结果 (md 内容)',
+  `result_path`        VARCHAR(1024)                        COMMENT '结果 md 文件绝对路径',
+  `push_status`        VARCHAR(16)  NOT NULL DEFAULT 'pending' COMMENT '推送状态: pending / sent / PUSH_FAILED',
+  `pushed_at`          DATETIME                             COMMENT '推送时间',
+  `error_message`      TEXT                                 COMMENT '最后一次失败的错误信息',
+  `created_at`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `finished_at`        DATETIME                             COMMENT '任务结束时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_disp_status_created` (`status`, `created_at`),
+  KEY `idx_disp_email_created`  (`email_id`, `created_at`),
+  KEY `idx_disp_push_status`    (`push_status`, `pushed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='派发任务主表';
+
+CREATE TABLE IF NOT EXISTS `push_config` (
+  `id`                          INT          NOT NULL DEFAULT 1 COMMENT '单行配置主键，固定为 1',
+  `push_email`                  VARCHAR(256)                  COMMENT '推送目标邮箱',
+  `push_threshold`              VARCHAR(16)  NOT NULL DEFAULT 'medium' COMMENT '重要性阈值: high/medium/low',
+  `batch_cron`                  VARCHAR(64)  NOT NULL DEFAULT '0 0 9 * * ?' COMMENT '批量推送 cron 表达式',
+  `immediate_enabled`           TINYINT(1)   NOT NULL DEFAULT 1  COMMENT '是否启用实时推送',
+  `workspace_max_count`         INT          NOT NULL DEFAULT 50 COMMENT '每邮箱归档工作区最大数量',
+  `workspace_max_age_days`      INT          NOT NULL DEFAULT 30 COMMENT '归档保留天数',
+  `retry_max`                   INT          NOT NULL DEFAULT 2  COMMENT '每个执行器最大重试次数',
+  `executor_timeout_seconds`    INT          NOT NULL DEFAULT 600 COMMENT '执行器超时时间（秒）',
+  `updated_at`                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推送与执行器全局配置（单行）';
+
+-- 默认推送配置（如果不存在）
+INSERT IGNORE INTO `push_config` (`id`) VALUES (1);
+
+-- ============================================
+-- 定时任务执行日志（参考 xxl-job 的 xxl_job_log 设计）
+-- 记录每次调度的触发时间、handler、参数、结果，用于前端调度管理页的日志面板
+-- ============================================
+CREATE TABLE IF NOT EXISTS `job_log` (
+  `id`                 BIGINT       NOT NULL AUTO_INCREMENT,
+  `job_id`             BIGINT       NOT NULL                COMMENT 'scheduled_task.id',
+  `job_name`           VARCHAR(100) NOT NULL                COMMENT '任务名（冗余，便于查询）',
+  `handler`            VARCHAR(100) NOT NULL                COMMENT '执行的 handler 名（与 scheduled_task.task_type 对应）',
+  `trigger_type`       VARCHAR(20)  NOT NULL DEFAULT 'CRON' COMMENT '触发类型: CRON / MANUAL / MISFIRE',
+  `trigger_time`       DATETIME     NOT NULL                COMMENT '触发时间',
+  `handle_start_time`  DATETIME                            COMMENT 'handler 实际开始执行时间',
+  `handle_end_time`    DATETIME                            COMMENT 'handler 实际结束时间',
+  `duration_ms`        BIGINT                              COMMENT '执行耗时（毫秒）',
+  `status`             VARCHAR(20)  NOT NULL DEFAULT 'RUNNING' COMMENT '状态: RUNNING / SUCCESS / FAILED',
+  `executor_param`     TEXT                                COMMENT '传入 handler 的参数快照',
+  `result`             MEDIUMTEXT                           COMMENT 'handler 返回的结果（截断到 4000 字符）',
+  `error_message`      TEXT                                COMMENT '失败时的异常信息',
+  `alarm_status`       TINYINT(1)   NOT NULL DEFAULT 0     COMMENT '0=无需告警, 1=需要告警',
+  PRIMARY KEY (`id`),
+  KEY `idx_log_job_id`       (`job_id`),
+  KEY `idx_log_trigger_time` (`trigger_time`),
+  KEY `idx_log_status`       (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务执行日志';
+
+-- 给 scheduled_task 加触发状态字段，参考 xxl-job 的 trigger_status（0=静止, 1=运行中）
+ALTER TABLE `scheduled_task`
+  ADD COLUMN `trigger_status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '触发状态: 0=静止, 1=运行中' AFTER `enabled`;
+
+-- ============================================
+-- 邮件附件 AI 解析（v4.1）
+-- ============================================
+
+-- email_config 增加单附件大小阈值列（每邮箱可覆盖全局默认）
+SET @has_email_max_size = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = 'email_config'
+      AND column_name = 'max_attachment_size_bytes'
+);
+
+SET @sql_email_max_size = IF(
+    @has_email_max_size = 0,
+    'ALTER TABLE `email_config` ADD COLUMN `max_attachment_size_bytes` BIGINT NULL COMMENT ''单附件大小阈值（字节），null 表示使用全局默认'' AFTER `provider_settings`',
+    'SELECT ''email_config.max_attachment_size_bytes exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_email_max_size;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ai_model_config 增加 purpose 字段（chat / attachment）
+SET @has_model_purpose = (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = 'ai_model_config'
+      AND column_name = 'purpose'
+);
+
+SET @sql_model_purpose = IF(
+    @has_model_purpose = 0,
+    'ALTER TABLE `ai_model_config` ADD COLUMN `purpose` VARCHAR(32) NOT NULL DEFAULT ''chat'' COMMENT ''模型用途: chat / attachment'' AFTER `enabled`',
+    'SELECT ''ai_model_config.purpose exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql_model_purpose;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 附件解析结果表
+CREATE TABLE IF NOT EXISTS `email_attachment_analysis` (
+  `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `message_id`      VARCHAR(512) NOT NULL                COMMENT '邮件 Message-ID',
+  `account_email`   VARCHAR(255)                         COMMENT '所属邮箱账号',
+  `file_name`       VARCHAR(500)                         COMMENT '原始文件名',
+  `content_type`    VARCHAR(255)                         COMMENT 'MIME 类型',
+  `size_bytes`      BIGINT                               COMMENT '字节数',
+  `file_path`       VARCHAR(1024)                        COMMENT '落盘路径',
+  `status`          VARCHAR(32)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/RUNNING/SUCCESS/FAILED/SKIPPED_SIZE/SKIPPED_TYPE',
+  `skip_reason`     VARCHAR(500)                         COMMENT '跳过原因或失败原因',
+  `summary`         MEDIUMTEXT                           COMMENT 'AI 摘要',
+  `raw_text`        MEDIUMTEXT                           COMMENT '文档类附件抽取出的原始文本',
+  `model_name`      VARCHAR(128)                         COMMENT '实际调用的模型名',
+  `error_detail`    TEXT                                 COMMENT '失败时异常信息',
+  `analyzed_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '解析时间',
+  `update_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_eaa_message`   (`message_id`),
+  KEY `idx_eaa_status`    (`status`),
+  KEY `idx_eaa_analyzed`  (`analyzed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮件附件 AI 解析结果';
+
+-- ============================================
 -- 完成提示
 -- ============================================
 -- 非破坏性迁移完成！
--- 已添加/更新的功能：用户认证增强、人脸验证、OAuth、邮箱验证、搜索、系统设置、聊天导入、虚拟助手
+-- 已添加/更新的功能：用户认证增强、人脸验证、OAuth、邮箱验证、搜索、系统设置、聊天导入、虚拟助手、派发执行、调度日志、邮件附件 AI 解析
 -- ============================================
