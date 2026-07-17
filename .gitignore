@@ -114,3 +114,6 @@ replay_pid*
 
 ### Claude Code 会话记录 ###
 *.jsonl
+
+### OpenSpec 工作产物(本地变更提案与归档,不入库)###
+openspec/

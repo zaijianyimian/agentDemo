@@ -24,6 +24,12 @@ repositories {
     mavenCentral()
 }
 
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.modulith:spring-modulith-bom:1.4.1'
+    }
+}
+
 dependencies {
     // Source: https://mvnrepository.com/artifact/com.google.apis/google-api-services-gmail
     implementation 'com.google.apis:google-api-services-gmail:v1-rev110-1.25.0'
@@ -59,6 +65,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.modulith:spring-modulith-starter-core'
 
     // 4. 工具与数据库
     compileOnly 'org.projectlombok:lombok'
@@ -80,6 +87,7 @@ dependencies {
 
     // 5. 测试
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

@@ -56,6 +56,9 @@ public class ProjectAutonomyService {
     private final ObjectMapper objectMapper;
     private final QwenChatService qwenChatService;
 
+    /**
+     * 构造器：注入配置、Jackson 序列化器与 LLM 聊天服务，用于生成补全草稿。
+     */
     public ProjectAutonomyService(AutonomyProperties autonomyProperties,
                                   ObjectMapper objectMapper,
                                   QwenChatService qwenChatService) {
@@ -64,6 +67,9 @@ public class ProjectAutonomyService {
         this.qwenChatService = qwenChatService;
     }
 
+    /**
+     * 返回当前自治能力开关给前端：扫描 / 草稿 / 验证是否启用，以及默认 workspace 与输出目录。
+     */
     public Map<String, Object> getCapabilities() {
         Map<String, Object> capabilities = new LinkedHashMap<>();
         capabilities.put("enabled", autonomyProperties.getEnabled());
@@ -79,6 +85,9 @@ public class ProjectAutonomyService {
         return capabilities;
     }
 
+    /**
+     * 全量扫描项目结构，生成结构化报告并落盘到输出目录。结果文件名为 {@code scan-<时间戳>.{json,md}}。
+     */
     public AutonomyScanReport scanProject() {
         Path root = resolveWorkspaceRoot();
         Path outputDir = ensureOutputDir();
@@ -160,6 +169,12 @@ public class ProjectAutonomyService {
         return report;
     }
 
+    /**
+     * 执行后端 / 前端构建或测试验证，按开关允许时启用。结果以 JSON 落盘并返回对象。
+     *
+     * @param verifyBackend 是否执行后端 gradle test
+     * @param verifyFrontend 是否执行前端 npm run build
+     */
     public AutonomyVerificationResult verifyProject(boolean verifyBackend, boolean verifyFrontend) {
         List<AutonomyVerificationStep> steps = new ArrayList<>();
         Path root = resolveWorkspaceRoot();
@@ -182,6 +197,12 @@ public class ProjectAutonomyService {
         return result;
     }
 
+    /**
+     * 调用 LLM 生成补全草稿（Markdown）。先扫描再向 LLM 注入上下文，输出写入输出目录。
+     *
+     * @param target              补全目标范围描述，传 null/空白代表 general
+     * @param includeVerification 是否在 prompt 中追加验证步骤要求
+     */
     public AutonomyDraftResponse generateCompletionDraft(String target, boolean includeVerification) {
         AutonomyScanReport report = scanProject();
         StringBuilder prompt = new StringBuilder();
@@ -223,6 +244,9 @@ public class ProjectAutonomyService {
                 .build();
     }
 
+    /**
+     * 列出最近若干个自治产物（scan / verify / draft），按文件名时间戳倒序。
+     */
     public List<AutonomyArtifact> listArtifacts(int limit) {
         Path outputDir = ensureOutputDir();
         if (!Files.exists(outputDir)) {
@@ -241,6 +265,9 @@ public class ProjectAutonomyService {
         }
     }
 
+    /**
+     * 读取某个自治产物的文本内容。出于安全限制路径必须落在 outputDir 内，否则抛错。
+     */
     public String readArtifact(String path) {
         if (path == null || path.isBlank()) {
             return "";
@@ -257,6 +284,9 @@ public class ProjectAutonomyService {
         }
     }
 
+    /**
+     * 对比最近两次扫描报告，分类得到新增 / 已解决 / 持续存在的发现项。
+     */
     public AutonomyDiff compareLatestScans() {
         List<Path> scanJsons = listScanJsons();
         if (scanJsons.size() < 2) {
