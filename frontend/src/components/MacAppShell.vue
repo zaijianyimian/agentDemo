@@ -65,6 +65,19 @@
 
         <!-- Right: User menu -->
         <div class="header-right">
+          <n-button
+            class="logout-button"
+            type="warning"
+            secondary
+            size="small"
+            :loading="logoutLoading"
+            @click="handleLogout"
+          >
+            <template #icon>
+              <n-icon><LogOutOutline /></n-icon>
+            </template>
+            <span class="logout-label">退出</span>
+          </n-button>
           <n-dropdown :options="userMenuOptions" @select="handleUserMenuSelect">
             <button class="user-menu-btn">
               <span class="user-avatar">{{ userInitial }}</span>
@@ -147,6 +160,7 @@
 </template>
 
 <script setup lang="ts">
+// macOS 风格应用主框架：整合全局导航栏、功能面板、控制中心、命令面板与密码修改等核心交互
 import { computed, ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
@@ -183,12 +197,17 @@ import {
   RocketOutline,
   CodeSlashOutline,
   CloudUploadOutline,
-  ChevronForwardOutline
+  ChevronForwardOutline,
+  LogOutOutline
 } from '@vicons/ionicons5'
 import { useMacNavStore } from '@/stores/mac-nav'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
-import { authService, inboxService, modelService, searchService, settingsService } from '@/services/api'
+import { authService } from '@/services/api/auth'
+import { inboxService } from '@/services/api/inbox'
+import { modelService } from '@/services/api/model'
+import { searchService } from '@/services/api/search'
+import { settingsService } from '@/services/api/settings'
 import MacGlobalRail from '@/components/MacGlobalRail.vue'
 import MacFunctionalPane from '@/components/MacFunctionalPane.vue'
 import MacControlCenter from '@/components/MacControlCenter.vue'
@@ -200,6 +219,7 @@ const macNavStore = useMacNavStore()
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
 const { message } = createDiscreteApi(['message'])
+const logoutLoading = ref(false)
 
 // Responsive
 const isMobile = computed(() => windowWidth.value < 768)
@@ -379,9 +399,23 @@ const handleUserMenuSelect = async (key: string) => {
     passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' }
     showPasswordModal.value = true
   } else if (key === 'logout') {
+    await handleLogout()
+  }
+}
+
+const handleLogout = async () => {
+  if (logoutLoading.value) return
+  logoutLoading.value = true
+  try {
     await authStore.logout()
     await router.replace('/login')
     message.success('已退出登录')
+  } catch (error: any) {
+    authStore.clearSession()
+    await router.replace('/login')
+    message.warning(error?.message || '已清除本地登录状态')
+  } finally {
+    logoutLoading.value = false
   }
 }
 
@@ -499,7 +533,12 @@ watch(actualTheme, (theme) => {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background: var(--bg-base);
+  background:
+    linear-gradient(var(--bg-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-grid-line) 1px, transparent 1px),
+    var(--bg-page-tint),
+    var(--bg-base);
+  background-size: 28px 28px, 28px 28px, auto, auto;
   transition: background var(--transition-base);
 }
 
@@ -520,17 +559,20 @@ watch(actualTheme, (theme) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px 20px;
+  gap: 14px;
+  padding: 10px 16px;
   margin-left: 96px;
   margin-right: 24px;
   margin-top: 24px;
-  background: var(--bg-card);
-  border-radius: var(--radius-xl);
-  border: 2px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-glass-strong);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-border);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    var(--shadow-card);
+  backdrop-filter: blur(var(--blur-md));
   z-index: 10;
-  min-width: 480px;
+  min-width: 0;
   flex-shrink: 0;
 }
 
@@ -538,6 +580,7 @@ watch(actualTheme, (theme) => {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .page-info {
@@ -555,10 +598,14 @@ watch(actualTheme, (theme) => {
 }
 
 .page-title {
-  font-size: 1.1rem;
+  font-size: 1.02rem;
   font-weight: 600;
   color: var(--text-primary) !important;
   margin: 0;
+  max-width: 28vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-name {
@@ -572,13 +619,23 @@ watch(actualTheme, (theme) => {
   gap: 8px;
 }
 
+.logout-button {
+  --n-border-radius: var(--radius-md);
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.16);
+}
+
+.logout-label {
+  line-height: 1;
+}
+
 .user-menu-btn {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 7px 10px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-base);
@@ -586,6 +643,7 @@ watch(actualTheme, (theme) => {
 
 .user-menu-btn:hover {
   background: var(--bg-menu-item-hover);
+  border-color: var(--border-accent);
 }
 
 .user-avatar {
@@ -607,14 +665,13 @@ watch(actualTheme, (theme) => {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 24px;
+  padding: 22px 24px 24px;
   padding-left: 120px; /* 72px rail + 48px gap */
   padding-right: 24px;
   scrollbar-width: thin;
   position: relative;
   z-index: 1;
-  /* Critical: Minimum width to prevent card deformation */
-  min-width: 600px;
+  min-width: 0;
   /* macOS style scrollbar overlay */
   scrollbar-color: rgba(142, 142, 147, 0.24) transparent;
 }
@@ -734,10 +791,11 @@ watch(actualTheme, (theme) => {
 /* Command Palette - macOS Spotlight style */
 .command-palette {
   width: min(560px, 90vw);
-  background: var(--bg-card);
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius-xl);
+  background: var(--bg-glass-strong);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(var(--blur-lg));
   overflow: hidden;
 }
 
@@ -840,8 +898,9 @@ watch(actualTheme, (theme) => {
   display: flex;
   justify-content: space-around;
   padding: 8px 16px;
-  background: var(--bg-card);
-  border-top: 2px solid var(--border-light);
+  background: var(--bg-glass-strong);
+  border-top: 1px solid var(--surface-border);
+  backdrop-filter: blur(var(--blur-md));
   z-index: 200;
 }
 
@@ -889,11 +948,12 @@ watch(actualTheme, (theme) => {
   .canvas-header {
     margin-left: 88px;
     margin-right: 16px;
+    margin-top: 16px;
     min-width: 0;
   }
 
   .content-frame {
-    padding-left: 100px;
+    padding-left: 96px;
     padding-right: 16px;
     min-width: 0;
   }
@@ -905,20 +965,32 @@ watch(actualTheme, (theme) => {
 
 @media (max-width: 768px) {
   .canvas-header {
-    margin-left: 0;
-    margin-right: 0;
-    margin-top: 16px;
+    margin: 12px 12px 0;
     border-radius: var(--radius-lg);
     min-width: 0;
+    gap: 10px;
   }
 
   .content-frame {
-    padding: 16px;
+    padding: 12px;
     padding-bottom: 72px;
     min-width: 0;
   }
 
+  .page-title {
+    max-width: 42vw;
+    font-size: 0.96rem;
+  }
+
+  .canvas-header :deep(.control-center) {
+    max-width: 44vw;
+  }
+
   .header-right .user-name {
+    display: none;
+  }
+
+  .logout-label {
     display: none;
   }
 

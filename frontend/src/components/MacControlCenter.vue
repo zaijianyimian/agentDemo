@@ -68,6 +68,7 @@
 </template>
 
 <script setup lang="ts">
+// macOS 风格控制中心：展示模型、向量库、搜索服务状态以及命令面板快捷入口
 import { computed } from 'vue'
 import { NIcon } from 'naive-ui'
 import {

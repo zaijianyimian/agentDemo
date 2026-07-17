@@ -32,6 +32,7 @@
 </template>
 
 <script setup lang="ts">
+// 沉浸式头部组件：可折叠展开的头部导航，提供全屏沉浸模式
 import { ref, watch } from 'vue'
 import { NIcon } from 'naive-ui'
 import { ChevronUpOutline, ChevronDownOutline } from '@vicons/ionicons5'

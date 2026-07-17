@@ -6,8 +6,14 @@ import {
   setTokens
 } from '@/services/auth-token'
 
+// 带认证与自动刷新的 fetch 封装：附加 Bearer token、401 时刷新一次后重试，失败跳登录
+
 let refreshingPromise: Promise<string | null> | null = null
 
+/**
+ * 使用 refresh token 换取新的 access/refresh token；同一时刻仅允许一个刷新请求在途。
+ * 失败时清除本地 token 并返回 null。
+ */
 const refreshAccessToken = async (): Promise<string | null> => {
   const refreshToken = getRefreshToken()
   if (!refreshToken) {

@@ -87,6 +87,7 @@
 </template>
 
 <script setup lang="ts">
+// macOS 风格功能面板：显示当前选中分类下的所有路由，可触发跳转或打开参数面板
 import { computed, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { NIcon } from 'naive-ui'

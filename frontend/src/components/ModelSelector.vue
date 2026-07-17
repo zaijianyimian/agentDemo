@@ -27,9 +27,10 @@
 </template>
 
 <script setup lang="ts">
+// 模型选择下拉组件：加载可用 AI 模型，自动选中默认模型，支持下拉切换
 import { ref, computed, onMounted } from 'vue'
 import { NDropdown } from 'naive-ui'
-import { modelService } from '@/services/api'
+import { modelService } from '@/services/api/model'
 import type { AiModelConfig } from '@/types'
 
 // Props

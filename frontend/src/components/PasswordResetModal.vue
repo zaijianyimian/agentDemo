@@ -152,8 +152,9 @@
 </template>
 
 <script setup lang="ts">
+// 密码重置弹窗组件：邮箱接收验证码后重置密码的三步流程（含倒计时与校验）
 import { ref, computed, watch } from 'vue'
-import { authService } from '@/services/api'
+import { authService } from '@/services/api/auth'
 import { useMessage } from 'naive-ui'
 
 const props = defineProps<{

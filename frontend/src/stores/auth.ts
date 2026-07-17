@@ -1,8 +1,17 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { authService, authTokenStorage } from '@/services/api'
+import { authService, authTokenStorage } from '@/services/api/auth'
 import type { AuthTokenResponse, AuthUserProfile, EmailCodeSendResponse } from '@/types'
 
+/**
+ * 认证状态 Store
+ *
+ * 职责：管理当前登录用户、access/refresh token 与登录态相关的副作用（登录、登出、会话恢复）。
+ * State 形状：
+ *  - user: AuthUserProfile | null - 当前登录用户档案
+ *  - initialized: boolean - 是否已完成首次会话恢复（hydrate）
+ *  - isAuthenticated: computed - 是否持有有效 token 且 user 已加载
+ */
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUserProfile | null>(null)
   const initialized = ref(false)
@@ -17,11 +26,18 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = payload.user
   }
 
+  /**
+   * 清除本地 token 与 user，回到未登录状态（不触发后端登出请求）。
+   */
   const clearSession = () => {
     authTokenStorage.clearTokens()
     user.value = null
   }
 
+  /**
+   * 应用启动时恢复登录态：若本地有 token 则调用 /me 拉取用户信息，
+   * 失败或无 token 时回退为未登录态。同一会话内只执行一次。
+   */
   const hydrate = async () => {
     if (initialized.value) return
     initialized.value = true
@@ -66,6 +82,9 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * 登出：调用后端登出接口并无论成功与否都清除本地会话。
+   */
   const logout = async () => {
     try {
       await authService.logout()

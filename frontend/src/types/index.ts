@@ -53,6 +53,10 @@ export interface EmailConfig {
   port: number
   sslEnabled: boolean
   protocol: string
+  provider?: 'GENERIC_IMAP' | 'GENERIC_POP3' | 'GMAIL_API' | 'MICROSOFT_GRAPH'
+  listenMode?: 'POLLING' | 'IMAP_IDLE' | 'WEBHOOK' | 'DELTA_SYNC'
+  fallbackListenMode?: 'POLLING' | 'IMAP_IDLE' | 'WEBHOOK' | 'DELTA_SYNC' | null
+  providerSettings?: string
   enabled: boolean
   folder: string
   pollInterval: number
@@ -143,6 +147,7 @@ export interface ScheduledTask {
   params?: string
   skillCode?: string
   enabled: boolean
+  triggerStatus?: 0 | 1
   lastExecuteTime?: string | number[] | null
   lastExecuteResult?: string
   nextExecuteTime?: string | number[] | null
@@ -151,6 +156,31 @@ export interface ScheduledTask {
   failCount?: number
   createTime?: string | number[] | null
   updateTime?: string | number[] | null
+}
+
+export interface JobLog {
+  id: number
+  jobId: number
+  jobName: string
+  handler: string
+  triggerType: 'CRON' | 'MANUAL' | 'MISFIRE'
+  triggerTime: string | number[] | null
+  handleStartTime?: string | number[] | null
+  handleEndTime?: string | number[] | null
+  durationMs?: number
+  status: 'RUNNING' | 'SUCCESS' | 'FAILED'
+  executorParam?: string
+  result?: string
+  errorMessage?: string
+  alarmStatus?: 0 | 1
+  createTime?: string | number[] | null
+}
+
+export interface JobLogPage {
+  records: JobLog[]
+  total: number
+  page: number
+  size: number
 }
 
 export interface SystemSettings {

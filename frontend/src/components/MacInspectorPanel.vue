@@ -69,6 +69,7 @@
 </template>
 
 <script setup lang="ts">
+// 参数检查面板组件：以分区 + 字段的形式呈现当前路由的可配置参数，并支持应用与重置
 import { computed } from 'vue'
 import { NIcon, NInput, NInputNumber, NSwitch, NButton } from 'naive-ui'
 import {

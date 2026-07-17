@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 邮箱通知桥接组件：监听后端 SSE 事件流，收到新邮件后弹出系统通知
 import { onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotification } from 'naive-ui'

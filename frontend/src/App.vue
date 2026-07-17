@@ -60,8 +60,9 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
       primaryColor: isDark ? '#FB923C' : '#EA580C',
       primaryColorHover: isDark ? '#F97316' : '#F97316',
       primaryColorPressed: isDark ? '#EA580C' : '#C2410C',
-      borderRadius: '14px',
-      borderRadiusSmall: '10px',
+      primaryColorSuppl: isDark ? '#FDBA74' : '#F97316',
+      borderRadius: '12px',
+      borderRadiusSmall: '8px',
       fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
       textColor: isDark ? '#F8FAFC' : '#111827',
       textColor2: isDark ? '#CBD5E1' : '#475569',
@@ -70,19 +71,32 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
       bodyColor: isDark ? '#111318' : '#F6F7F9',
       cardColor: isDark ? '#1F2430' : '#FFFFFF',
       inputColor: isDark ? '#262B36' : '#F3F4F6',
-      borderColor: isDark ? '#2D3748' : '#E2E8F0'
+      modalColor: isDark ? '#1F2430' : '#FFFFFF',
+      popoverColor: isDark ? '#1F2430' : '#FFFFFF',
+      tableColor: isDark ? '#1F2430' : '#FFFFFF',
+      borderColor: isDark ? '#2D3748' : '#E2E8F0',
+      dividerColor: isDark ? '#2D3748' : '#E2E8F0'
     },
     Button: {
       borderRadiusMedium: '8px',
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      textColor: isDark ? '#F8FAFC' : '#111827',
+      textColorHover: isDark ? '#FFFFFF' : '#0F172A',
+      textColorPressed: isDark ? '#FFFFFF' : '#0F172A',
+      borderHover: isDark ? '1px solid #FB923C' : '1px solid #EA580C'
     },
     Card: {
       borderRadius: '12px',
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      color: isDark ? '#1F2430' : '#FFFFFF',
+      textColor: isDark ? '#F8FAFC' : '#111827',
+      borderColor: isDark ? '#2D3748' : '#E2E8F0'
     },
     Input: {
       borderRadius: '8px',
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      color: isDark ? '#262B36' : '#F3F4F6',
+      colorFocus: isDark ? '#1F2430' : '#FFFFFF',
+      textColor: isDark ? '#F8FAFC' : '#111827',
+      borderFocus: isDark ? '1px solid #FB923C' : '1px solid #EA580C',
+      boxShadowFocus: isDark ? '0 0 0 3px rgba(251, 146, 60, 0.22)' : '0 0 0 3px rgba(234, 88, 12, 0.18)'
     },
     Tag: {
       borderRadius: '100px'
@@ -95,7 +109,8 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
       textColor: isDark ? '#FFFFFF' : '#1D1D1F'
     },
     Modal: {
-      textColor: isDark ? '#FFFFFF' : '#1D1D1F'
+      color: isDark ? '#1F2430' : '#FFFFFF',
+      textColor: isDark ? '#F8FAFC' : '#111827'
     },
     Form: {
       labelTextColor: isDark ? '#EBEBF5' : '#6E6E73'

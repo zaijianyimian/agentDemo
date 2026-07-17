@@ -1,3 +1,5 @@
+// 用户偏好持久化工具：localStorage 中的焦点模式、离线缓存开关与最近操作日志读写
+
 const FOCUS_MODE_KEY = 'app.focusMode'
 const OFFLINE_CACHE_KEY = 'app.offlineCacheEnabled'
 const ACTION_LOG_KEY = 'app.recentActions'

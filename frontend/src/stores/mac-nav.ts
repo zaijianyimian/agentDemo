@@ -2,8 +2,16 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 /**
- * Navigation Category Definition
- * macOS-style functional grouping
+ * macOS 风格导航 Store
+ *
+ * 职责：管理三级导航（Rail → Pane → Inspector）的状态、分组定义、激活态以及最近访问统计。
+ * State 形状：
+ *  - categories: NavCategory[] - 所有功能分组与各自分组下的路由
+ *  - activeCategory: string | null - 当前激活的分组 ID（控制 Pane 显隐）
+ *  - quickAccessItems: QuickAccessItem[] - 最近访问记录（持久化于 localStorage）
+ *  - inspectorOpen / inspectorContent - 第三层 Inspector 面板状态
+ *  - paneAnimating: boolean - Pane 开关动画进行中标记
+ *  - currentCategory / topQuickAccess - 派生计算属性
  */
 export interface NavCategory {
   id: string
@@ -84,6 +92,7 @@ export const useMacNavStore = defineStore('macNav', () => {
       color: 'var(--category-automation)',
       routes: [
         { name: 'Tasks', path: '/tasks', label: '定时任务', description: '配置计划任务', icon: 'time' },
+        { name: 'TaskAdmin', path: '/task-admin', label: '调度管理', description: 'xxl-job 风格调度中心', icon: 'calendar' },
         { name: 'Schedule', path: '/schedule', label: '日程管理', description: '事件与推送', icon: 'calendar' },
         { name: 'ScheduleReader', path: '/schedule-reader', label: '日程阅读', description: 'Markdown 日程文件', icon: 'reader' },
         { name: 'Email', path: '/email', label: '邮件配置', description: '邮箱连接', icon: 'mail' },
@@ -98,6 +107,7 @@ export const useMacNavStore = defineStore('macNav', () => {
       routes: [
         { name: 'Tools', path: '/tools', label: '工具管理', description: 'MCP 工具', icon: 'construct' },
         { name: 'Skills', path: '/skills', label: '技能管理', description: '技能目录', icon: 'rocket' },
+        { name: 'MarkdownSkills', path: '/markdown-skills', label: 'Markdown Skills', description: 'SKILL.md 加载', icon: 'document' },
         { name: 'Snippets', path: '/snippets', label: '代码片段', description: '代码管理', icon: 'code' },
         { name: 'Search', path: '/search', label: '网络搜索', description: '搜索与总结', icon: 'search' }
       ]
@@ -139,6 +149,7 @@ export const useMacNavStore = defineStore('macNav', () => {
   })
 
   // Load quick access from localStorage
+  /** 从 localStorage 恢复最近访问列表；解析失败时回退为空数组。 */
   const loadQuickAccess = () => {
     try {
       const stored = localStorage.getItem('macNavQuickAccess')
@@ -156,6 +167,7 @@ export const useMacNavStore = defineStore('macNav', () => {
   }
 
   // Track route access
+  /** 记录一次路由访问：累加已存在项的访问次数与最近访问时间，并新增条目，触发持久化。 */
   const trackAccess = (routeName: string, routePath: string, label: string, icon: string) => {
     const existing = quickAccessItems.value.find(item => item.name === routeName)
     if (existing) {
@@ -175,6 +187,7 @@ export const useMacNavStore = defineStore('macNav', () => {
   }
 
   // Set active category (opens pane)
+  let paneAnimTimer: ReturnType<typeof setTimeout> | null = null
   const setActiveCategory = (categoryId: string | null) => {
     if (activeCategory.value === categoryId) {
       // Toggle off
@@ -182,8 +195,13 @@ export const useMacNavStore = defineStore('macNav', () => {
     } else {
       paneAnimating.value = true
       activeCategory.value = categoryId
-      setTimeout(() => {
+      // 每次切换前清掉上一次未触发的 timer，避免连续切换时多个 timer 互相覆盖状态
+      if (paneAnimTimer !== null) {
+        clearTimeout(paneAnimTimer)
+      }
+      paneAnimTimer = setTimeout(() => {
         paneAnimating.value = false
+        paneAnimTimer = null
       }, 200)
     }
   }

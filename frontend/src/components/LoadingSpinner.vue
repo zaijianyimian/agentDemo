@@ -8,6 +8,7 @@
 </template>
 
 <script setup lang="ts">
+// 加载动画组件：带多层旋转环和脉冲文字的加载指示器
 interface Props {
   size?: number
   spinnerSize?: number

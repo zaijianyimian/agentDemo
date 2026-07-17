@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+// macOS 风格全局导航栏：分类切换、快速访问、用户头像与主题切换的 Dock 式侧栏
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { NIcon } from 'naive-ui'

@@ -1,3 +1,5 @@
+// 认证令牌存储工具：在 localStorage 中读写 access/refresh token，并提供登录跳转 URL 构造
+
 const ACCESS_TOKEN_KEY = 'agent_access_token'
 const REFRESH_TOKEN_KEY = 'agent_refresh_token'
 

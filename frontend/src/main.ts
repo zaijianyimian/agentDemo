@@ -4,6 +4,7 @@ import App from './App.vue'
 import router from './router'
 import { useAuthStore } from '@/stores/auth'
 import './styles/variables.css'
+import './styles/page-system.css'
 import 'highlight.js/styles/github-dark.css' // 代码高亮样式
 
 const app = createApp(App)

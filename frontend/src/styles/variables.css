@@ -49,6 +49,13 @@
   --bg-active: rgba(234, 88, 12, 0.08);
   --bg-sidebar: #F8FAFC;
   --bg-rail: rgba(248, 250, 252, 0.94);
+  --bg-page-tint: linear-gradient(135deg, rgba(234, 88, 12, 0.05), rgba(20, 184, 166, 0.04) 46%, rgba(99, 102, 241, 0.04));
+  --bg-grid-line: rgba(100, 116, 139, 0.08);
+  --surface-highlight: rgba(255, 255, 255, 0.78);
+  --surface-shadow-color: rgba(15, 23, 42, 0.10);
+  --surface-border: rgba(226, 232, 240, 0.86);
+  --surface-border-strong: rgba(203, 213, 225, 0.92);
+  --surface-hover: rgba(255, 255, 255, 0.98);
 
   /* Sidebar Menu - Warm amber */
   --bg-menu-item: transparent;
@@ -81,7 +88,8 @@
   --shadow-md: 0 8px 20px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 14px 34px rgba(15, 23, 42, 0.10);
   --shadow-xl: 0 24px 56px rgba(15, 23, 42, 0.14);
-  --shadow-card: 0 2px 12px rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 8px 24px rgba(15, 23, 42, 0.07);
+  --shadow-card-hover: 0 18px 42px rgba(15, 23, 42, 0.11);
   --shadow-sidebar: 4px 0 16px rgba(15, 23, 42, 0.05);
   --shadow-focus: 0 0 0 4px rgba(234, 88, 12, 0.20);
   --shadow-rail: 0 4px 24px rgba(234, 88, 12, 0.06);
@@ -125,9 +133,11 @@
   --gradient-sunset: linear-gradient(135deg, #EA580C 0%, #F59E0B 50%, #FCD34D 100%);
   --gradient-citrus: linear-gradient(180deg, #FFFFFF 0%, #F6F7F9 100%);
   --gradient-warm-glow: radial-gradient(ellipse at top, rgba(234, 88, 12, 0.08) 0%, transparent 58%);
+  --gradient-workbench: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.88));
 
   /* Border states */
   --border-glow: rgba(234, 88, 12, 0.30);
+  --border-hairline: rgba(255, 255, 255, 0.68);
 
   /* Chat specific */
   --chat-user-bg: #F59E0B;
@@ -152,34 +162,61 @@
 /* Shared page layout primitives */
 .page-shell {
   display: grid;
-  gap: 20px;
+  gap: 18px;
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
+  color: var(--text-primary);
 }
 
 .page-hero,
 .surface-panel {
   background: var(--bg-panel);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.page-hero::before,
+.surface-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--surface-highlight), transparent);
+  pointer-events: none;
 }
 
 .page-hero {
   padding: 22px;
+  background:
+    var(--gradient-accent),
+    var(--gradient-workbench),
+    var(--bg-panel);
 }
 
 .section-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 20px;
+  gap: 16px;
   align-items: start;
 }
 
 .surface-panel {
   min-width: 0;
   padding: 18px;
+}
+
+.surface-panel:hover {
+  border-color: var(--surface-border-strong);
+  box-shadow:
+    inset 0 1px 0 var(--border-hairline),
+    var(--shadow-card-hover);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
 .span-3 { grid-column: span 3; }
@@ -210,9 +247,28 @@
   color: var(--text-secondary);
 }
 
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.muted-text {
+  color: var(--text-muted);
+}
+
 .page-eyebrow {
   margin-bottom: 4px;
-  color: var(--text-muted);
+  color: var(--text-accent);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -261,6 +317,13 @@
   --bg-active: rgba(251, 146, 60, 0.15);
   --bg-sidebar: #181B22;
   --bg-rail: rgba(17, 19, 24, 0.92);
+  --bg-page-tint: linear-gradient(135deg, rgba(251, 146, 60, 0.08), rgba(20, 184, 166, 0.05) 44%, rgba(129, 140, 248, 0.07));
+  --bg-grid-line: rgba(148, 163, 184, 0.08);
+  --surface-highlight: rgba(255, 255, 255, 0.08);
+  --surface-shadow-color: rgba(0, 0, 0, 0.46);
+  --surface-border: rgba(45, 55, 72, 0.92);
+  --surface-border-strong: rgba(71, 85, 105, 0.96);
+  --surface-hover: rgba(38, 43, 54, 0.98);
 
   /* Sidebar Menu */
   --bg-menu-item: transparent;
@@ -287,7 +350,8 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.50);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.60);
   --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.70);
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.50);
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.42);
+  --shadow-card-hover: 0 18px 44px rgba(0, 0, 0, 0.52);
   --shadow-sidebar: 4px 0 16px rgba(0, 0, 0, 0.30);
   --shadow-focus: 0 0 0 4px rgba(251, 146, 60, 0.25);
   --shadow-rail: 0 4px 24px rgba(0, 0, 0, 0.40);
@@ -303,9 +367,11 @@
   --gradient-sunset: linear-gradient(135deg, #EA580C 0%, #F59E0B 50%, #FBBF24 100%);
   --gradient-citrus: linear-gradient(180deg, #1F2430 0%, #111318 100%);
   --gradient-warm-glow: radial-gradient(ellipse at top, rgba(251, 146, 60, 0.1) 0%, transparent 60%);
+  --gradient-workbench: linear-gradient(135deg, rgba(31, 36, 48, 0.94), rgba(17, 19, 24, 0.86));
 
   /* Border states */
   --border-glow: rgba(251, 146, 60, 0.35);
+  --border-hairline: rgba(255, 255, 255, 0.08);
 
   /* Chat specific */
   --chat-user-bg: #F59E0B;
@@ -337,7 +403,12 @@ html, body, #app {
 
 body {
   font-family: var(--font-sans);
-  background: var(--bg-base);
+  background:
+    linear-gradient(var(--bg-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-grid-line) 1px, transparent 1px),
+    var(--bg-page-tint),
+    var(--bg-base);
+  background-size: 28px 28px, 28px 28px, auto, auto;
   color: var(--text-primary, #431407);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -412,6 +483,13 @@ body {
 :focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
 /* Scrollbar - Warm thin */

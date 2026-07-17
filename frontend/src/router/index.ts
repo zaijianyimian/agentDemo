@@ -86,6 +86,12 @@ const routes = [
     meta: { title: '定时任务', icon: 'time', description: '配置计划任务、执行技能和定时流程。' }
   },
   {
+    path: '/task-admin',
+    name: 'TaskAdmin',
+    component: () => import('@/views/TaskAdmin.vue'),
+    meta: { title: '调度管理', icon: 'calendar', description: 'xxl-job 风格的调度中心：任务列表、执行日志、状态一站管理。' }
+  },
+  {
     path: '/notes',
     name: 'Notes',
     component: () => import('@/views/Notes.vue'),
@@ -110,6 +116,12 @@ const routes = [
     meta: { title: '邮件配置', icon: 'mail', description: '维护邮箱连接、模板和监听状态。' }
   },
   {
+    path: '/email/detail/:messageId',
+    name: 'EmailDetail',
+    component: () => import('@/views/EmailDetail.vue'),
+    meta: { title: '邮件详情', icon: 'mail', description: '查看邮件正文、附件列表与 AI 解析结果。' }
+  },
+  {
     path: '/search',
     name: 'Search',
     component: () => import('@/views/Search.vue'),
@@ -126,6 +138,12 @@ const routes = [
     name: 'Skills',
     component: () => import('@/views/Skills.vue'),
     meta: { title: '技能管理', icon: 'skill', description: '维护技能目录、分类、绑定关系与执行能力。' }
+  },
+  {
+    path: '/markdown-skills',
+    name: 'MarkdownSkills',
+    component: () => import('@/views/MarkdownSkills.vue'),
+    meta: { title: 'Markdown Skills', icon: 'document', description: '类似 Claude Skills 的 SKILL.md 管理：自动加载、LLM 调用、关键词匹配。' }
   },
   {
     path: '/settings',
@@ -162,6 +180,18 @@ const routes = [
     name: 'Notifications',
     component: () => import('@/views/Notifications.vue'),
     meta: { title: '通知中心', icon: 'bell', description: '查看系统通知、日程提醒和消息。' }
+  },
+  {
+    path: '/dispatched',
+    name: 'Dispatched',
+    component: () => import('@/views/Dispatched.vue'),
+    meta: { title: '派发任务', icon: 'dispatch', description: '查看邮件产生的派发任务、状态与执行结果。' }
+  },
+  {
+    path: '/push-config',
+    name: 'PushConfig',
+    component: () => import('@/views/PushConfig.vue'),
+    meta: { title: '推送配置', icon: 'push', description: '维护推送邮箱、阈值与批量 cron。' }
   }
 ]
 

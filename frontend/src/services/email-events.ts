@@ -1,3 +1,4 @@
+// 邮箱新事件 SSE 连接工具：订阅后端 /api/email/events，解析 new-email 事件并回调
 import { getAccessToken } from '@/services/auth-token'
 
 export interface EmailNotificationEvent {
@@ -8,6 +9,7 @@ export interface EmailNotificationEvent {
   sentDate?: string
   receivedDate?: string
   detectedAt?: string
+  messageId?: string
 }
 
 type EmailEventHandlers = {
@@ -15,6 +17,10 @@ type EmailEventHandlers = {
   onDisconnect?: () => void
 }
 
+/**
+ * 连接邮箱事件 SSE 流，返回 AbortController 用于断开。
+ * 读取过程中按 \n\n 切分事件，仅处理 new-email 类型，JSON 解析后回调 onEmail。
+ */
 export function connectEmailEventStream(handlers: EmailEventHandlers): AbortController | null {
   const token = getAccessToken()
   if (!token) return null
