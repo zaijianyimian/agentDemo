@@ -645,9 +645,13 @@ CREATE TABLE IF NOT EXISTS `email_attachment_analysis` (
   KEY `idx_eaa_analyzed`  (`analyzed_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮件附件 AI 解析结果';
 
+-- 给 scheduled_task 加 requires_ai 字段：true 时定时任务触发走 Claude Code CLI
+ALTER TABLE `scheduled_task`
+  ADD COLUMN `requires_ai` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否走 AI 处理：1=触发时调用 Claude Code CLI' AFTER `trigger_status`;
+
 -- ============================================
 -- 完成提示
 -- ============================================
 -- 非破坏性迁移完成！
--- 已添加/更新的功能：用户认证增强、人脸验证、OAuth、邮箱验证、搜索、系统设置、聊天导入、虚拟助手、派发执行、调度日志、邮件附件 AI 解析
+-- 已添加/更新的功能：用户认证增强、人脸验证、OAuth、邮箱验证、搜索、系统设置、聊天导入、虚拟助手、派发执行、调度日志、邮件附件 AI 解析、AI 定时任务
 -- ============================================

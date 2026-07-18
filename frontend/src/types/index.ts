@@ -148,6 +148,11 @@ export interface ScheduledTask {
   skillCode?: string
   enabled: boolean
   triggerStatus?: 0 | 1
+  /**
+   * 是否走 AI 处理：true 时定时任务触发会调 Claude Code CLI。
+   * 把 description + params 作为 prompt 喂进去，结果写 job_log.result。
+   */
+  requiresAi?: boolean
   lastExecuteTime?: string | number[] | null
   lastExecuteResult?: string
   nextExecuteTime?: string | number[] | null

@@ -47,6 +47,7 @@ public class ScheduledTaskService {
     private final SystemSettingsService systemSettingsService;
     private final ObjectMapper objectMapper;
     private final MemoryApplicationService memoryApplicationService;
+    private final com.example.demo.task.scheduler.ClaudeCodeRunner claudeCodeRunner;
 
     public ScheduledTaskService(
             ScheduledTaskMapper taskMapper,
@@ -62,7 +63,8 @@ public class ScheduledTaskService {
             EmailSenderService emailSenderService,
             SystemSettingsService systemSettingsService,
             ObjectMapper objectMapper,
-            MemoryApplicationService memoryApplicationService) {
+            MemoryApplicationService memoryApplicationService,
+            com.example.demo.task.scheduler.ClaudeCodeRunner claudeCodeRunner) {
         this.taskMapper = taskMapper;
         this.jobLogMapper = jobLogMapper;
         this.skillExecutor = skillExecutor;
@@ -71,6 +73,7 @@ public class ScheduledTaskService {
         this.systemSettingsService = systemSettingsService;
         this.objectMapper = objectMapper;
         this.memoryApplicationService = memoryApplicationService;
+        this.claudeCodeRunner = claudeCodeRunner;
     }
 
     /** 日志结果最大保留字符数，与前端展示宽度对齐。 */
@@ -231,12 +234,30 @@ public class ScheduledTaskService {
     }
 
     private String executeTaskHandler(ScheduledTask task) {
+        // 标记为 requiresAi=true 时跳过类型分发，直接走 Claude Code CLI 路径。
+        // 这允许任意 taskType 与 AI 处理组合（"REMINDER + AI" 可以让 LLM 先总结再发邮件）。
+        if (Boolean.TRUE.equals(task.getRequiresAi())) {
+            return executeAiTask(task);
+        }
         return switch (task.getTaskType()) {
             case "SKILL" -> executeSkillTask(task);
             case "CHAT" -> executeChatTask(task);
             case "REMINDER" -> executeReminderTask(task);
             default -> "不支持的任务类型: " + task.getTaskType();
         };
+    }
+
+    /**
+     * 走 Claude Code CLI 的 AI 处理路径。结果作为 Markdown 文本返回，落库到 job_log.result。
+     */
+    private String executeAiTask(ScheduledTask task) {
+        log.info("AI 任务调度: {} (taskType={}, skillCode={})",
+                task.getName(), task.getTaskType(), task.getSkillCode());
+        try {
+            return claudeCodeRunner.run(task);
+        } catch (Exception e) {
+            throw new RuntimeException("AI 任务执行失败: " + e.getMessage(), e);
+        }
     }
 
     private void updateTaskExecutionSummary(ScheduledTask task, String result, boolean success) {
