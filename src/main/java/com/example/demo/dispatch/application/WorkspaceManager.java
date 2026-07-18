@@ -126,23 +126,46 @@ public class WorkspaceManager {
         }
         try {
             Files.createDirectories(archive.getParent());
+            // 关键：先复制到 archive 目录，再让 git 移除 worktree。
+            // 之前先 worktree remove 再 Files.move 的顺序会在 worktree 移除成功后
+            // 让 live 目录消失，导致 Files.move 抛 NoSuchFileException。
+            copyRecursive(live, archive);
+            // 复制成功后再做 worktree 清理，失败仅警告不抛
             ProcessResult remove = runCommand(projectRoot(),
                     List.of("git", "worktree", "remove", "--force", live.toString()),
                     Duration.ofSeconds(15));
             if (remove.exitCode != 0) {
-                // git bookkeeping 失败不应阻塞归档：先尝试普通 move，失败再抛
                 log.warn("git worktree remove failed (exit {}): {}", remove.exitCode, remove.output);
-            }
-            try {
-                Files.move(live, archive, StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException amns) {
-                // 跨设备/某些 FS 不支持 ATOMIC_MOVE，降级为非原子；不删除原 live 让运维能回滚
-                Files.move(live, archive);
             }
             log.info("workspace archived: {} -> {}", live, archive);
             return archive;
         } catch (IOException e) {
             throw new WorkspaceUnavailableException("failed to archive workspace: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 递归把 src 整个目录树拷到 dst。如果 dst 已存在则覆盖其中文件但保留其他内容。
+     * 跨设备时 Files.move 走原子会失败，这个方法是替代方案。
+     */
+    private static void copyRecursive(Path src, Path dst) throws IOException {
+        try (var stream = Files.walk(src)) {
+            stream.forEach(srcPath -> {
+                try {
+                    Path relative = src.relativize(srcPath);
+                    Path target = dst.resolve(relative.toString());
+                    if (Files.isDirectory(srcPath)) {
+                        Files.createDirectories(target);
+                    } else {
+                        Files.createDirectories(target.getParent());
+                        Files.copy(srcPath, target, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } catch (IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            });
+        } catch (java.io.UncheckedIOException ue) {
+            throw ue.getCause();
         }
     }
 

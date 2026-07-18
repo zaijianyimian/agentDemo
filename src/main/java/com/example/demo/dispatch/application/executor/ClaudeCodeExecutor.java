@@ -97,7 +97,15 @@ public class ClaudeCodeExecutor implements Executor {
         if (raw == null) {
             return "";
         }
+        // Claude CLI 可能在前置输出"Warning: ..."之类的非 JSON 行，先扫描找到第一个 '{' 起始。
         String trimmed = raw.trim();
+        int brace = trimmed.indexOf('{');
+        if (brace < 0) {
+            return trimmed;
+        }
+        if (brace > 0) {
+            trimmed = trimmed.substring(brace);
+        }
         if (!trimmed.startsWith("{")) {
             return trimmed;
         }
