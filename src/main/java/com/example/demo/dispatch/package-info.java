@@ -11,7 +11,8 @@
                 "email::*",
                 "memory::application",
                 "model::application",
-                "shared::*"
+                "shared::*",
+                "system::*"
         }
 )
 package com.example.demo.dispatch;

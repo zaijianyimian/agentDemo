@@ -1,5 +1,6 @@
 package com.example.demo.dispatch.application.executor;
 
+import com.example.demo.dispatch.application.ExecutorToggleService;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,11 @@ import java.util.concurrent.TimeUnit;
 public class CodexExecutor implements Executor {
 
     private static final String CLI = "codex";
+    private final ExecutorToggleService executorToggleService;
+
+    public CodexExecutor(ExecutorToggleService executorToggleService) {
+        this.executorToggleService = executorToggleService;
+    }
 
     @Override
     public String hint() {
@@ -32,6 +38,10 @@ public class CodexExecutor implements Executor {
 
     @Override
     public boolean isAvailable() {
+        if (!executorToggleService.isExecutorEnabled("codex")) {
+            log.debug("codex executor disabled via settings");
+            return false;
+        }
         return isOnPath(CLI);
     }
 

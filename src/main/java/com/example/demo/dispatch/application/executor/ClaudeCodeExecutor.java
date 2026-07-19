@@ -1,5 +1,6 @@
 package com.example.demo.dispatch.application.executor;
 
+import com.example.demo.dispatch.application.ExecutorToggleService;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,11 @@ import java.util.concurrent.TimeUnit;
 public class ClaudeCodeExecutor implements Executor {
 
     private static final String CLI = "claude";
+    private final ExecutorToggleService executorToggleService;
+
+    public ClaudeCodeExecutor(ExecutorToggleService executorToggleService) {
+        this.executorToggleService = executorToggleService;
+    }
 
     @Override
     public String hint() {
@@ -32,6 +38,11 @@ public class ClaudeCodeExecutor implements Executor {
 
     @Override
     public boolean isAvailable() {
+        // 双重检查：用户在前端禁用 → 直接不可用，不依赖 CLI
+        if (!executorToggleService.isExecutorEnabled("claude-code")) {
+            log.debug("claude-code executor disabled via settings");
+            return false;
+        }
         return isOnPath(CLI);
     }
 

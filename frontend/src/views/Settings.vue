@@ -144,6 +144,75 @@
           </div>
         </div>
 
+        <!-- 执行器（Claude Code / Codex 等） -->
+        <div v-show="activeSection === 'executor'" class="section-wrapper">
+          <div class="section-header">
+            <h2 class="section-title">
+              <n-icon size="20"><TerminalIcon /></n-icon>
+              执行器
+            </h2>
+            <p class="section-desc">管理派发任务和 AI 定时任务可用的 CLI 执行器</p>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-card-header">
+              <div>
+                <h3 class="setting-card-title">Claude Code</h3>
+                <p class="setting-card-desc">调用本地 <code>claude</code> CLI 执行任务，支持工具调用、文件读写、文件编辑</p>
+              </div>
+              <n-switch
+                :value="executorSettings['claude-code'] ?? true"
+                :loading="executorLoading === 'claude-code'"
+                @update:value="(v: boolean) => toggleExecutor('claude-code', v)"
+              />
+            </div>
+            <div class="setting-card-body">
+              <div class="status-row">
+                <span class="status-label">PATH 检测：</span>
+                <n-tag :type="executorAvailability['claude-code'] ? 'success' : 'error'" size="small">
+                  {{ executorAvailability['claude-code'] ? '可用' : '未检测到' }}
+                </n-tag>
+                <span v-if="executorSettings['claude-code'] === false" class="status-hint">已手动禁用</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-card-header">
+              <div>
+                <h3 class="setting-card-title">Codex</h3>
+                <p class="setting-card-desc">调用本地 <code>codex</code> CLI，作为 Claude Code 的替代执行器</p>
+              </div>
+              <n-switch
+                :value="executorSettings['codex'] ?? true"
+                :loading="executorLoading === 'codex'"
+                @update:value="(v: boolean) => toggleExecutor('codex', v)"
+              />
+            </div>
+            <div class="setting-card-body">
+              <div class="status-row">
+                <span class="status-label">PATH 检测：</span>
+                <n-tag :type="executorAvailability['codex'] ? 'success' : 'error'" size="small">
+                  {{ executorAvailability['codex'] ? '可用' : '未检测到' }}
+                </n-tag>
+                <span v-if="executorSettings['codex'] === false" class="status-hint">已手动禁用</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-card-header">
+              <div>
+                <h3 class="setting-card-title">调度行为说明</h3>
+                <p class="setting-card-desc">
+                  被禁用的执行器对派发任务不可用，调度会自动降级到下一步（codex → claude-code → 决策层 LLM）；
+                  AI 定时任务会提示无可用执行器并发执行失败。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 模型参数 -->
         <div v-show="activeSection === 'model'" class="section-wrapper">
           <div class="section-header">
@@ -818,11 +887,13 @@ import {
   CloudUploadOutline as CloudUploadIcon,
   DownloadOutline as DownloadIcon,
   PulseOutline as PulseIcon,
-  CloseOutline as CloseIcon
+  CloseOutline as CloseIcon,
+  TerminalOutline as TerminalIcon
 } from '@vicons/ionicons5'
 import { embeddingService } from '@/services/api/embedding'
 import { searchService } from '@/services/api/search'
 import { settingsService } from '@/services/api/settings'
+import { dispatchedService } from '@/services/api/dispatch'
 import { backupService } from '@/services/api/backup'
 import type { BackupFileInfo } from '@/types'
 import { useThemeStore } from '@/stores/theme'
@@ -836,6 +907,46 @@ const testing = ref(false)
 const exportingData = ref(false)
 const importingData = ref(false)
 const creatingBackup = ref(false)
+
+// 执行器（Claude Code / Codex）启用状态
+const executorSettings = ref<Record<string, boolean>>({ 'claude-code': true, codex: true })
+const executorAvailability = ref<Record<string, boolean>>({ 'claude-code': false, codex: false })
+const executorLoading = ref<string | null>(null)
+
+/**
+ * 加载执行器配置 + PATH 检测结果。挂在页面 mount 时调用一次。
+ */
+const loadExecutorConfig = async () => {
+  const [settings, av] = await Promise.all([
+    dispatchedService.executorSettings(),
+    dispatchedService.executorAvailability()
+  ])
+  if (settings.success) executorSettings.value = { ...executorSettings.value, ...settings.data }
+  if (av.success) executorAvailability.value = { ...executorAvailability.value, ...av.data }
+}
+
+/**
+ * 切换单个执行器的启停状态（带乐观更新 + 失败回滚）
+ */
+const toggleExecutor = async (hint: string, enabled: boolean) => {
+  const prev = executorSettings.value[hint]
+  executorSettings.value = { ...executorSettings.value, [hint]: enabled }
+  executorLoading.value = hint
+  try {
+    const res = await dispatchedService.updateExecutorSettings({ [hint]: enabled })
+    if (!res.success) {
+      throw new Error(res.message || '更新失败')
+    }
+    // 同时刷新 PATH 检测结果（关闭后 executor.isAvailable() 会返回 false，但 PATH 还在）
+    const av = await dispatchedService.executorAvailability()
+    if (av.success) executorAvailability.value = { ...executorAvailability.value, ...av.data }
+  } catch (e: any) {
+    executorSettings.value = { ...executorSettings.value, [hint]: prev }
+    message.error(`切换执行器失败: ${e?.message || e}`)
+  } finally {
+    executorLoading.value = null
+  }
+}
 const loadingBackupList = ref(false)
 const cleaningBackups = ref(false)
 const importReplaceExisting = ref(true)
@@ -847,7 +958,8 @@ const backupList = ref<BackupFileInfo[]>([])
 // 导航项
 const navItems = [
   { key: 'system', label: '系统设置', icon: GlobeIcon },
-  { key: 'model', label: '模型参数', icon: CubeIcon, badge: 'New' },
+  { key: 'executor', label: '执行器', icon: TerminalIcon, badge: 'New' },
+  { key: 'model', label: '模型参数', icon: CubeIcon },
   { key: 'qdrant', label: '向量数据库', icon: ServerIcon },
   { key: 'search', label: '网络搜索', icon: SearchIcon },
   { key: 'schedule', label: '日程管理', icon: CalendarIcon },
@@ -1159,6 +1271,7 @@ const importDataArchive = async () => {
 onMounted(() => {
   loadAllSettings()
   loadBackupList()
+  loadExecutorConfig()
 })
 
 /** 在服务端创建一份数据快照备份。 */

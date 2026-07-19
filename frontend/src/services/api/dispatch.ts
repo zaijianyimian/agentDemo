@@ -55,6 +55,24 @@ export const dispatchedService = {
   executorAvailability: async (): Promise<ApiResponse<Record<string, boolean>>> => {
     const response = await api.get('/dispatched/executors/availability')
     return response.data
+  },
+
+  /**
+   * 拉取 Settings 页面配置的 executor 启停状态（如 {claude-code: true, codex: false}）。
+   */
+  executorSettings: async (): Promise<ApiResponse<Record<string, boolean>>> => {
+    const response = await api.get('/dispatched/executors/settings')
+    return response.data
+  },
+
+  /**
+   * 一次性保存所有 executor 启停状态。
+   */
+  updateExecutorSettings: async (
+    states: Record<string, boolean>
+  ): Promise<ApiResponse<Record<string, boolean>>> => {
+    const response = await api.put('/dispatched/executors/settings', states)
+    return response.data
   }
 }
 
