@@ -56,11 +56,13 @@ public class SecurityConfig {
                                 "/api/auth/oauth/github/exchange",
                                 "/api/auth/password/reset/send-code",
                                 "/api/auth/password/reset",
-                                // Actuator 端点（监控/健康检查用）
+                                // Actuator 端点（监控/健康检查用）。
+                                // 注意：/actuator/prometheus 不放开——含连接池/JVM/自定义 metrics，
+                                // 生产部署应通过反向代理限定 /actuator/prometheus 仅内网访问，
+                                // 或保留应用层认证（用 Prometheus pull + 服务端鉴权）。
                                 "/actuator/health",
                                 "/actuator/health/**",
-                                "/actuator/info",
-                                "/actuator/prometheus"
+                                "/actuator/info"
                         ).permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()

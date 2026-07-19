@@ -186,7 +186,8 @@ management:
       base-path: /actuator
   endpoint:
     health:
-      show-details: always
+      # when_authorized: 详情（含 DB schema/异常）只对认证用户可见；本地调试可改 always
+      show-details: when_authorized
       probes:
         enabled: true
       group:

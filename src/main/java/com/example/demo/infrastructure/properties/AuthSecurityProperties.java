@@ -2,8 +2,10 @@ package com.example.demo.infrastructure.properties;
 
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
@@ -15,8 +17,11 @@ import java.util.Set;
 @Data
 @Slf4j
 @Component
+@RequiredArgsConstructor
 @ConfigurationProperties(prefix = "app.security")
 public class AuthSecurityProperties {
+
+    private final Environment env;
 
     /**
      * 启动时拒绝通过的占位符密钥集合（避免生产误用默认密钥签发可伪造的 JWT）。
@@ -74,10 +79,17 @@ public class AuthSecurityProperties {
 
     /**
      * 启动时 fail-fast 校验：拒绝明显占位密钥、长度不足的密钥。
-     * 仅在 {@code spring.profiles.active != test} 时严格生效（避免单测占用启动路径）。
+     * 单测（{@code spring.profiles.active=test}）跳过，避免测试环境被严格校验拦死。
      */
     @PostConstruct
     void validateOnStartup() {
+        // 测试环境不校验（application-test.yaml 通常用短密钥或随机串）
+        boolean isTestProfile = env != null
+                && env.matchesProfiles("test");
+        if (isTestProfile) {
+            log.debug("检测到 test profile，跳过 SECRET fail-fast 校验");
+            return;
+        }
         String jwt = resolve(jwtSecret);
         if (PLACEHOLDER_SECRETS.contains(jwt)) {
             throw new IllegalStateException(
