@@ -174,3 +174,37 @@ app:
       redirect-uri: http://localhost:3000/oauth/github/callback
       scope: "read:user user:email"
       state-ttl-seconds: 600
+
+# ============================================
+# 6. 运维可观测性：Actuator + Prometheus
+# ============================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+  health:
+    db:
+      enabled: true
+  info:
+    env:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true

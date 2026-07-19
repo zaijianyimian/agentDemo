@@ -579,8 +579,12 @@ CREATE TABLE IF NOT EXISTS `job_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务执行日志';
 
 -- 给 scheduled_task 加触发状态字段，参考 xxl-job 的 trigger_status（0=静止, 1=运行中）
-ALTER TABLE `scheduled_task`
-  ADD COLUMN `trigger_status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '触发状态: 0=静止, 1=运行中' AFTER `enabled`;
+SET @col := (SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema=DATABASE() AND table_name='scheduled_task' AND column_name='trigger_status');
+SET @sql := IF(@col=0,
+  'ALTER TABLE `scheduled_task` ADD COLUMN `trigger_status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''触发状态: 0=静止, 1=运行中'' AFTER `enabled`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ============================================
 -- 邮件附件 AI 解析（v4.1）
@@ -646,8 +650,40 @@ CREATE TABLE IF NOT EXISTS `email_attachment_analysis` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮件附件 AI 解析结果';
 
 -- 给 scheduled_task 加 requires_ai 字段：true 时定时任务触发走 Claude Code CLI
-ALTER TABLE `scheduled_task`
-  ADD COLUMN `requires_ai` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否走 AI 处理：1=触发时调用 Claude Code CLI' AFTER `trigger_status`;
+SET @col := (SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema=DATABASE() AND table_name='scheduled_task' AND column_name='requires_ai');
+SET @sql := IF(@col=0,
+  'ALTER TABLE `scheduled_task` ADD COLUMN `requires_ai` TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''是否走 AI 处理：1=触发时调用 Claude Code CLI'' AFTER `trigger_status`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ============================================
+-- 高频查询复合索引（性能优化）
+-- ============================================
+
+-- JobTriggerThread 每秒扫 enabled=1 且 next_execute_time<=now 的任务，复合索引避免全表扫
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+             WHERE table_schema=DATABASE() AND table_name='scheduled_task' AND index_name='idx_enabled_next');
+SET @sql := IF(@idx=0, 'CREATE INDEX idx_enabled_next ON scheduled_task (enabled, next_execute_time)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- schedule_event 按日期范围查未完成事件
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+             WHERE table_schema=DATABASE() AND table_name='schedule_event' AND index_name='idx_date_status');
+SET @sql := IF(@idx=0, 'CREATE INDEX idx_date_status ON schedule_event (event_date, status)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- schedule_event 按提醒状态过滤未发送
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+             WHERE table_schema=DATABASE() AND table_name='schedule_event' AND index_name='idx_reminder_enabled_time');
+SET @sql := IF(@idx=0, 'CREATE INDEX idx_reminder_enabled_time ON schedule_event (reminder_enabled, event_time)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- chat_message 翻页查询反向索引，覆盖 (session_id, id) 避免回表
+SET @idx := (SELECT COUNT(*) FROM information_schema.statistics
+             WHERE table_schema=DATABASE() AND table_name='chat_message' AND index_name='idx_session_id');
+SET @sql := IF(@idx=0, 'CREATE INDEX idx_session_id ON chat_message (session_id, id)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ============================================
 -- 完成提示

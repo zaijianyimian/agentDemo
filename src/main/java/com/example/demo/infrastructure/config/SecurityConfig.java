@@ -55,7 +55,12 @@ public class SecurityConfig {
                                 "/api/auth/oauth/github/authorize",
                                 "/api/auth/oauth/github/exchange",
                                 "/api/auth/password/reset/send-code",
-                                "/api/auth/password/reset"
+                                "/api/auth/password/reset",
+                                // Actuator 端点（监控/健康检查用）
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info",
+                                "/actuator/prometheus"
                         ).permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()

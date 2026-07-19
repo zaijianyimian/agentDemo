@@ -209,7 +209,10 @@ CREATE TABLE IF NOT EXISTS `schedule_event` (
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX `idx_event_date` (`event_date`),
     INDEX `idx_reminder_status` (`reminder_status`),
-    INDEX `idx_summary_status` (`summary_status`)
+    INDEX `idx_summary_status` (`summary_status`),
+    -- 按日期范围查未完成事件 + 按状态过滤提醒的复合索引
+    INDEX `idx_date_status` (`event_date`, `status`),
+    INDEX `idx_reminder_enabled_time` (`reminder_enabled`, `event_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日程事件表';
 
 -- ============================================
@@ -234,7 +237,9 @@ CREATE TABLE IF NOT EXISTS `scheduled_task` (
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX `idx_enabled` (`enabled`),
-    INDEX `idx_task_type` (`task_type`)
+    INDEX `idx_task_type` (`task_type`),
+    -- JobTriggerThread 每秒扫 enabled=1 且 next_execute_time<=now 的任务，复合索引避免全表扫
+    INDEX `idx_enabled_next` (`enabled`, `next_execute_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定时任务表';
 
 -- ============================================
@@ -260,6 +265,8 @@ CREATE TABLE IF NOT EXISTS `chat_message` (
     `token_count` INT COMMENT 'token数量',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX `idx_session_time` (`session_id`, `create_time`),
+    -- 翻页查询按 session_id + id DESC 的反向索引，覆盖 (session_id, id) 避免回表
+    INDEX `idx_session_id` (`session_id`, `id`),
     FOREIGN KEY (`session_id`) REFERENCES `chat_session`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天消息表';
 
