@@ -1,0 +1,8 @@
+# Generated runtime data and logs - not for source control.
+data/
+generated/
+logs/
+mysql/
+qdrant/
+nginx-logs/
+nginx-cache/

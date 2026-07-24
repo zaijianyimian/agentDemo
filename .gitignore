@@ -27,6 +27,15 @@ frontend/dist
 frontend/node_modules
 frontend/.vite
 
+### Docker 运行时数据 ###
+runtime/data
+runtime/generated
+runtime/logs
+runtime/mysql
+runtime/qdrant
+runtime/nginx-logs
+runtime/nginx-cache
+
 ### 旧版文档（已合并到主文档）###
 API1.md
 README1.md
