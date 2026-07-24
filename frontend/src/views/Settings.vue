@@ -203,9 +203,32 @@
           <div class="setting-card">
             <div class="setting-card-header">
               <div>
+                <h3 class="setting-card-title">OpenClaw</h3>
+                <p class="setting-card-desc">通过 OpenClaw Gateway HTTP API 调用预配置 Agent</p>
+              </div>
+              <n-switch
+                :value="executorSettings['openclaw'] ?? true"
+                :loading="executorLoading === 'openclaw'"
+                @update:value="(v: boolean) => toggleExecutor('openclaw', v)"
+              />
+            </div>
+            <div class="setting-card-body">
+              <div class="status-row">
+                <span class="status-label">Gateway 检测：</span>
+                <n-tag :type="executorAvailability['openclaw'] ? 'success' : 'error'" size="small">
+                  {{ executorAvailability['openclaw'] ? '可用' : '未检测到' }}
+                </n-tag>
+                <span v-if="executorSettings['openclaw'] === false" class="status-hint">已手动禁用</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-card-header">
+              <div>
                 <h3 class="setting-card-title">调度行为说明</h3>
                 <p class="setting-card-desc">
-                  被禁用的执行器对派发任务不可用，调度会自动降级到下一步（codex → claude-code → 决策层 LLM）；
+                  被禁用的执行器对派发任务不可用，调度会自动降级到其他可用执行器或决策层 LLM；
                   AI 定时任务会提示无可用执行器并发执行失败。
                 </p>
               </div>
@@ -908,13 +931,13 @@ const exportingData = ref(false)
 const importingData = ref(false)
 const creatingBackup = ref(false)
 
-// 执行器（Claude Code / Codex）启用状态
-const executorSettings = ref<Record<string, boolean>>({ 'claude-code': true, codex: true })
-const executorAvailability = ref<Record<string, boolean>>({ 'claude-code': false, codex: false })
+// 执行器启用状态
+const executorSettings = ref<Record<string, boolean>>({ 'claude-code': true, codex: true, openclaw: true })
+const executorAvailability = ref<Record<string, boolean>>({ 'claude-code': false, codex: false, openclaw: false })
 const executorLoading = ref<string | null>(null)
 
 /**
- * 加载执行器配置 + PATH 检测结果。挂在页面 mount 时调用一次。
+ * 加载执行器配置 + 可用性检测结果。挂在页面 mount 时调用一次。
  */
 const loadExecutorConfig = async () => {
   const [settings, av] = await Promise.all([
@@ -937,7 +960,7 @@ const toggleExecutor = async (hint: string, enabled: boolean) => {
     if (!res.success) {
       throw new Error(res.message || '更新失败')
     }
-    // 同时刷新 PATH 检测结果（关闭后 executor.isAvailable() 会返回 false，但 PATH 还在）
+    // 同时刷新执行器可用性（关闭后 executor.isAvailable() 会返回 false）
     const av = await dispatchedService.executorAvailability()
     if (av.success) executorAvailability.value = { ...executorAvailability.value, ...av.data }
   } catch (e: any) {

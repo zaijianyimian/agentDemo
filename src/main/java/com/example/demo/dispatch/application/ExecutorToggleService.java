@@ -14,7 +14,7 @@ import java.util.Map;
  * 外部执行器（claude-code / codex 等）的启用开关管理。
  *
  * <p>配置存储在 {@code system_settings} 表（category="dispatch", config_key="executor.<hint>.enabled"）。
- * 默认值：claude-code=true, codex=true。运行时 {@code Executor.isAvailable()} 调用
+ * 默认值：claude-code=true, codex=true, openclaw=true。运行时 {@code Executor.isAvailable()} 调用
  * {@link #isExecutorEnabled(String)}，被禁用时调度器走 fallback（decision-layer-self LLM）。</p>
  */
 @Slf4j
@@ -31,7 +31,8 @@ public class ExecutorToggleService {
     /** 默认全启用。增删这里同时改 {@link #defaults()} 与前端的 executors 配置清单。 */
     private static final List<String> DEFAULT_HINTS = List.of(
             "claude-code",
-            "codex"
+            "codex",
+            "openclaw"
     );
 
     private final SystemSettingsService systemSettingsService;

@@ -61,6 +61,17 @@ public class DispatchProperties {
     /** 批量推送 cron（运行时使用；push_config.batch_cron 在前端可改） */
     private String batchCron = "0 0 9 * * ?";
 
+    /** OpenClaw Gateway HTTP 配置 */
+    private OpenClaw openclaw = new OpenClaw();
+
+    @Data
+    public static class OpenClaw {
+        private String baseUrl = "http://127.0.0.1:18789";
+        private String token = "";
+        private String model = "openclaw";
+        private int healthTimeoutSeconds = 3;
+    }
+
     /**
      * 将 {@link #defaultToolAllowlist} 字符串按逗号拆分成工具列表。
      */

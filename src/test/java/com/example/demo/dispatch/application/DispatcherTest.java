@@ -83,25 +83,47 @@ class DispatcherTest {
     }
 
     @Test
-    void swapAfterPrimaryExhaustion() {
+    void openClawSucceedsAsFallback() {
         Executor primary = mock(Executor.class);
         Executor fb = mock(Executor.class);
         when(primary.hint()).thenReturn("claude-code");
-        when(fb.hint()).thenReturn("codex");
+        when(fb.hint()).thenReturn("openclaw");
         when(primary.execute(any(), anyString(), any(), anyInt()))
                 .thenThrow(new Executor.ExecutorFailedException("primary failed"));
         when(fb.execute(any(), anyString(), any(), anyInt())).thenReturn("fallback ok");
         when(router.pick("claude-code")).thenReturn(primary);
-        when(router.pick("codex")).thenReturn(fb);
+        when(router.pick("openclaw")).thenReturn(fb);
 
         DispatchedTask t = baseTask();
+        t.setFallbackExecutor("openclaw");
+        dispatcher = new Dispatcher(props, taskService, workspaceManager, recallService,
+                promptTemplate, router, fallback);
+
+        dispatcher.run(t);
+        verify(taskService).switchExecutor(eq(1L), eq("openclaw"));
+        verify(taskService).markDone(eq(1L), eq("openclaw"), eq("fallback ok"), anyString());
+        verify(fallback, never()).answer(anyString());
+    }
+
+    @Test
+    void unavailableOpenClawPrimaryFallsBackToCodex() {
+        Executor openClaw = mock(Executor.class);
+        Executor codex = mock(Executor.class);
+        when(openClaw.execute(any(), anyString(), any(), anyInt()))
+                .thenThrow(new Executor.ExecutorUnavailableException("openclaw unavailable"));
+        when(codex.execute(any(), anyString(), any(), anyInt())).thenReturn("codex ok");
+        when(router.pick("openclaw")).thenReturn(openClaw);
+        when(router.pick("codex")).thenReturn(codex);
+
+        DispatchedTask t = baseTask();
+        t.setExecutorHint("openclaw");
+        t.setFallbackExecutor("codex");
         dispatcher = new Dispatcher(props, taskService, workspaceManager, recallService,
                 promptTemplate, router, fallback);
 
         dispatcher.run(t);
         verify(taskService).switchExecutor(eq(1L), eq("codex"));
-        verify(taskService).markDone(eq(1L), eq("codex"), eq("fallback ok"), anyString());
-        verify(fallback, never()).answer(anyString());
+        verify(taskService).markDone(eq(1L), eq("codex"), eq("codex ok"), anyString());
     }
 
     @Test

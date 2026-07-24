@@ -39,6 +39,8 @@ public class DispatchedTask {
     public static final String EXECUTOR_CLAUDE_CODE = "claude-code";
     /** 执行器：Codex */
     public static final String EXECUTOR_CODEX = "codex";
+    /** 执行器：OpenClaw */
+    public static final String EXECUTOR_OPENCLAW = "openclaw";
     /** 执行器：决策层自答 */
     public static final String EXECUTOR_DECISION_LAYER_SELF = "decision-layer-self";
 
