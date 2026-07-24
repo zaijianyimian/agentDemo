@@ -8,8 +8,8 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/agent?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowPublicKeyRetrieval=true&useSSL=false
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: your_db_user
-    password: your_db_password
+    username: ${MYSQL_USERNAME:your_db_user}
+    password: ${MYSQL_PASSWORD:your_db_password}
     druid:
       max-active: 10
       initial-size: 1
@@ -24,16 +24,23 @@ spring:
 langchain4j:
   open-ai:
     chat-model:
-      api-key: your_llm_api_key
-      base-url: https://your-llm-compatible-endpoint.example.com/v1
-      model-name: your_model_name
+      api-key: ${OPENAI_API_KEY:your_llm_api_key}
+      base-url: ${OPENAI_BASE_URL:https://your-llm-compatible-endpoint.example.com/v1}
+      model-name: ${OPENAI_MODEL_NAME:your_model_name}
+    embedding-model:
+      enabled: ${OPENAI_EMBEDDING_ENABLED:false}
+      base-url: ${OPENAI_EMBEDDING_BASE_URL:https://api.openai.com/v1}
+      api-key: ${OPENAI_EMBEDDING_API_KEY:your_openai_compatible_embedding_api_key}
+      model-name: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+      dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:0}
+      timeout-seconds: ${OPENAI_EMBEDDING_TIMEOUT_SECONDS:30}
   ollama:
     embedding-model:
-      base-url: http://localhost:11434
-      model-name: nomic-embed-text:latest
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      model-name: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text:latest}
 
 server:
-  port: 8000
+  port: ${SERVER_PORT:8000}
   servlet:
     encoding:
       charset: UTF-8
@@ -44,140 +51,131 @@ server:
 
 app:
   memory:
-    collection-name: agent_memory
+    collection-name: ${MEMORY_COLLECTION_NAME:agent_memory}
     vector-size: 768
     top-k: 5
-    min-score: 0.6
+    min-score: 0.5
   qdrant:
-    host: localhost
+    host: ${QDRANT_HOST:localhost}
     # LangChain4j/Qdrant Java 客户端使用的 gRPC/SDK 端口，REST 管理接口默认使用 6333
-    port: 6334
-    rest-port: 6333
-    api-key: ""
-    use-tls: false
+    port: ${QDRANT_GRPC_PORT:6334}
+    rest-port: ${QDRANT_REST_PORT:6333}
+    api-key: ${QDRANT_API_KEY:}
+    use-tls: ${QDRANT_USE_TLS:false}
     # true 时环境变量优先于数据库 system_settings，适合 Docker/云端部署
-    prefer-env: false
+    prefer-env: ${QDRANT_PREFER_ENV:false}
   mcp:
     auto-sync:
-      enabled: false
-      url: ""
-      token: ""
-      cron: "0 */5 * * * ?"
-      connect-timeout-seconds: 5
-      read-timeout-seconds: 15
-      sync-enabled-state: true
-      disable-missing: true
-      missing-threshold: 2
+      enabled: ${MCP_AUTO_SYNC_ENABLED:false}
+      url: ${MCP_AUTO_SYNC_URL:}
+      token: ${MCP_AUTO_SYNC_TOKEN:}
+      cron: ${MCP_AUTO_SYNC_CRON:"0 */5 * * * ?"}
+      connect-timeout-seconds: ${MCP_AUTO_SYNC_CONNECT_TIMEOUT_SECONDS:5}
+      read-timeout-seconds: ${MCP_AUTO_SYNC_READ_TIMEOUT_SECONDS:15}
+      sync-enabled-state: ${MCP_AUTO_SYNC_SYNC_ENABLED_STATE:true}
+      disable-missing: ${MCP_AUTO_SYNC_DISABLE_MISSING:true}
+      missing-threshold: ${MCP_AUTO_SYNC_MISSING_THRESHOLD:2}
   search:
-    enabled: false
-    engine: serper
-    api-key: your_search_api_key
-    max-results: 3
+    enabled: ${SEARCH_ENABLED:false}
+    engine: ${SEARCH_ENGINE:serper}
+    api-key: ${SEARCH_API_KEY:your_search_api_key}
+    max-results: ${SEARCH_MAX_RESULTS:3}
   mail:
-    smtp-host: smtp.example.com
-    smtp-port: 465
-    smtp-username: your_mail@example.com
-    smtp-password: your_smtp_password_or_app_password
-    smtp-ssl-enabled: true
-    from-name: AI Agent
+    smtp-host: ${SMTP_HOST:smtp.example.com}
+    smtp-port: ${SMTP_PORT:465}
+    smtp-username: ${SMTP_USERNAME:your_mail@example.com}
+    smtp-password: ${SMTP_PASSWORD:your_smtp_password_or_app_password}
+    smtp-ssl-enabled: ${SMTP_SSL_ENABLED:true}
+    from-name: ${SMTP_FROM_NAME:AI Agent}
   schedule:
-    enabled: true
-    storage-path: ./data/schedules
-    user-email: your_mail@example.com
-    daily-summary-cron: "0 0 20 * * ?"
-    morning-reminder-cron: "0 0 8 * * ?"
-    file-sort-cron: "0 0 19 * * ?"
+    enabled: ${SCHEDULE_ENABLED:true}
+    storage-path: ${SCHEDULE_STORAGE_PATH:./data/schedules}
+    user-email: ${SCHEDULE_USER_EMAIL:your_mail@example.com}
+    daily-summary-cron: ${SCHEDULE_DAILY_SUMMARY_CRON:"0 0 20 * * ?"}
+    morning-reminder-cron: ${SCHEDULE_MORNING_REMINDER_CRON:"0 0 8 * * ?"}
+    file-sort-cron: ${SCHEDULE_FILE_SORT_CRON:"0 0 19 * * ?"}
   task:
     scheduler:
-      enabled: true
-      scan-interval-seconds: 1
-      batch-size: 50
+      enabled: ${TASK_SCHEDULER_ENABLED:true}
+      scan-interval-seconds: ${TASK_SCHEDULER_SCAN_INTERVAL_SECONDS:1}
+      batch-size: ${TASK_SCHEDULER_BATCH_SIZE:50}
     executor:
-      pool-size: 5
-      queue-capacity: 200
-      await-seconds: 60
+      pool-size: ${TASK_EXECUTOR_POOL_SIZE:5}
+      queue-capacity: ${TASK_EXECUTOR_QUEUE_CAPACITY:200}
+      await-seconds: ${TASK_EXECUTOR_AWAIT_SECONDS:60}
   markdown-skills:
-    # 总开关；false 时整个 markdown-skills 模块不装配
-    enabled: true
-    # skill 文件根目录，支持相对路径（相对 JVM 工作目录）
-    dir: ./skills
-    # 自动注入阈值（Jaccard 相似度），0~1，越大越严格
-    match-threshold: 0.15
-    # tag 完全命中时的额外加权
-    tag-match-bonus: 0.2
-    # 是否在 QwenChatService 调用前自动注入 skill 正文
-    auto-inject: true
-    # 注入时 body 最大字符数
-    inject-body-limit: 4000
+    enabled: ${MARKDOWN_SKILLS_ENABLED:true}
+    dir: ${MARKDOWN_SKILLS_DIR:./skills}
+    match-threshold: ${MARKDOWN_SKILLS_MATCH_THRESHOLD:0.15}
+    tag-match-bonus: ${MARKDOWN_SKILLS_TAG_MATCH_BONUS:0.2}
+    auto-inject: ${MARKDOWN_SKILLS_AUTO_INJECT:true}
+    inject-body-limit: ${MARKDOWN_SKILLS_INJECT_BODY_LIMIT:4000}
   file:
-    upload-dir: ./data/documents
-    allowed-types: txt,md
+    upload-dir: ${FILE_UPLOAD_DIR:./data/documents}
+    allowed-types: ${FILE_ALLOWED_TYPES:txt,md}
   autonomy:
-    enabled: true
-    workspace-root: .
-    output-dir: ./generated/autonomy
-    allow-backend-verify: true
-    allow-frontend-verify: true
-    allow-source-write: false
-    allow-remote-update: false
-    command-timeout-seconds: 180
+    enabled: ${AUTONOMY_ENABLED:true}
+    workspace-root: ${AUTONOMY_WORKSPACE_ROOT:.}
+    output-dir: ${AUTONOMY_OUTPUT_DIR:./generated/autonomy}
+    allow-backend-verify: ${AUTONOMY_ALLOW_BACKEND_VERIFY:true}
+    allow-frontend-verify: ${AUTONOMY_ALLOW_FRONTEND_VERIFY:true}
+    allow-source-write: ${AUTONOMY_ALLOW_SOURCE_WRITE:false}
+    allow-remote-update: ${AUTONOMY_ALLOW_REMOTE_UPDATE:false}
+    command-timeout-seconds: ${AUTONOMY_COMMAND_TIMEOUT_SECONDS:180}
   dispatch:
-    enabled: false
-    workspace-root: ./data/workspaces
-    dispatched-root: ./data/dispatched
-    poll-interval-ms: 5000
-    poll-grace-seconds: 0
-    executor-timeout-seconds: 600
-    recall-timeout-seconds: 2
-    default-executor-hint: claude-code
-    default-sandbox-level: workspace-write
-    default-tool-allowlist: "Read,Edit,Write,Glob,Grep,Bash"
-    decision-layer-fallback-timeout-seconds: 120
-    push-retry-max: 3
+    enabled: ${DISPATCH_ENABLED:true}
+    workspace-root: ${DISPATCH_WORKSPACE_ROOT:./data/workspaces}
+    dispatched-root: ${DISPATCH_RESULT_ROOT:./data/dispatched}
+    poll-interval-ms: ${DISPATCH_POLL_INTERVAL_MS:5000}
+    poll-grace-seconds: ${DISPATCH_POLL_GRACE_SECONDS:0}
+    executor-timeout-seconds: ${DISPATCH_EXECUTOR_TIMEOUT_SECONDS:600}
+    recall-timeout-seconds: ${DISPATCH_RECALL_TIMEOUT_SECONDS:2}
+    default-executor-hint: ${DISPATCH_DEFAULT_EXECUTOR_HINT:claude-code}
+    default-sandbox-level: ${DISPATCH_DEFAULT_SANDBOX_LEVEL:workspace-write}
+    default-tool-allowlist: ${DISPATCH_DEFAULT_TOOL_ALLOWLIST:Read,Edit,Write,Glob,Grep,Bash}
+    decision-layer-fallback-timeout-seconds: ${DISPATCH_DECISION_LAYER_TIMEOUT_SECONDS:120}
+    openclaw:
+      base-url: ${OPENCLAW_GATEWAY_BASE_URL:http://127.0.0.1:18789}
+      token: ${OPENCLAW_GATEWAY_TOKEN:your_openclaw_gateway_token}
+      model: ${OPENCLAW_GATEWAY_MODEL:openclaw}
+      health-timeout-seconds: ${OPENCLAW_GATEWAY_HEALTH_TIMEOUT_SECONDS:3}
+    push-retry-max: ${DISPATCH_PUSH_RETRY_MAX:3}
   skills:
-    config-path: skills.yaml
-    auto-load: true
-    findskills-enabled: false
-    findskills-url: ""
-    findskills-token: ""
-    findskills-timeout-seconds: 10
-    findskills-cron: "0 */10 * * * ?"
-    findskills-presync-mcp: true
-    findskills-merge-existing: true
+    config-path: ${SKILLS_CONFIG_PATH:skills.yaml}
+    auto-load: ${SKILLS_AUTO_LOAD:true}
+    findskills-enabled: ${FINDSKILLS_ENABLED:false}
+    findskills-url: ${FINDSKILLS_URL:}
+    findskills-token: ${FINDSKILLS_TOKEN:}
+    findskills-timeout-seconds: ${FINDSKILLS_TIMEOUT_SECONDS:10}
+    findskills-cron: ${FINDSKILLS_CRON:"0 */10 * * * ?"}
+    findskills-presync-mcp: ${FINDSKILLS_PRESYNC_MCP:true}
+    findskills-merge-existing: ${FINDSKILLS_MERGE_EXISTING:true}
   backup:
-    # 服务端数据快照备份目录（相对项目根或绝对路径）
-    directory: ./data/backups
-    # 单次清理时按 mtime 倒序保留的最大份数
-    keep-most-recent: 10
-    # 备份保留天数，超过则会被清理
-    retention-days: 30
-    # 备份目录的总大小上限（MB），0 表示不限制
-    max-total-size-mb: 0
-    # 备份文件名前缀
-    file-name-prefix: agent-data-backup
+    directory: ${BACKUP_DIRECTORY:./data/backups}
+    keep-most-recent: ${BACKUP_KEEP_MOST_RECENT:10}
+    retention-days: ${BACKUP_RETENTION_DAYS:30}
+    max-total-size-mb: ${BACKUP_MAX_TOTAL_SIZE_MB:0}
+    file-name-prefix: ${BACKUP_FILE_NAME_PREFIX:agent-data-backup}
   security:
-    issuer: agent-demo
+    issuer: ${SECURITY_ISSUER:agent-demo}
     jwt-secret: ${JWT_SECRET:replace_with_a_32_plus_byte_secret}
-    data-secret: ${DATA_SECRET:${JWT_SECRET:replace_with_a_32_plus_byte_secret}}
-    access-token-minutes: 120
-    refresh-token-days: 7
-    email-code-ttl-seconds: 600
-    email-code-cooldown-seconds: 120
+    data-secret: ${DATA_SECRET:replace_with_a_32_plus_byte_secret}
+    access-token-minutes: ${SECURITY_ACCESS_TOKEN_MINUTES:120}
+    refresh-token-days: ${SECURITY_REFRESH_TOKEN_DAYS:7}
+    email-code-ttl-seconds: ${SECURITY_EMAIL_CODE_TTL_SECONDS:600}
+    email-code-cooldown-seconds: ${SECURITY_EMAIL_CODE_COOLDOWN_SECONDS:120}
     github:
-      enabled: false
-      client-id: your_github_client_id
-      client-secret: your_github_client_secret
-      authorize-uri: https://github.com/login/oauth/authorize
-      token-uri: https://github.com/login/oauth/access_token
-      user-uri: https://api.github.com/user
-      emails-uri: https://api.github.com/user/emails
-      redirect-uri: http://localhost:3000/oauth/github/callback
-      scope: "read:user user:email"
-      state-ttl-seconds: 600
+      enabled: ${GITHUB_OAUTH_ENABLED:false}
+      client-id: ${GITHUB_CLIENT_ID:your_github_client_id}
+      client-secret: ${GITHUB_CLIENT_SECRET:your_github_client_secret}
+      authorize-uri: ${GITHUB_AUTHORIZE_URI:https://github.com/login/oauth/authorize}
+      token-uri: ${GITHUB_TOKEN_URI:https://github.com/login/oauth/access_token}
+      user-uri: ${GITHUB_USER_URI:https://api.github.com/user}
+      emails-uri: ${GITHUB_EMAILS_URI:https://api.github.com/user/emails}
+      redirect-uri: ${GITHUB_REDIRECT_URI:http://localhost:3000/oauth/github/callback}
+      scope: ${GITHUB_SCOPE:"read:user user:email"}
+      state-ttl-seconds: ${GITHUB_STATE_TTL_SECONDS:600}
 
-# ============================================
-# 6. 运维可观测性：Actuator + Prometheus
-# ============================================
 management:
   endpoints:
     web:
@@ -186,7 +184,6 @@ management:
       base-path: /actuator
   endpoint:
     health:
-      # when_authorized: 详情（含 DB schema/异常）只对认证用户可见；本地调试可改 always
       show-details: when_authorized
       probes:
         enabled: true
@@ -198,14 +195,3 @@ management:
   health:
     db:
       enabled: true
-  info:
-    env:
-      enabled: true
-  metrics:
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
-  prometheus:
-    metrics:
-      export:
-        enabled: true
