@@ -4,5 +4,3 @@ generated/
 logs/
 mysql/
 qdrant/
-nginx-logs/
-nginx-cache/
