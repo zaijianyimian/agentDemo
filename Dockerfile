@@ -7,7 +7,6 @@ FROM gradle:8.14.4-jdk17 AS backend-builder
 
 WORKDIR /workspace
 
-# 先复制 wrapper 与依赖文件，最大化缓存命中
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle ./gradle
 COPY src ./src
@@ -31,36 +30,37 @@ RUN npm run build \
  && rm -rf node_modules
 
 # -----------------------------------------------------------------------------
-# 阶段 3: 运行时镜像 - nginx 静态服务 + 反代 /api 到 Spring Boot
+# 阶段 3a: 后端镜像（8000） - 仅 Spring Boot + wget healthcheck
 # -----------------------------------------------------------------------------
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre-alpine AS backend
 
-# nginx + wget（healthcheck 用） + tini（信号转发） + tzdata
-RUN apk add --no-cache nginx wget tini tzdata curl \
- && mkdir -p /app/data /app/generated /app/logs /var/cache/nginx /var/log/nginx /run/nginx
+RUN apk add --no-cache wget tini tzdata \
+ && mkdir -p /app/data /app/generated /app/logs
 
-# 前端 dist
-COPY --from=frontend-builder /workspace/dist /usr/share/nginx/html
-
-# nginx 配置（前端静态 + /api 反代到本机 8080 后端）
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-
-# 后端 jar 与启动脚本
 COPY --from=backend-builder /workspace/app.jar /app/app.jar
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# 容器默认时区
 ENV TZ=Asia/Shanghai \
     JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/logs -Dfile.encoding=UTF-8" \
-    BACKEND_PORT=8080 \
-    NGINX_PORT=80
+    SERVER_PORT=8000
 
-EXPOSE 80
+EXPOSE 8000
 
 VOLUME ["/app/data", "/app/generated", "/app/logs"]
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=90s \
-    CMD wget -qO- http://localhost:80/actuator/health/liveness || exit 1
+    CMD wget -qO- http://localhost:8000/actuator/health/liveness || exit 1
 
-ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["/sbin/tini", "--", "java", "$JAVA_OPTS", "-Dserver.port=${SERVER_PORT}", "-jar", "/app/app.jar"]
+
+# -----------------------------------------------------------------------------
+# 阶段 3b: 前端镜像（3000） - 仅 nginx 静态服务，由宿主机 nginx 反代
+# -----------------------------------------------------------------------------
+FROM nginx:1.27-alpine AS frontend
+
+COPY --from=frontend-builder /workspace/dist /usr/share/nginx/html
+COPY docker/nginx-frontend.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget -qO- http://localhost:3000/nginx-health || exit 1
