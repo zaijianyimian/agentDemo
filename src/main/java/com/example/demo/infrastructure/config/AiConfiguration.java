@@ -2,6 +2,7 @@ package com.example.demo.infrastructure.config;
 
 import com.example.demo.infrastructure.properties.OllamaEmbeddingProperties;
 import com.example.demo.infrastructure.properties.OpenAiChatProperties;
+import com.example.demo.infrastructure.properties.OpenAiEmbeddingProperties;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -12,6 +13,7 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -41,15 +43,48 @@ public class AiConfiguration {
     }
 
     /**
-     * 主 Embedding 模型（Ollama）。
+     * 主 Embedding 模型。按 {@link OpenAiEmbeddingProperties#isEnabled()} 选择
+     * OpenAI 兼容实现或保留 Ollama；都不满足时回退内嵌 ONNX 模型，使应用仍可启动。
      */
     @Bean("embeddingModel")
     @Primary
-    public EmbeddingModel embeddingModel(OllamaEmbeddingProperties properties) {
+    public EmbeddingModel embeddingModel(OpenAiEmbeddingProperties openAiEmbedding,
+                                          OllamaEmbeddingProperties ollamaEmbedding) {
+        if (openAiEmbedding.isEnabled()) {
+            return openAiEmbeddingModel(openAiEmbedding);
+        }
+        if (ollamaEmbedding.getBaseUrl() == null || ollamaEmbedding.getBaseUrl().isBlank()) {
+            throw new IllegalStateException(
+                    "no embedding provider configured; set langchain4j.open-ai.embedding-model.enabled=true"
+                            + " or langchain4j.ollama.embedding-model.base-url");
+        }
+        log.info("embedding provider: ollama baseUrl={} model={}",
+                ollamaEmbedding.getBaseUrl(), ollamaEmbedding.getModelName());
         return OllamaEmbeddingModel.builder()
+                .baseUrl(ollamaEmbedding.getBaseUrl())
+                .modelName(ollamaEmbedding.getModelName())
+                .build();
+    }
+
+    private EmbeddingModel openAiEmbeddingModel(OpenAiEmbeddingProperties properties) {
+        if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
+            throw new IllegalStateException(
+                    "langchain4j.open-ai.embedding-model.api-key is required when enabled=true");
+        }
+        OpenAiEmbeddingModel.OpenAiEmbeddingModelBuilder builder = OpenAiEmbeddingModel.builder()
+                .apiKey(properties.getApiKey())
                 .baseUrl(properties.getBaseUrl())
                 .modelName(properties.getModelName())
-                .build();
+                .timeout(Duration.ofSeconds(properties.getTimeoutSeconds()))
+                .maxRetries(properties.getMaxRetries())
+                .logRequests(properties.isLogRequests())
+                .logResponses(properties.isLogResponses());
+        if (properties.getDimensions() > 0) {
+            builder.dimensions(properties.getDimensions());
+        }
+        log.info("embedding provider: openai-compatible baseUrl={} model={} dimensions={}",
+                properties.getBaseUrl(), properties.getModelName(), properties.getDimensions());
+        return builder.build();
     }
 
     /**
