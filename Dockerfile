@@ -1,36 +1,66 @@
-FROM gradle:8.7-jdk17 AS builder
+# syntax=docker/dockerfile:1.6
+
+# -----------------------------------------------------------------------------
+# 阶段 1: 构建后端 bootJar (Spring Boot)
+# -----------------------------------------------------------------------------
+FROM gradle:8.14.4-jdk17 AS backend-builder
 
 WORKDIR /workspace
 
-COPY gradlew gradlew
-COPY gradle gradle
-COPY settings.gradle settings.gradle
-COPY build.gradle build.gradle
-COPY src src
+# 先复制 wrapper 与依赖文件，最大化缓存命中
+COPY gradlew settings.gradle build.gradle ./
+COPY gradle ./gradle
+COPY src ./src
 
-RUN chmod +x ./gradlew && ./gradlew --no-daemon clean bootJar -x test
+RUN chmod +x ./gradlew \
+ && ./gradlew --no-daemon clean bootJar -x test \
+ && cp build/libs/*.jar /workspace/app.jar
 
+# -----------------------------------------------------------------------------
+# 阶段 2: 构建前端 dist (Vue 3 + Vite)
+# -----------------------------------------------------------------------------
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /workspace
+
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install --no-audit --no-fund
+
+COPY frontend ./
+RUN npm run build \
+ && rm -rf node_modules
+
+# -----------------------------------------------------------------------------
+# 阶段 3: 运行时镜像 - nginx 静态服务 + 反代 /api 到 Spring Boot
+# -----------------------------------------------------------------------------
 FROM eclipse-temurin:17-jre-alpine
 
-WORKDIR /app
+# nginx + wget（healthcheck 用） + tini（信号转发） + tzdata
+RUN apk add --no-cache nginx wget tini tzdata curl \
+ && mkdir -p /app/data /app/generated /app/logs /var/cache/nginx /var/log/nginx /run/nginx
 
+# 前端 dist
+COPY --from=frontend-builder /workspace/dist /usr/share/nginx/html
+
+# nginx 配置（前端静态 + /api 反代到本机 8080 后端）
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# 后端 jar 与启动脚本
+COPY --from=backend-builder /workspace/app.jar /app/app.jar
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# 容器默认时区
 ENV TZ=Asia/Shanghai \
-    # 用 Alpine 镜像减半体积（~200MB → ~90MB）。
-    # MaxRAMPercentage 跟随容器内存限制自动伸缩堆。
-    # ExitOnOutOfMemoryError + HeapDumpPath 保证 OOM 时有现场可查。
-    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/logs -Dfile.encoding=UTF-8"
+    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/logs -Dfile.encoding=UTF-8" \
+    BACKEND_PORT=8080 \
+    NGINX_PORT=80
 
-COPY --from=builder /workspace/build/libs/*.jar /app/app.jar
-
-RUN apk add --no-cache wget && \
-    mkdir -p /app/data /app/generated /app/logs
-
-EXPOSE 8000
+EXPOSE 80
 
 VOLUME ["/app/data", "/app/generated", "/app/logs"]
 
-# wget 用于 docker-compose healthcheck 探活
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
-    CMD wget -qO- http://localhost:8000/actuator/health/liveness || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=90s \
+    CMD wget -qO- http://localhost:80/actuator/health/liveness || exit 1
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/entrypoint.sh"]
