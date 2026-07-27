@@ -127,6 +127,10 @@ replay_pid*
 ### Claude Code 会话记录 ###
 *.jsonl
 
+### Docker 打包产物(不入库)###
+agentdemo.tar.gz
+docker/*.tar.gz
+
 ### OpenSpec 工作产物(本地变更提案与归档,不入库)###
 openspec/
 stress-test/
