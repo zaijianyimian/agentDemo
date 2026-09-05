@@ -121,13 +121,13 @@
     </n-card>
 
     <!-- AI总结 -->
-    <n-card v-if="summary" title="AI总结" class="summary-card" :bordered="false">
+    <n-card v-if="stripThinkContent(summary)" title="AI总结" class="summary-card" :bordered="false">
       <div class="summary-content markdown-body" v-html="renderMarkdown(summary)"></div>
       <span v-if="isStreamingSummary" class="cursor-blink">|</span>
     </n-card>
 
     <!-- AI回答 -->
-    <n-card v-if="chatAnswer" title="AI回答" class="answer-card" :bordered="false">
+    <n-card v-if="stripThinkContent(chatAnswer)" title="AI回答" class="answer-card" :bordered="false">
       <div class="answer-content markdown-body" v-html="renderMarkdown(chatAnswer)"></div>
       <span v-if="isStreamingChat" class="cursor-blink">|</span>
     </n-card>
@@ -182,6 +182,7 @@ import { searchService } from '@/services/api/search'
 import { fetchWithAuth } from '@/services/auth-fetch'
 import type { SearchResult } from '@/types'
 import { sanitizeHtml } from '@/utils/sanitize-html'
+import { stripThinkContent } from '@/utils/markdown'
 import { marked } from 'marked'
 import hljs from 'highlight.js/lib/core'
 import javascript from 'highlight.js/lib/languages/javascript'
@@ -218,11 +219,12 @@ marked.setOptions({
 
 // 渲染 Markdown
 const renderMarkdown = (text: string) => {
-  if (!text) return ''
+  const visibleText = stripThinkContent(text)
+  if (!visibleText) return ''
   try {
-    return sanitizeHtml(marked.parse(text) as string)
+    return sanitizeHtml(marked.parse(visibleText) as string)
   } catch {
-    return sanitizeHtml(text)
+    return sanitizeHtml(visibleText)
   }
 }
 
@@ -352,7 +354,10 @@ const doStreamSummary = async () => {
 
   while (true) {
     const { done, value } = await reader.read()
-    if (done) break
+    if (done) {
+      buffer += decoder.decode()
+      break
+    }
 
     buffer += decoder.decode(value, { stream: true })
 
@@ -411,7 +416,10 @@ const doStreamChat = async () => {
 
   while (true) {
     const { done, value } = await reader.read()
-    if (done) break
+    if (done) {
+      buffer += decoder.decode()
+      break
+    }
 
     buffer += decoder.decode(value, { stream: true })
 

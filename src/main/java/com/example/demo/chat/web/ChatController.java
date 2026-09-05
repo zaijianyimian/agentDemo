@@ -14,12 +14,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -191,27 +194,28 @@ public class ChatController {
         AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
 
         // 3. 流式调用带记忆的AI服务
-        return chatWithMemoryService.streamChat(sessionId, message)
+        Flux<ServerSentEvent<String>> contentStream = chatWithMemoryService.streamChat(sessionId, message)
                 .doOnNext(chunk -> fullResponse.get().append(chunk))
                 .doOnComplete(() -> {
-                    // 4. 流完成后保存AI响应
                     String response = fullResponse.get().toString();
-                    chatHistoryService.addMessage(sessionId, "assistant", response, "model-" + activeModelId);
-                    log.info("保存AI响应: sessionId={}, responseLength={}", sessionId, response.length());
-
-                    // 5. 提取并存储记忆
-                    try {
-                        memoryApplicationService.extractAndStore(
-                                sessionId.toString(),
-                                List.of("user: " + message, "assistant: " + response));
-                        log.info("提取记忆成功: sessionId={}", sessionId);
-                    } catch (Exception e) {
-                        log.warn("提取记忆失败: sessionId={}, error={}", sessionId, e.getMessage());
-                    }
+                    // 持久化可能涉及数据库和向量存储，不能阻塞 SSE 的完成信号。
+                    Mono.fromRunnable(() -> persistCompletedStream(
+                                    sessionId, message, response, "model-" + activeModelId))
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .subscribe(null, error -> log.error(
+                                    "异步保存流式响应失败: sessionId={}, error={}",
+                                    sessionId, error.getMessage(), error));
                 })
                 .doOnError(error -> log.error("流式响应错误: sessionId={}, error={}", sessionId, error.getMessage()))
                 .map(chunk -> ServerSentEvent.<String>builder()
                         .data(chunk)
+                        .build());
+
+        return contentStream
+                .startWith(ServerSentEvent.<String>builder().comment("connected").build())
+                .concatWithValues(ServerSentEvent.<String>builder()
+                        .event("done")
+                        .data("[DONE]")
                         .build());
     }
 
@@ -294,6 +298,28 @@ public class ChatController {
     // ==================== 测试接口 ====================
 
     /**
+     * 不调用模型的确定性 SSE 探针，每 300ms 发送一条，用于隔离 Spring/Vite/浏览器传输层。
+     */
+    @GetMapping("/stream/probe")
+    public ResponseEntity<Flux<ServerSentEvent<String>>> streamProbe() {
+        Flux<ServerSentEvent<String>> ticks = Flux.interval(Duration.ofMillis(300))
+                .take(5)
+                .map(index -> ServerSentEvent.<String>builder()
+                        .event("probe")
+                        .data("tick-" + index + "@" + Instant.now())
+                        .build());
+        Flux<ServerSentEvent<String>> stream = ticks
+                .startWith(ServerSentEvent.<String>builder().comment("connected").build())
+                .concatWithValues(ServerSentEvent.<String>builder()
+                        .event("done")
+                        .data("[DONE]")
+                        .build());
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_EVENT_STREAM)
+                .body(stream);
+    }
+
+    /**
      * 测试流式响应 - 用于诊断问题
      * 每个 token 都会记录时间戳
      */
@@ -322,5 +348,21 @@ public class ChatController {
                 LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
                 message
         );
+    }
+
+    private void persistCompletedStream(Long sessionId,
+                                        String userMessage,
+                                        String assistantResponse,
+                                        String modelName) {
+        chatHistoryService.addMessage(sessionId, "assistant", assistantResponse, modelName);
+        log.info("保存AI响应: sessionId={}, responseLength={}", sessionId, assistantResponse.length());
+        try {
+            memoryApplicationService.extractAndStore(
+                    sessionId.toString(),
+                    List.of("user: " + userMessage, "assistant: " + assistantResponse));
+            log.info("提取记忆成功: sessionId={}", sessionId);
+        } catch (Exception e) {
+            log.warn("提取记忆失败: sessionId={}, error={}", sessionId, e.getMessage());
+        }
     }
 }

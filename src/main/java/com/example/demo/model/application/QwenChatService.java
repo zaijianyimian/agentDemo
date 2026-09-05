@@ -14,7 +14,7 @@ import static dev.langchain4j.service.spring.AiServiceWiringMode.EXPLICIT;
         wiringMode = EXPLICIT,
         chatModel = "chatModel",
         streamingChatModel = "streamingChatModel",
-        tools = {"scheduleTaskTools", "markdownSkillTools", "scheduleEventTools"})
+        tools = {"scheduleTaskTools", "markdownSkillTools", "scheduleEventTools", "emailTools"})
 public interface QwenChatService {
     /**
      * 流式聊天

@@ -16,4 +16,11 @@ public class OpenAiChatProperties {
     private String apiKey;
     private String baseUrl;
     private String modelName;
+
+    /**
+     * 请求和响应可能包含凭据、邮件正文及用户对话，默认禁止写入日志。
+     * 仅允许在使用脱敏测试数据的受控排障环境中显式开启。
+     */
+    private boolean logRequests = false;
+    private boolean logResponses = false;
 }

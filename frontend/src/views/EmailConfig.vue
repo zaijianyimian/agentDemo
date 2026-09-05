@@ -169,7 +169,7 @@
           <n-input v-model:value="formData.folder" placeholder="INBOX" />
         </n-form-item>
         <n-form-item label="轮询间隔" path="pollInterval">
-          <n-input-number v-model:value="formData.pollInterval" :min="10" :max="3600">
+          <n-input-number v-model:value="formData.pollInterval" :min="600" :max="3600">
             <template #suffix>秒</template>
           </n-input-number>
         </n-form-item>
@@ -308,7 +308,7 @@ const formData = ref({
   sslEnabled: true,
   protocol: 'imap',
   folder: 'INBOX',
-  pollInterval: 30,
+  pollInterval: 600,
   listenWindowEnabled: false,
   listenStartTime: null as string | null,
   listenEndTime: null as string | null
@@ -391,7 +391,7 @@ const buildSavePayload = () => {
   const payload = normalizeConfigPayload({
     ...formData.value,
     folder: formData.value.folder || 'INBOX',
-    pollInterval: formData.value.pollInterval || 30,
+    pollInterval: formData.value.pollInterval || 600,
     provider: formData.value.provider,
     listenMode: formData.value.listenMode,
     fallbackListenMode: formData.value.listenMode === 'IMAP_IDLE' ? 'POLLING' : formData.value.fallbackListenMode,
@@ -483,7 +483,7 @@ const resetFormData = () => {
     sslEnabled: true,
     protocol: 'imap',
     folder: 'INBOX',
-    pollInterval: 30,
+    pollInterval: 600,
     listenWindowEnabled: false,
     listenStartTime: null,
     listenEndTime: null
@@ -755,7 +755,7 @@ const editConfig = (config: EmailConfig) => {
     sslEnabled: config.sslEnabled,
     protocol: trimText(config.protocol || 'imap'),
     folder: trimText(config.folder || 'INBOX'),
-    pollInterval: config.pollInterval || 30,
+    pollInterval: Math.max(600, config.pollInterval || 600),
     listenWindowEnabled: Boolean(config.listenStartTime && config.listenEndTime),
     listenStartTime: config.listenStartTime || null,
     listenEndTime: config.listenEndTime || null

@@ -92,13 +92,13 @@
             </div>
             <div class="ai-content-wrapper">
               <div class="ai-content">
-                <div v-if="!msg.content && msg.isStreaming" class="thinking-indicator">
+                <div v-if="!stripThinkContent(msg.content) && msg.isStreaming" class="thinking-indicator">
                   <span class="thinking-dot"></span>
                   <span class="thinking-dot"></span>
                   <span class="thinking-dot"></span>
                 </div>
                 <div v-else class="markdown-content" v-html="renderMarkdown(msg.content)"></div>
-                <span v-if="msg.isStreaming && msg.content" class="cursor-blink"></span>
+                <span v-if="msg.isStreaming && stripThinkContent(msg.content)" class="cursor-blink"></span>
               </div>
               <div class="ai-footer">
                 <span class="bubble-time">{{ formatTime(msg.timestamp) }}</span>
@@ -232,7 +232,7 @@ import type { ChatMessage, ChatSession, AiModelConfig } from '@/types'
 import { chatActionService } from '@/services/api/chat-action'
 import { chatHistoryService } from '@/services/api/chat-history'
 import { fetchWithAuth } from '@/services/auth-fetch'
-import { renderMarkdown } from '@/utils/markdown'
+import { renderMarkdown, stripThinkContent } from '@/utils/markdown'
 import { formatTime, formatSessionTime } from '@/utils/date-format'
 import { animate as motionAnimate, type JSAnimation } from 'motion'
 import ModelSelector from '@/components/ModelSelector.vue'
@@ -555,7 +555,7 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
   try {
     const response = await fetchWithAuth(apiPath, {
       signal: abortController.signal,
-      headers: { 'Accept': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' }
+      headers: { 'Accept': 'text/event-stream', 'Cache-Control': 'no-cache' }
     })
 
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
@@ -565,10 +565,26 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
 
     const decoder = new TextDecoder()
     let buffer = ''
+    // 原始流单独累计；messageObj.content 只保存可见正文。
+    // 这样 <think> 阶段不会触发数百次 Markdown 渲染和 Vue 更新。
+    let rawContent = ''
 
-    while (true) {
+    const appendVisibleChunk = async (chunk: string) => {
+      rawContent += chunk
+      const visibleContent = stripThinkContent(rawContent)
+      if (visibleContent === messageObj.content) return
+      messageObj.content = visibleContent
+      await nextTick()
+      scrollToBottom()
+      await new Promise(resolve => setTimeout(resolve, 8))
+    }
+
+    readStream: while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        buffer += decoder.decode()
+        break
+      }
 
       buffer += decoder.decode(value, { stream: true })
       const events = buffer.split(/\r?\n\r?\n/)
@@ -576,21 +592,22 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
 
       for (const event of events) {
         if (!event.trim()) continue
+        if (/(?:^|\n)event:\s*done\s*(?:\n|$)/i.test(event) ||
+            /(?:^|\n)data:\s*\[DONE\]\s*(?:\n|$)/i.test(event)) {
+          await reader.cancel()
+          buffer = ''
+          break readStream
+        }
         const chunks = parseSseEvents(event)
         for (const chunk of chunks) {
-          // Typewriter effect: add small delay between chunks
-          messageObj.content += chunk
-          await nextTick()
-          scrollToBottom()
-          // Small delay for typewriter feel (optional, can be removed for instant streaming)
-          await new Promise(resolve => setTimeout(resolve, 8))
+          await appendVisibleChunk(chunk)
         }
       }
     }
 
     if (buffer.trim()) {
       const chunks = parseSseEvents(buffer)
-      for (const chunk of chunks) messageObj.content += chunk
+      for (const chunk of chunks) await appendVisibleChunk(chunk)
     }
   } catch (error: any) {
     if (error.name !== 'AbortError') throw error

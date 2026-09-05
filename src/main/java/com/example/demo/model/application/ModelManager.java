@@ -2,6 +2,7 @@ package com.example.demo.model.application;
 
 import com.example.demo.model.domain.AiModelConfig;
 import com.example.demo.model.persistence.AiModelConfigMapper;
+import com.example.demo.infrastructure.properties.OpenAiChatProperties;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
@@ -31,6 +32,7 @@ public class ModelManager {
     // Spring Bean fallback models (from AiConfiguration)
     private final ChatModel fallbackChatModel;
     private final StreamingChatModel fallbackStreamingModel;
+    private final OpenAiChatProperties chatProperties;
 
     // Fallback model ID constant
     public static final Long FALLBACK_MODEL_ID = -1L;
@@ -46,11 +48,13 @@ public class ModelManager {
             AiModelConfigMapper configMapper,
             EncodingService encodingService,
             @Qualifier("chatModel") ChatModel fallbackChatModel,
-            @Qualifier("streamingChatModel") StreamingChatModel fallbackStreamingModel) {
+            @Qualifier("streamingChatModel") StreamingChatModel fallbackStreamingModel,
+            OpenAiChatProperties chatProperties) {
         this.configMapper = configMapper;
         this.encodingService = encodingService;
         this.fallbackChatModel = fallbackChatModel;
         this.fallbackStreamingModel = fallbackStreamingModel;
+        this.chatProperties = chatProperties;
     }
 
     @PostConstruct
@@ -81,8 +85,8 @@ public class ModelManager {
                 .modelName(config.getModelName())
                 .timeout(Duration.ofSeconds(120))
                 .maxRetries(3)
-                .logRequests(true)
-                .logResponses(true)
+                .logRequests(chatProperties.isLogRequests())
+                .logResponses(chatProperties.isLogResponses())
                 .build();
     }
 

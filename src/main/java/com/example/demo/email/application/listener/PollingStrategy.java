@@ -62,7 +62,7 @@ public class PollingStrategy implements ListenStrategy {
     }
 
     private void pollLoop(EmailConfig config, MailSourceAdapter adapter) {
-        int interval = config.getPollInterval() == null ? 30 : Math.max(5, config.getPollInterval());
+        int interval = config.getPollInterval() == null ? 600 : Math.max(600, config.getPollInterval());
         stateService.markStatus(config, ListenerStatus.RUNNING, null);
         while (!Thread.currentThread().isInterrupted()) {
             try {

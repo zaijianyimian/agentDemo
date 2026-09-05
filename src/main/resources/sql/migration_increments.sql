@@ -686,6 +686,14 @@ SET @sql := IF(@idx=0, 'CREATE INDEX idx_session_id ON chat_message (session_id,
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ============================================
+-- 邮件轮询间隔统一为 600 秒（10 分钟）
+-- 仅更新现存的低频设置（< 600s），保留用户主动调高的值；NULL 留给运行时默认值兜底。
+-- ============================================
+UPDATE `email_config`
+SET `poll_interval` = 600
+WHERE `poll_interval` IS NOT NULL AND `poll_interval` < 600;
+
+-- ============================================
 -- 完成提示
 -- ============================================
 -- 非破坏性迁移完成！

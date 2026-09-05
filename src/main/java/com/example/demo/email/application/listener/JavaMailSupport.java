@@ -80,6 +80,19 @@ public class JavaMailSupport {
     }
 
     public EmailMessage parseMessage(Message message, EmailConfig config) throws MessagingException, IOException {
+        return parseMessage(message, config, true);
+    }
+
+    /**
+     * 解析邮件正文但不保存附件，供只读查询工具使用。
+     */
+    public EmailMessage parseMessageWithoutAttachments(Message message, EmailConfig config)
+            throws MessagingException, IOException {
+        return parseMessage(message, config, false);
+    }
+
+    private EmailMessage parseMessage(Message message, EmailConfig config, boolean saveAttachments)
+            throws MessagingException, IOException {
         EmailMessage.EmailMessageBuilder builder = EmailMessage.builder()
                 .accountEmail(config.getEmail());
 
@@ -110,7 +123,7 @@ public class JavaMailSupport {
         builder.seen(flags.contains(Flags.Flag.SEEN));
 
         List<EmailMessage.Attachment> attachments = new ArrayList<>();
-        parseContent(message, builder, attachments, builder.build().getMessageId(), config);
+        parseContent(message, builder, attachments, builder.build().getMessageId(), config, saveAttachments);
         builder.attachments(attachments);
         return builder.build();
     }
@@ -251,8 +264,19 @@ public class JavaMailSupport {
     }
 
     private void parseContent(Part part, EmailMessage.EmailMessageBuilder builder,
-                              List<EmailMessage.Attachment> attachments, String messageId, EmailConfig config)
+                              List<EmailMessage.Attachment> attachments, String messageId, EmailConfig config,
+                              boolean saveAttachments)
             throws MessagingException, IOException {
+        if (!saveAttachments && part instanceof BodyPart bodyPart) {
+            String disposition = bodyPart.getDisposition();
+            String fileName = bodyPart.getFileName();
+            boolean attachmentLike = Part.ATTACHMENT.equalsIgnoreCase(disposition)
+                    || Part.INLINE.equalsIgnoreCase(disposition)
+                    || (fileName != null && !fileName.isBlank());
+            if (attachmentLike) {
+                return;
+            }
+        }
         Object content = part.getContent();
         if (content instanceof String text) {
             if (part.isMimeType("text/plain")) {
@@ -265,11 +289,14 @@ public class JavaMailSupport {
         if (content instanceof Multipart multipart) {
             for (int i = 0; i < multipart.getCount(); i++) {
                 BodyPart bodyPart = multipart.getBodyPart(i);
-                parseContent(bodyPart, builder, attachments, messageId, config);
+                parseContent(bodyPart, builder, attachments, messageId, config, saveAttachments);
             }
             return;
         }
         if (part instanceof BodyPart bodyPart) {
+            if (!saveAttachments) {
+                return;
+            }
             try {
                 String disposition = bodyPart.getDisposition();
                 String fileName = bodyPart.getFileName();

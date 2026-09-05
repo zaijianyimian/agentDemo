@@ -32,8 +32,9 @@
         <appender-ref ref="FILE"/>
     </appender>
 
-    <!-- 应用程序日志级别 -->
-    <logger name="com.example.demo" level="DEBUG" additivity="false">
+    <!-- 应用程序日志级别：生产默认 INFO；排障时可设置 APP_LOG_LEVEL=DEBUG。 -->
+    <property name="APP_LOG_LEVEL" value="${APP_LOG_LEVEL:-INFO}"/>
+    <logger name="com.example.demo" level="${APP_LOG_LEVEL}" additivity="false">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ASYNC"/>
     </logger>

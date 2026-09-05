@@ -61,15 +61,18 @@ async function readEmailEventStream(
 
   while (!controller.signal.aborted) {
     const { value, done } = await reader.read()
-    if (done) break
+    if (done) {
+      buffer += decoder.decode()
+      break
+    }
     buffer += decoder.decode(value, { stream: true })
 
-    let boundary = buffer.indexOf('\n\n')
-    while (boundary >= 0) {
-      const rawEvent = buffer.slice(0, boundary)
-      buffer = buffer.slice(boundary + 2)
+    let match = /\r?\n\r?\n/.exec(buffer)
+    while (match?.index != null) {
+      const rawEvent = buffer.slice(0, match.index)
+      buffer = buffer.slice(match.index + match[0].length)
       handleSseEvent(rawEvent, handlers)
-      boundary = buffer.indexOf('\n\n')
+      match = /\r?\n\r?\n/.exec(buffer)
     }
   }
 }

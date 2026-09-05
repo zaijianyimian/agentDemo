@@ -27,6 +27,9 @@ langchain4j:
       api-key: ${OPENAI_API_KEY:your_llm_api_key}
       base-url: ${OPENAI_BASE_URL:https://your-llm-compatible-endpoint.example.com/v1}
       model-name: ${OPENAI_MODEL_NAME:your_model_name}
+      # 请求/响应可能包含用户对话、邮件正文和 Authorization，生产环境保持关闭
+      log-requests: ${OPENAI_LOG_REQUESTS:false}
+      log-responses: ${OPENAI_LOG_RESPONSES:false}
     embedding-model:
       enabled: ${OPENAI_EMBEDDING_ENABLED:false}
       base-url: ${OPENAI_EMBEDDING_BASE_URL:https://api.openai.com/v1}
@@ -50,6 +53,10 @@ server:
       force-request: true
 
 app:
+  email:
+    listener:
+      # 测试或维护环境可关闭自动连接；手动连接 API 仍然可用
+      enabled: ${EMAIL_LISTENER_ENABLED:true}
   memory:
     collection-name: ${MEMORY_COLLECTION_NAME:agent_memory}
     vector-size: 768

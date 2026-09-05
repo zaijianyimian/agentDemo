@@ -30,32 +30,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        // 禁用代理缓冲，支持流式响应
-        ws: true,
-        configure: (proxy, _options) => {
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            // 对于流式请求，设置特殊头部
-            if (req.url?.includes('/stream')) {
-              proxyReq.setHeader('Accept', 'text/event-stream')
-              proxyReq.setHeader('Cache-Control', 'no-cache')
-              proxyReq.setHeader('Connection', 'keep-alive')
-              // 禁用 Nagle 算法，确保数据立即发送
-              proxyReq.setHeader('X-Accel-Buffering', 'no')
-            }
-          })
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            // 对于流式响应，禁用缓冲
-            if (req.url?.includes('/stream')) {
-              proxyRes.headers['cache-control'] = 'no-cache, no-transform, no-store'
-              proxyRes.headers['connection'] = 'keep-alive'
-              proxyRes.headers['x-accel-buffering'] = 'no'
-              // 添加 Transfer-Encoding: chunked 确保流式传输
-              if (!proxyRes.headers['transfer-encoding']) {
-                proxyRes.headers['transfer-encoding'] = 'chunked'
-              }
-            }
-          })
-        }
+        // Vite/http-proxy 默认逐块透传响应。不要手工设置 Connection 或
+        // Transfer-Encoding；它们由 Node HTTP 层管理，强制改写会破坏 SSE 分块。
+        timeout: 0,
+        proxyTimeout: 0
       }
     }
   },

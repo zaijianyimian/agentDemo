@@ -98,8 +98,8 @@ public class AiConfiguration {
                 .baseUrl(properties.getBaseUrl())
                 .timeout(Duration.ofSeconds(120))
                 .maxRetries(3)
-                .logRequests(true)
-                .logResponses(true)
+                .logRequests(properties.isLogRequests())
+                .logResponses(properties.isLogResponses())
                 .build();
     }
 

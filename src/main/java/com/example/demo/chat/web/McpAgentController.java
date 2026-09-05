@@ -3,11 +3,14 @@ package com.example.demo.chat.web;
 import com.example.demo.chat.application.ChatHistoryService;
 import com.example.demo.mcp.application.McpAgentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -20,6 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @RestController
 @RequestMapping("/api/mcp/agent")
 @RequiredArgsConstructor
+@Slf4j
 public class McpAgentController {
 
     private final McpAgentService mcpAgentService;
@@ -101,15 +105,29 @@ public class McpAgentController {
             chatHistoryService.addMessage(chatSessionId, "user", message, null);
         }
         AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
-        return mcpAgentStreamingService.chatStreamWithMemory(sessionId, withRuntimeContext(message))
+        Flux<ServerSentEvent<String>> contentStream = mcpAgentStreamingService
+                .chatStreamWithMemory(sessionId, withRuntimeContext(message))
                 .doOnNext(chunk -> fullResponse.get().append(chunk))
                 .doOnComplete(() -> {
                     if (chatSessionId != null) {
-                        chatHistoryService.addMessage(chatSessionId, "assistant", fullResponse.get().toString(), "mcp-agent");
+                        String response = fullResponse.get().toString();
+                        Mono.fromRunnable(() -> chatHistoryService.addMessage(
+                                        chatSessionId, "assistant", response, "mcp-agent"))
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .subscribe(null, error -> log.error(
+                                        "异步保存 Agent 流式响应失败: sessionId={}, error={}",
+                                        chatSessionId, error.getMessage(), error));
                     }
                 })
                 .map(chunk -> ServerSentEvent.<String>builder()
                         .data(chunk)
+                        .build());
+
+        return contentStream
+                .startWith(ServerSentEvent.<String>builder().comment("connected").build())
+                .concatWithValues(ServerSentEvent.<String>builder()
+                        .event("done")
+                        .data("[DONE]")
                         .build());
     }
 

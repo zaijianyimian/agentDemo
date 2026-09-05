@@ -5,10 +5,13 @@ import com.example.demo.infrastructure.settings.RuntimeSettingsProvider;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.qdrant.QdrantEmbeddingStore;
+import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.net.HttpURLConnection;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Qdrant 连接辅助类
@@ -20,6 +23,7 @@ public class QdrantConnectionSupport {
 
     private final QdrantProperties qdrantProperties;
     private final ObjectProvider<RuntimeSettingsProvider> settingsProvider;
+    private final Map<String, QdrantEmbeddingStore> embeddingStores = new ConcurrentHashMap<>();
 
     /**
      * 构造时注入 Qdrant 属性和动态设置提供者
@@ -138,15 +142,29 @@ public class QdrantConnectionSupport {
      */
     public EmbeddingStore<TextSegment> embeddingStore(String collectionName) {
         String apiKey = apiKey();
-        QdrantEmbeddingStore.Builder builder = QdrantEmbeddingStore.builder()
-                .host(grpcHost())
-                .port(grpcPort())
-                .useTls(useTls())
-                .collectionName(collectionName);
-        if (!apiKey.isBlank()) {
-            builder.apiKey(apiKey);
-        }
-        return builder.build();
+        String host = grpcHost();
+        int port = grpcPort();
+        boolean tls = useTls();
+        String cacheKey = host + ':' + port + ':' + tls + ':' + collectionName + ':' + apiKey;
+
+        return embeddingStores.computeIfAbsent(cacheKey, ignored -> {
+            QdrantEmbeddingStore.Builder builder = QdrantEmbeddingStore.builder()
+                    .host(host)
+                    .port(port)
+                    .useTls(tls)
+                    .collectionName(collectionName);
+            if (!apiKey.isBlank()) {
+                builder.apiKey(apiKey);
+            }
+            return builder.build();
+        });
+    }
+
+    /** 应用退出时关闭所有复用的 gRPC channel。 */
+    @PreDestroy
+    public void closeEmbeddingStores() {
+        embeddingStores.values().forEach(QdrantEmbeddingStore::close);
+        embeddingStores.clear();
     }
 
     private String stripPort(String host) {

@@ -7,6 +7,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -40,6 +41,9 @@ public class EmailListenerScheduleService {
     private final Map<Long, List<WheelTask>> scheduledTasks = new ConcurrentHashMap<>();
     private final AtomicBoolean initialized = new AtomicBoolean(false);
 
+    @Value("${app.email.listener.enabled:true}")
+    private boolean listenerEnabled;
+
     public EmailListenerScheduleService(
             EmailConfigMapper emailConfigMapper,
             EmailAuthConfigService emailAuthConfigService,
@@ -57,6 +61,10 @@ public class EmailListenerScheduleService {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void start() {
+        if (!listenerEnabled) {
+            log.info("邮件监听启动已通过 app.email.listener.enabled=false 禁用");
+            return;
+        }
         if (!initialized.compareAndSet(false, true)) {
             return;
         }

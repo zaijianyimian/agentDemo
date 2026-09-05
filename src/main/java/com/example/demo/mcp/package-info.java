@@ -1,7 +1,7 @@
 @ApplicationModule(
         id = "mcp",
         displayName = "MCP",
-        allowedDependencies = {"chat::*", "infrastructure", "schedule::*", "shared::*"}
+        allowedDependencies = {"chat::*", "email::tools", "infrastructure", "schedule::*", "shared::*"}
 )
 package com.example.demo.mcp;
 

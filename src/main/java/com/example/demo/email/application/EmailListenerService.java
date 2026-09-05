@@ -285,7 +285,8 @@ public class EmailListenerService {
         EmailConfig config = configMap.get(configId);
         if (config == null) return;
 
-        int intervalSeconds = config.getPollInterval() != null ? config.getPollInterval() : 30;
+        int intervalSeconds = Math.max(600,
+                config.getPollInterval() != null ? config.getPollInterval() : 600);
         String emailAddr = config.getEmail();
 
         while (storeMap.containsKey(configId)) {

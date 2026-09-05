@@ -129,10 +129,15 @@ replay_pid*
 
 ### Docker 打包产物(不入库)###
 agentdemo.tar.gz
+/agent*.tar
+/agent*.tar.gz
+/agent*.tgz
 docker/*.tar.gz
 docker-compose.yml
 docker-compose.yaml
 ### OpenSpec 工作产物(本地变更提案与归档,不入库)###
+/.agents/
+/.codex/
 openspec/
 stress-test/
 stress-test/results/*.csv

@@ -2,6 +2,7 @@ package com.example.demo.chat.application;
 
 import com.example.demo.model.application.ModelFailoverService;
 import com.example.demo.model.application.ModelManager;
+import com.example.demo.email.tools.EmailTools;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.SystemMessage;
@@ -16,6 +17,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -31,14 +34,19 @@ public class ChatWithMemoryService {
     private final ModelManager modelManager;
     private final ModelFailoverService failoverService;
     private final ToolProvider toolProvider;
+    private final EmailTools emailTools;
 
     // 最大重试次数
     private static final int MAX_RETRY_COUNT = 3;
 
-    public ChatWithMemoryService(ModelManager modelManager, ModelFailoverService failoverService, ToolProvider toolProvider) {
+    public ChatWithMemoryService(ModelManager modelManager,
+                                 ModelFailoverService failoverService,
+                                 ToolProvider toolProvider,
+                                 EmailTools emailTools) {
         this.modelManager = modelManager;
         this.failoverService = failoverService;
         this.toolProvider = toolProvider;
+        this.emailTools = emailTools;
     }
 
     /**
@@ -89,6 +97,7 @@ public class ChatWithMemoryService {
                     .chatModel(modelManager.getChatModel(id))
                     .streamingChatModel(modelManager.getStreamingChatModel(id))
                     .toolProvider(toolProvider)
+                    .tools(emailTools)
                     .chatMemoryProvider(memoryId -> MessageWindowChatMemory.withMaxMessages(20))
                     .build();
         });
@@ -156,13 +165,27 @@ public class ChatWithMemoryService {
 
         return Flux.defer(() -> {
             Long modelId = currentModelId.get();
+            AtomicLong startedAt = new AtomicLong(System.nanoTime());
+            AtomicInteger chunkCount = new AtomicInteger();
             log.info("Stream chat attempt {} with sessionId={}, modelId={}", retryCount.get() + 1, sessionId, modelId);
 
             return getChatWithMemory(modelId).streamChat(sessionId, withRuntimeContext(question))
                     .doOnNext(chunk -> {
+                        int index = chunkCount.incrementAndGet();
+                        long elapsedMs = (System.nanoTime() - startedAt.get()) / 1_000_000;
+                        if (index == 1) {
+                            log.info("Stream first chunk: sessionId={}, modelId={}, latencyMs={}, length={}",
+                                    sessionId, modelId, elapsedMs, chunk == null ? 0 : chunk.length());
+                        }
+                        log.debug("Stream chunk: sessionId={}, modelId={}, index={}, elapsedMs={}, length={}",
+                                sessionId, modelId, index, elapsedMs, chunk == null ? 0 : chunk.length());
                         // 成功收到数据，记录成功
                         failoverService.recordSuccess(modelId);
                     })
+                    .doOnComplete(() -> log.info(
+                            "Stream model completed: sessionId={}, modelId={}, chunks={}, durationMs={}",
+                            sessionId, modelId, chunkCount.get(),
+                            (System.nanoTime() - startedAt.get()) / 1_000_000))
                     .doOnError(error -> {
                         log.error("Stream chat failed with modelId={}, attempt {}: {}",
                                 modelId, retryCount.get() + 1, error.getMessage());

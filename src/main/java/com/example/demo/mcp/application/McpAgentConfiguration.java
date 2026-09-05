@@ -1,5 +1,6 @@
 package com.example.demo.mcp.application;
 
+import com.example.demo.email.tools.EmailTools;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -24,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class McpAgentConfiguration {
 
     private final McpToolAdapter mcpToolAdapter;
+    private final EmailTools emailTools;
     private final Map<Object, MessageWindowChatMemory> chatMemories = new ConcurrentHashMap<>();
 
     /**
@@ -56,6 +58,7 @@ public class McpAgentConfiguration {
         return AiServices.builder(McpAgentService.class)
                 .chatModel(chatModel)
                 .toolProvider(toolProvider)
+                .tools(emailTools)
                 .chatMemoryProvider(memoryId -> chatMemories.computeIfAbsent(memoryId,
                         ignored -> MessageWindowChatMemory.withMaxMessages(10)))
                 .build();
@@ -71,6 +74,7 @@ public class McpAgentConfiguration {
         return AiServices.builder(McpAgentService.class)
                 .streamingChatModel(streamingChatModel)
                 .toolProvider(toolProvider)
+                .tools(emailTools)
                 .chatMemoryProvider(memoryId -> chatMemories.computeIfAbsent(memoryId,
                         ignored -> MessageWindowChatMemory.withMaxMessages(10)))
                 .build();

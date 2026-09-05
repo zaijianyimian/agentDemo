@@ -40,7 +40,7 @@ RUN apk add --no-cache wget tini tzdata \
 COPY --from=backend-builder /workspace/app.jar /app/app.jar
 
 ENV TZ=Asia/Shanghai \
-    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/logs -Dfile.encoding=UTF-8" \
+    JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -XX:HeapDumpPath=/app/logs -Dfile.encoding=UTF-8" \
     SERVER_PORT=8000
 
 EXPOSE 8000
@@ -51,7 +51,7 @@ VOLUME ["/app/data", "/app/generated", "/app/logs"]
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=90s \
     CMD wget -qO- http://localhost:8000/actuator/health/liveness || exit 1
 
-ENTRYPOINT ["/sbin/tini", "--", "java", "$JAVA_OPTS", "-Dserver.port=${SERVER_PORT}", "-jar", "/app/app.jar"]
+ENTRYPOINT ["/sbin/tini", "--", "java", "-jar", "/app/app.jar"]
 
 # -----------------------------------------------------------------------------
 # 阶段 3b: 前端镜像 - nginx :3000 静态 SPA
@@ -67,3 +67,26 @@ EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD wget -qO- http://localhost:3000/nginx-health || exit 1
+
+# -----------------------------------------------------------------------------
+# 阶段 3c: 默认完整镜像 - Spring Boot :8000 + nginx :3000
+# docker build 未指定 --target 时构建此阶段，兼容单容器部署。
+# -----------------------------------------------------------------------------
+FROM backend AS runtime
+
+RUN apk add --no-cache nginx supervisor \
+ && mkdir -p /run/nginx /usr/share/nginx/html /etc/supervisor.d
+
+COPY --from=frontend-builder /workspace/dist /usr/share/nginx/html
+COPY docker/nginx-frontend.conf /etc/nginx/http.d/default.conf
+COPY docker/supervisord.ini /etc/supervisor.d/agentdemo.ini
+
+EXPOSE 3000 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=90s \
+    CMD wget -qO- http://localhost:3000/nginx-health >/dev/null \
+     && wget -qO- http://localhost:8000/actuator/health/liveness >/dev/null \
+     || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
