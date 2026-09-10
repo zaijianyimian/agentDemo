@@ -1,0 +1,477 @@
+/*
+ * Agent Workspace visual layer.
+ *
+ * 这一层只负责重构现有壳层和通用业务页面的视觉层级，避免直接侵入各业务页面。
+ * 保留现有 Vue/Naive UI 组件与路由结构，降低重构对功能代码的影响。
+ */
+
+:root {
+  --workspace-edge: 18px;
+  --workspace-rail-width: 68px;
+  --workspace-content-offset: 110px;
+  --workspace-panel-radius: 16px;
+  --workspace-shell-radius: 20px;
+  --workspace-border: color-mix(in srgb, var(--border-light) 82%, transparent);
+  --workspace-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme='dark'] {
+  --workspace-border: color-mix(in srgb, var(--border-light) 88%, transparent);
+  --workspace-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+}
+
+html,
+body,
+#app {
+  min-width: 320px;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-base);
+}
+
+/* --------------------------------------------------------------------------
+ * Application shell
+ * -------------------------------------------------------------------------- */
+
+.mac-shell {
+  background: var(--bg-base) !important;
+}
+
+.global-rail {
+  left: var(--workspace-edge) !important;
+  top: var(--workspace-edge) !important;
+  bottom: var(--workspace-edge) !important;
+  width: var(--workspace-rail-width) !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 14px 8px !important;
+  transform: none !important;
+  gap: 8px !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: var(--workspace-shell-radius) !important;
+  box-shadow: var(--workspace-shadow) !important;
+}
+
+.global-rail.rail-compact {
+  width: 58px !important;
+  padding-inline: 6px !important;
+}
+
+.quick-access-header,
+.rail-divider {
+  opacity: 0.72;
+}
+
+.quick-access-items,
+.category-dock {
+  gap: 7px !important;
+}
+
+.quick-access-item,
+.dock-item,
+.user-avatar-btn,
+.theme-toggle-btn {
+  border-radius: 12px !important;
+}
+
+.quick-icon-wrapper,
+.dock-icon-wrapper,
+.avatar-circle {
+  border-radius: 11px !important;
+  box-shadow: none !important;
+}
+
+.dock-icon-wrapper {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.quick-access-item:hover .quick-icon-wrapper,
+.dock-item:hover .dock-icon-wrapper,
+.avatar-circle:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.dock-item.active .dock-icon-wrapper,
+.dock-item.current .dock-icon-wrapper {
+  background: color-mix(in srgb, var(--primary-color) 12%, var(--bg-card)) !important;
+  border-color: color-mix(in srgb, var(--primary-color) 36%, transparent) !important;
+}
+
+.dock-indicator {
+  left: 3px !important;
+  bottom: 50% !important;
+  width: 3px !important;
+  height: 18px !important;
+  border-radius: 99px !important;
+  transform: translateY(50%) !important;
+  box-shadow: none !important;
+}
+
+.functional-pane {
+  left: 98px !important;
+  top: var(--workspace-edge) !important;
+  bottom: var(--workspace-edge) !important;
+  width: 248px !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 16px 12px !important;
+  transform: translateX(-12px) !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: var(--workspace-shell-radius) !important;
+  box-shadow: var(--workspace-shadow) !important;
+}
+
+.functional-pane.open {
+  transform: translateX(0) !important;
+}
+
+.pane-header {
+  padding: 2px 4px 14px !important;
+  border-bottom: 1px solid var(--workspace-border) !important;
+}
+
+.pane-routes {
+  gap: 5px !important;
+  padding: 12px 0 !important;
+}
+
+.pane-route-item {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 10px 11px !important;
+  border-radius: 11px !important;
+}
+
+.pane-route-item:hover,
+.pane-route-item.active {
+  transform: none !important;
+}
+
+.main-canvas {
+  background: transparent !important;
+}
+
+.canvas-header {
+  min-height: 62px !important;
+  margin: var(--workspace-edge) 24px 0 var(--workspace-content-offset) !important;
+  padding: 9px 14px 9px 18px !important;
+  gap: 18px !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: var(--workspace-panel-radius) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.page-info {
+  gap: 3px !important;
+}
+
+.page-category {
+  font-size: 0.68rem !important;
+  letter-spacing: 0.09em !important;
+}
+
+.page-title {
+  max-width: 34vw !important;
+  font-size: 1.08rem !important;
+  font-weight: 700 !important;
+}
+
+.logout-button {
+  box-shadow: none !important;
+}
+
+.user-menu-btn {
+  padding: 6px 8px !important;
+  border-color: var(--workspace-border) !important;
+  background: var(--bg-input) !important;
+}
+
+.content-frame {
+  padding: 26px 30px 34px var(--workspace-content-offset) !important;
+}
+
+.inspector-panel {
+  top: var(--workspace-edge) !important;
+  right: var(--workspace-edge) !important;
+  bottom: var(--workspace-edge) !important;
+  height: auto !important;
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: var(--workspace-shell-radius) !important;
+  box-shadow: var(--workspace-shadow) !important;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+ * Shared business pages
+ * -------------------------------------------------------------------------- */
+
+.ui-page,
+.page-shell,
+.file-manager,
+.schedule-page,
+.tools-page,
+.skills-page,
+.models-page,
+.knowledge-page,
+.notes-page,
+.snippets-page,
+.reports-page,
+.email-config,
+.email-page,
+.search-page,
+.personal-center,
+.inbox-page,
+.autonomy-center,
+.autonomy-page,
+.dashboard,
+.automation-hub,
+.chat-page,
+.notifications-page,
+.chat-import-page,
+.knowledge-search-page,
+.schedule-reader-page {
+  width: min(100%, 1520px) !important;
+}
+
+.ui-page {
+  gap: 24px !important;
+}
+
+.ui-page-header {
+  position: relative;
+  padding: 24px 26px !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: var(--workspace-panel-radius) !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.ui-page-header::before {
+  content: '';
+  position: absolute;
+  inset: 18px auto 18px 0;
+  width: 3px;
+  border-radius: 0 99px 99px 0;
+  background: var(--primary-color);
+}
+
+.ui-page-header__eyebrow,
+.ui-eyebrow {
+  margin-bottom: 7px !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.1em !important;
+}
+
+.ui-page-header__title {
+  font-size: clamp(1.35rem, 1.8vw, 1.72rem) !important;
+  letter-spacing: -0.02em;
+}
+
+.ui-page-header__subtitle {
+  max-width: 780px !important;
+  margin-top: 9px !important;
+  line-height: 1.7 !important;
+}
+
+.ui-panel,
+.surface-panel,
+.action-card,
+.filter-card,
+.list-card,
+.file-list-card,
+.upload-card,
+.page-hero,
+.stat-box {
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: var(--workspace-panel-radius) !important;
+  box-shadow: none !important;
+}
+
+.ui-panel {
+  padding: 22px !important;
+}
+
+.ui-panel--flush {
+  padding: 0 !important;
+}
+
+.ui-panel__header {
+  margin-bottom: 18px !important;
+}
+
+.ui-panel__title {
+  font-size: 1.02rem !important;
+  letter-spacing: -0.01em;
+}
+
+.ui-grid {
+  gap: 20px !important;
+}
+
+.ui-stat-grid {
+  gap: 16px !important;
+}
+
+.ui-stat {
+  min-height: 96px !important;
+  padding: 18px !important;
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+.ui-stat__icon {
+  width: 40px !important;
+  height: 40px !important;
+  border: 0 !important;
+  border-radius: 11px !important;
+}
+
+.ui-stat__value {
+  font-size: 1.7rem !important;
+  letter-spacing: -0.03em;
+}
+
+.ui-empty,
+.n-empty {
+  min-height: 168px;
+  background: color-mix(in srgb, var(--bg-input) 72%, transparent) !important;
+  border-color: var(--workspace-border) !important;
+  border-radius: 14px !important;
+}
+
+.ui-toolbar {
+  gap: 14px !important;
+}
+
+.n-card,
+.n-data-table,
+.n-list,
+.n-tabs,
+.n-form {
+  --n-border-radius: 14px !important;
+}
+
+.n-card {
+  box-shadow: none !important;
+}
+
+.n-button:not(.n-button--disabled):hover {
+  transform: none !important;
+}
+
+.n-button.n-button--primary-type,
+.n-button.n-button--warning-type {
+  box-shadow: none !important;
+}
+
+.n-button.n-button--primary-type:not(.n-button--disabled):hover {
+  box-shadow: none !important;
+}
+
+.n-data-table {
+  border-color: var(--workspace-border) !important;
+  border-radius: 14px !important;
+}
+
+.n-data-table .n-data-table-th {
+  background: color-mix(in srgb, var(--bg-input) 84%, transparent) !important;
+}
+
+.command-palette {
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.18) !important;
+  backdrop-filter: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Responsive layout
+ * -------------------------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  :root {
+    --workspace-content-offset: 92px;
+  }
+
+  .canvas-header {
+    margin-left: var(--workspace-content-offset) !important;
+  }
+
+  .content-frame {
+    padding-left: var(--workspace-content-offset) !important;
+  }
+
+  .functional-pane {
+    left: 82px !important;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --workspace-edge: 12px;
+    --workspace-content-offset: 12px;
+  }
+
+  .global-rail,
+  .functional-pane {
+    display: none !important;
+  }
+
+  .canvas-header {
+    min-height: 56px !important;
+    margin: 12px 12px 0 !important;
+    padding: 8px 10px 8px 14px !important;
+  }
+
+  .canvas-header .page-category,
+  .canvas-header .user-name,
+  .canvas-header .logout-label {
+    display: none !important;
+  }
+
+  .page-title {
+    max-width: 38vw !important;
+    font-size: 0.98rem !important;
+  }
+
+  .content-frame {
+    padding: 18px 12px 84px !important;
+  }
+
+  .ui-page {
+    gap: 16px !important;
+  }
+
+  .ui-page-header {
+    padding: 18px !important;
+  }
+
+  .ui-page-header::before {
+    inset-block: 14px;
+  }
+
+  .ui-panel {
+    padding: 16px !important;
+  }
+
+  .ui-grid,
+  .ui-stat-grid {
+    gap: 14px !important;
+  }
+
+  .inspector-panel {
+    inset: 12px !important;
+    width: auto !important;
+  }
+}
