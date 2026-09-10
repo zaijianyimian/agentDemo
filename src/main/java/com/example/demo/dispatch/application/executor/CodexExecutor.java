@@ -3,6 +3,7 @@ package com.example.demo.dispatch.application.executor;
 import com.example.demo.dispatch.application.ExecutorToggleService;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "app.agent", name = "mode", havingValue = "legacy", matchIfMissing = true)
 public class CodexExecutor implements Executor {
 
     private static final String CLI = "codex";
@@ -88,14 +90,6 @@ public class CodexExecutor implements Executor {
         }
     }
 
-    /**
-     * Codex NDJSON: 每行一个 JSON 事件，从后往前找带 {@code message} 或 {@code content} 字段的事件。
-     * 找不到则回退到原始字符串。
-     */
-    /**
-     * Codex NDJSON: 每行一个 JSON 事件，从后往前找带 {@code message} / {@code content} 字段的事件；
-     * 找不到则回退到原始字符串。
-     */
     static String extractTextFromJsonl(String raw) {
         if (raw == null || raw.isBlank()) {
             return "";
@@ -131,7 +125,7 @@ public class CodexExecutor implements Executor {
                         }
                     }
                 } catch (Exception ignored) {
-                    // skip malformed line
+                    // 跳过非 JSON 行。
                 }
             }
         } catch (Exception e) {
