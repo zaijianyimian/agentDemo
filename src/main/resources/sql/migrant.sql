@@ -210,8 +210,6 @@ CALL mig_add_column('scheduled_task', 'requires_ai',
     'TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''是否走 AI 执行路径'' AFTER `trigger_status`');
 CALL mig_add_column('job_log', 'create_time',
     'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT ''创建时间''');
-CALL mig_add_column('email_attachment_analysis', 'email_config_id',
-    'BIGINT NULL COMMENT ''所属邮箱配置ID'' AFTER `user_id`');
 
 -- =========================================================
 -- 2. 所有用户归属字段
@@ -220,6 +218,8 @@ CALL mig_add_column('email_attachment_analysis', 'email_config_id',
 -- 强隔离表：最终会收紧为 NOT NULL。
 CALL mig_add_column('email_config', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('email_attachment_analysis', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
+CALL mig_add_column('email_attachment_analysis', 'email_config_id',
+    'BIGINT NULL COMMENT ''所属邮箱配置ID'' AFTER `user_id`');
 CALL mig_add_column('chat_session', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('schedule_event', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('scheduled_task', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
@@ -244,7 +244,6 @@ CALL mig_add_column('skill', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID，
 -- 3. 历史数据归属回填
 -- =========================================================
 
--- 根业务表：历史单用户数据统一归属最早创建的账号。
 UPDATE `email_config`
 SET `user_id` = @default_user_id
 WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
@@ -374,7 +373,6 @@ WHERE tool.user_id IS NULL
 
 -- =========================================================
 -- 4. 私有表收紧为 NOT NULL
--- 如果历史业务表有数据但 user_account 为空，会主动终止迁移，避免静默串用户。
 -- =========================================================
 
 CALL mig_require_user_not_null('email_config');
@@ -396,7 +394,7 @@ CALL mig_require_user_not_null('dispatched_task');
 CALL mig_require_user_not_null('ai_model_config');
 
 -- =========================================================
--- 5. 移除单用户时代的全局唯一约束，替换为 owner 维度唯一约束
+-- 5. 单用户唯一约束 -> owner 维度唯一约束
 -- =========================================================
 
 CALL mig_drop_index('email_config', 'uk_email');
@@ -504,7 +502,6 @@ CALL mig_add_fk('mcp_tool', 'fk_mcp_tool_user',
 CALL mig_add_fk('skill', 'fk_skill_user',
     'CONSTRAINT `fk_skill_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 
--- email_listener_state 通过 email_config 继承 owner；清除历史孤儿后补 FK。
 DELETE state_row
 FROM `email_listener_state` state_row
 LEFT JOIN `email_config` config ON config.id = state_row.config_id
