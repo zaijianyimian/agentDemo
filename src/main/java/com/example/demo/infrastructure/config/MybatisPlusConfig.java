@@ -19,15 +19,35 @@ import java.util.Set;
 /**
  * MyBatis Plus 配置类。
  *
- * <p>MySQL 仍然是 Java 唯一业务数据源。对已完成多用户改造的表，通过 TenantLine 自动追加
- * {@code user_id} 条件；后台线程没有登录态时不启用过滤，保证邮件监听和定时任务可以跨用户运行。</p>
+ * <p>MySQL 仍然是 Java 唯一业务数据源。用户私有表通过 TenantLine 自动追加
+ * {@code user_id} 条件；系统级后台扫描没有用户上下文时不启用过滤，扫描到具体任务后再由
+ * UserExecutionContext 绑定 owner，保证后台执行阶段继续遵守租户边界。</p>
  */
 @Configuration
 public class MybatisPlusConfig implements MetaObjectHandler {
 
+    /**
+     * 强租户隔离表。混合范围表（ai_model_config / mcp_tool / skill）不在此集合，
+     * 它们需要同时支持系统全局记录（user_id IS NULL）与当前用户私有记录。
+     */
     private static final Set<String> USER_SCOPED_TABLES = Set.of(
             "email_config",
-            "chat_session"
+            "email_attachment_analysis",
+            "chat_session",
+            "schedule_event",
+            "scheduled_task",
+            "job_log",
+            "note",
+            "code_snippet",
+            "document",
+            "chat_history",
+            "virtual_assistant",
+            "knowledge_base",
+            "knowledge_document",
+            "search_history",
+            "user_interest",
+            "dispatched_task",
+            "push_config"
     );
 
     private final CurrentUserProvider currentUserProvider;
