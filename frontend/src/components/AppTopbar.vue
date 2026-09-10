@@ -63,7 +63,7 @@ import {
   SearchOutline
 } from '@vicons/ionicons5'
 
-export type ServiceStatus = 'active' | 'inactive' | 'error'
+type ServiceStatus = 'active' | 'inactive' | 'error'
 
 const props = withDefaults(defineProps<{
   title: string
