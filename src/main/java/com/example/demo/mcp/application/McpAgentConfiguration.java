@@ -17,30 +17,25 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * MCP Agent 配置。
+ * LEGACY 模式下的本地 LangChain4j Agent 配置。
  *
- * <p>ToolProvider 始终保留给 Java 兼容能力使用；只有两个本地 Agent Bean 会在 Graph 关闭时创建。
- * Graph 开启后由 {@link GraphMcpAgentConfiguration} 提供同名 Bean。</p>
+ * <p>REMOTE 模式不会创建 ToolProvider、本地 Agent 服务或其对 ChatModel 的依赖，避免 Java
+ * 在远程模式继续承担 Agent Tool Selection 与模型执行。</p>
  */
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "app.agent", name = "mode", havingValue = "legacy", matchIfMissing = true)
 public class McpAgentConfiguration {
 
     private final McpToolAdapter mcpToolAdapter;
     private final EmailTools emailTools;
     private final Map<Object, MessageWindowChatMemory> chatMemories = new ConcurrentHashMap<>();
 
-    /**
-     * 动态工具提供者，从缓存加载启用工具。
-     *
-     * @return 工具提供器。
-     */
     @Bean
     public ToolProvider mcpToolProvider() {
         return request -> {
             var builder = dev.langchain4j.service.tool.ToolProviderResult.builder();
-
             mcpToolAdapter.loadToolSpecifications().forEach(spec -> {
                 ToolExecutor executor = (executionRequest, memoryId) -> {
                     log.info("执行工具: {}", executionRequest.name());
@@ -48,21 +43,12 @@ public class McpAgentConfiguration {
                 };
                 builder.add(spec, executor);
             });
-
             log.debug("加载 {} 个工具", mcpToolAdapter.loadToolSpecifications().size());
             return builder.build();
         };
     }
 
-    /**
-     * 本地 LangChain4j MCP Agent 服务。
-     *
-     * @param chatModel 聊天模型。
-     * @param toolProvider 工具提供器。
-     * @return 本地 Agent 服务。
-     */
     @Bean
-    @ConditionalOnProperty(prefix = "app.graph", name = "enabled", havingValue = "false", matchIfMissing = true)
     public McpAgentService mcpAgentService(ChatModel chatModel, ToolProvider toolProvider) {
         return AiServices.builder(McpAgentService.class)
                 .chatModel(chatModel)
@@ -73,15 +59,7 @@ public class McpAgentConfiguration {
                 .build();
     }
 
-    /**
-     * 本地 LangChain4j MCP Agent 流式服务。
-     *
-     * @param streamingChatModel 流式模型。
-     * @param toolProvider 工具提供器。
-     * @return 本地 Agent 流式服务。
-     */
     @Bean("mcpAgentStreamingService")
-    @ConditionalOnProperty(prefix = "app.graph", name = "enabled", havingValue = "false", matchIfMissing = true)
     public McpAgentService mcpAgentStreamingService(
             StreamingChatModel streamingChatModel,
             ToolProvider toolProvider) {
