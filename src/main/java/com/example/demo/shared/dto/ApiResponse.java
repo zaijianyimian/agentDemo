@@ -25,6 +25,14 @@ public class ApiResponse<T> {
     /** 稳定的业务响应码，便于前端按类型处理。 */
     private String code;
 
+    /**
+     * 兼容旧异常响应中的 error 字段。
+     *
+     * @deprecated 新代码统一读取 {@link #code}。
+     */
+    @Deprecated
+    private String error;
+
     /** 面向用户的响应消息。 */
     private String message;
 
@@ -99,6 +107,7 @@ public class ApiResponse<T> {
         return ApiResponse.<T>builder()
                 .success(false)
                 .code("REQUEST_FAILED")
+                .error("REQUEST_FAILED")
                 .message(message)
                 .timestamp(Instant.now())
                 .build();
@@ -116,6 +125,7 @@ public class ApiResponse<T> {
         return ApiResponse.<T>builder()
                 .success(false)
                 .code("REQUEST_FAILED")
+                .error("REQUEST_FAILED")
                 .message(message)
                 .data(data)
                 .timestamp(Instant.now())
@@ -145,9 +155,10 @@ public class ApiResponse<T> {
             String code,
             String message,
             Map<String, Object> details) {
-        return ApiResponse.builder()
+        return ApiResponse.<Object>builder()
                 .success(false)
                 .code(code)
+                .error(code)
                 .message(message)
                 .timestamp(Instant.now())
                 .details(details)
