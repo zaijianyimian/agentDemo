@@ -53,6 +53,7 @@ let refreshingPromise: Promise<string> | null = null
 
 type ApiErrorPayload = ApiResponse<unknown> & {
   code?: string
+  error?: string
   timestamp?: string
   details?: Record<string, unknown>
 }
@@ -66,9 +67,12 @@ const applyBackendErrorMessage = (error: any): void => {
   if (payload.message) {
     error.message = payload.message
   }
-  if (payload.code) {
-    error.apiCode = payload.code
+
+  const apiCode = payload.code || payload.error
+  if (apiCode) {
+    error.apiCode = apiCode
   }
+
   if (payload.details) {
     error.apiDetails = payload.details
   }
