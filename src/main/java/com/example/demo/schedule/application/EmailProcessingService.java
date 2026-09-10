@@ -11,6 +11,7 @@ import com.example.demo.model.application.QwenChatService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
@@ -24,11 +25,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 邮件智能处理服务
- * 接收邮件 -> 调用大模型解析 -> 保存日程 -> 写入文件
+ * 邮件智能处理服务。
+ * 接收邮件 -> 调用大模型解析 -> 保存日程 -> 写入文件。
+ *
+ * <p>仅在 Python Graph 未启用时作为兼容实现运行；Graph 开启后邮件分析职责完全交给 Python。</p>
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(prefix = "app.graph", name = "enabled", havingValue = "false", matchIfMissing = true)
 public class EmailProcessingService {
 
     private final QwenChatService qwenChatService;
@@ -59,7 +63,7 @@ public class EmailProcessingService {
     }
 
     /**
-     * 处理新邮件
+     * 处理新邮件。
      */
     public void handle(EmailMessage emailMessage) {
         log.info("处理新邮件: {} - {}", emailMessage.getFrom(), emailMessage.getSubject());
@@ -129,7 +133,7 @@ public class EmailProcessingService {
     }
 
     /**
-     * 提取邮件内容
+     * 提取邮件内容。
      */
     private String extractContent(EmailMessage emailMessage) {
         // 优先使用纯文本内容
@@ -144,7 +148,7 @@ public class EmailProcessingService {
     }
 
     /**
-     * 去除HTML标签
+     * 去除HTML标签。
      */
     private String stripHtml(String html) {
         return html.replaceAll("<[^>]*>", " ")
@@ -153,7 +157,7 @@ public class EmailProcessingService {
     }
 
     /**
-     * 调用大模型解析邮件中的日程信息
+     * 调用大模型解析邮件中的日程信息。
      */
     private EmailAnalysis analyzeEmail(EmailMessage emailMessage, String content) {
         String prompt = buildPrompt(emailMessage, content);
@@ -171,7 +175,7 @@ public class EmailProcessingService {
     }
 
     /**
-     * 构建提示词
+     * 构建提示词。
      */
     private String buildPrompt(EmailMessage emailMessage, String content) {
         return """
@@ -226,7 +230,7 @@ public class EmailProcessingService {
     }
 
     /**
-     * 解析大模型响应
+     * 解析大模型响应。
      */
     private EmailAnalysis parseModelResponse(String response, EmailMessage emailMessage, String content) {
         try {
@@ -439,7 +443,7 @@ public class EmailProcessingService {
     }
 
     /**
-     * 从响应中提取JSON
+     * 从响应中提取JSON。
      */
     private String extractJson(String response) {
         // 尝试找到JSON块
@@ -454,7 +458,7 @@ public class EmailProcessingService {
     }
 
     /**
-     * 手动处理邮件内容（用于测试或手动触发）
+     * 手动处理邮件内容（用于测试或手动触发）。
      */
     public ScheduleEvent processEmailContent(String subject, String from, String content) {
         EmailMessage emailMessage = EmailMessage.builder()

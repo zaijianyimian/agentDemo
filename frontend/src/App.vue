@@ -1,16 +1,11 @@
 <template>
-  <!-- Naive UI Global Providers - Must wrap entire app -->
   <n-config-provider :theme-overrides="themeOverrides">
     <n-message-provider>
       <n-dialog-provider>
         <n-notification-provider>
           <EmailNotificationBridge />
-          <!-- App Content -->
           <div class="app-root" :data-theme="actualTheme">
-            <!-- Auth pages: direct render -->
             <router-view v-if="isAuthPage" />
-
-            <!-- Main app: Mac-style shell -->
             <MacAppShell v-else>
               <router-view />
             </MacAppShell>
@@ -26,16 +21,16 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   NConfigProvider,
-  NMessageProvider,
   NDialogProvider,
+  NMessageProvider,
   NNotificationProvider,
   type GlobalThemeOverrides
 } from 'naive-ui'
-import { useThemeStore } from '@/stores/theme'
-import { useAuthStore } from '@/stores/auth'
-import { hasAccessToken } from '@/services/auth-token'
-import MacAppShell from '@/components/MacAppShell.vue'
 import EmailNotificationBridge from '@/components/EmailNotificationBridge.vue'
+import MacAppShell from '@/components/MacAppShell.vue'
+import { hasAccessToken } from '@/services/auth-token'
+import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 
 const route = useRoute()
 const themeStore = useThemeStore()
@@ -50,20 +45,19 @@ const actualTheme = computed(() => {
   return themeStore.mode
 })
 
-// Naive UI theme overrides for macOS style
-// Dynamic based on actual theme for text visibility
+// Agent Workspace 使用克制的橙色作为强调色，业务页面统一复用 Naive UI 主题变量。
 const themeOverrides = computed<GlobalThemeOverrides>(() => {
   const isDark = actualTheme.value === 'dark'
 
   return {
     common: {
       primaryColor: isDark ? '#FB923C' : '#EA580C',
-      primaryColorHover: isDark ? '#F97316' : '#F97316',
+      primaryColorHover: '#F97316',
       primaryColorPressed: isDark ? '#EA580C' : '#C2410C',
       primaryColorSuppl: isDark ? '#FDBA74' : '#F97316',
       borderRadius: '12px',
       borderRadiusSmall: '8px',
-      fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
+      fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
       textColor: isDark ? '#F8FAFC' : '#111827',
       textColor2: isDark ? '#CBD5E1' : '#475569',
       textColor3: isDark ? '#94A3B8' : '#64748B',
@@ -121,32 +115,27 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   }
 })
 
-// Initialize auth store
 onMounted(async () => {
   if (hasAccessToken() && !authStore.user && !authStore.initialized) {
     await authStore.hydrate()
   }
 })
 
-// Apply theme to document
-watch(actualTheme, (theme) => {
+watch(actualTheme, theme => {
   document.documentElement.setAttribute('data-theme', theme)
 }, { immediate: true })
 
-// Update document title
-watch(() => route.meta.title, (title) => {
-  document.title = `${title || 'Agent Grid'} - Dashboard`
+watch(() => route.meta.title, title => {
+  document.title = `${title || 'Agent Workspace'} - Agent Workspace`
 })
 </script>
 
 <style>
-/* Import macOS design variables */
 @import '@/styles/variables.css';
 
-/* App Root - Ensure proper height inheritance */
 .app-root {
-  height: 100vh;
   width: 100vw;
+  height: 100vh;
   overflow: hidden;
 }
 </style>

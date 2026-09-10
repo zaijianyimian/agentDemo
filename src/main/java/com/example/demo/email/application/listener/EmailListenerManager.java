@@ -10,6 +10,7 @@ import com.example.demo.email.domain.EmailListenerState;
 import com.example.demo.email.domain.listener.ListenMode;
 import com.example.demo.email.domain.listener.ListenerStatus;
 import com.example.demo.email.domain.listener.MailProvider;
+import com.example.demo.email.persistence.EmailConfigMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,12 +33,15 @@ public class EmailListenerManager {
     private final EmailListenerStateService stateService;
     private final MailSourceAdapterRegistry adapterRegistry;
     private final ListenStrategyRegistry strategyRegistry;
+    private final EmailConfigMapper emailConfigMapper;
 
     private final Map<Long, ListenStrategy> runningStrategies = new ConcurrentHashMap<>();
     private final Map<Long, EmailConfig> runningConfigs = new ConcurrentHashMap<>();
 
     /**
      * 启动指定邮箱的监听：选择 provider 适配器 + 监听策略并替换已有的同邮箱会话。
+     *
+     * @param config 邮箱配置。
      */
     public void start(EmailConfig config) {
         authConfigService.decodeTransientFields(config);
@@ -61,7 +65,9 @@ public class EmailListenerManager {
     }
 
     /**
-     * 停止指定邮箱的监听并把状态置为已停止。
+     * 停止指定邮箱监听并更新状态。
+     *
+     * @param configId 邮箱配置 ID。
      */
     public void stop(Long configId) {
         ListenStrategy strategy = runningStrategies.remove(configId);
@@ -74,9 +80,7 @@ public class EmailListenerManager {
         }
     }
 
-    /**
-     * 停止所有邮箱的监听。
-     */
+    /** 停止所有邮箱监听。 */
     public void stopAll() {
         for (Long configId : List.copyOf(runningStrategies.keySet())) {
             stop(configId);
@@ -84,13 +88,23 @@ public class EmailListenerManager {
     }
 
     /**
-     * 汇总所有邮箱的连接状态、运行状态、最近成功/错误时间等，供管理面板展示。
+     * 汇总当前请求可见邮箱的运行状态。
+     *
+     * <p>状态表本身没有 user_id，因此不能直接把 {@link EmailListenerStateService#listAll()} 的结果返回。
+     * 这里重新通过 {@code email_config} 查询配置；HTTP 请求场景会被 MyBatis TenantLine 自动按当前 JWT
+     * 用户过滤，后台线程无认证上下文时则仍可看到全部状态。</p>
+     *
+     * @return 当前调用方可见的邮箱状态。
      */
     public Map<Long, Map<String, Object>> status() {
         Map<Long, Map<String, Object>> result = new HashMap<>();
         for (EmailListenerState state : stateService.listAll()) {
+            EmailConfig config = emailConfigMapper.selectById(state.getConfigId());
+            if (config == null) {
+                continue;
+            }
+
             Map<String, Object> item = new HashMap<>();
-            EmailConfig config = runningConfigs.get(state.getConfigId());
             item.put("connected", runningStrategies.containsKey(state.getConfigId()));
             item.put("status", state.getStatus());
             item.put("provider", state.getProvider());
@@ -99,8 +113,8 @@ public class EmailListenerManager {
             item.put("lastSuccessTime", state.getLastSuccessTime());
             item.put("lastErrorTime", state.getLastErrorTime());
             item.put("lastError", state.getLastError());
-            item.put("email", config == null ? "" : config.getEmail());
-            item.put("host", config == null ? "" : config.getHost());
+            item.put("email", config.getEmail());
+            item.put("host", config.getHost());
             result.put(state.getConfigId(), item);
         }
         return result;
@@ -108,6 +122,9 @@ public class EmailListenerManager {
 
     /**
      * 把 provider webhook 回调转交给对应邮箱的 webhook 策略处理。
+     *
+     * @param configId 邮箱配置 ID。
+     * @param payload Webhook 请求体。
      */
     public void handleWebhook(Long configId, Map<String, Object> payload) {
         EmailConfig config = runningConfigs.get(configId);

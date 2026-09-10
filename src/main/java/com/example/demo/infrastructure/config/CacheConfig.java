@@ -1,9 +1,13 @@
 package com.example.demo.infrastructure.config;
 
+import com.example.demo.infrastructure.security.CurrentUserProvider;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
+import org.springframework.cache.interceptor.KeyGenerator;
+import org.springframework.cache.interceptor.SimpleKeyGenerator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,12 +15,14 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * 缓存配置
- * 使用 Caffeine 作为 Spring Cache 后端，统一管理用户、模型、技能、设置等缓存名称与过期策略
+ * Caffeine 缓存配置。
+ *
+ * <p>默认 KeyGenerator 会把当前 userId 放进缓存键，避免模型、Skill、知识库、Note 等用户数据
+ * 因相同方法参数命中另一个用户的缓存。系统后台无用户上下文时使用 {@code system} scope。</p>
  */
 @Configuration
 @EnableCaching
-public class CacheConfig {
+public class CacheConfig implements CachingConfigurer {
 
     public static final String USER_ACCOUNT_BY_ID = "userAccountById";
     public static final String USER_ACCOUNT_BY_USERNAME = "userAccountByUsername";
@@ -45,10 +51,15 @@ public class CacheConfig {
     public static final String PERSONAL_INSIGHTS = "personalInsights";
     public static final String EMAIL_CONFIG_LIST = "emailConfigList";
 
-    /**
-     * 配置 Caffeine 缓存管理器
-     */
+    private final CurrentUserProvider currentUserProvider;
+
+    public CacheConfig(CurrentUserProvider currentUserProvider) {
+        this.currentUserProvider = currentUserProvider;
+    }
+
+    /** 配置 Caffeine 缓存管理器。 */
     @Bean
+    @Override
     public CacheManager cacheManager() {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager();
         cacheManager.setCacheNames(List.of(
@@ -85,5 +96,22 @@ public class CacheConfig {
                 .expireAfterWrite(Duration.ofSeconds(30))
                 .recordStats());
         return cacheManager;
+    }
+
+    /**
+     * 默认缓存键增加用户 scope。
+     *
+     * @return 租户感知 KeyGenerator。
+     */
+    @Bean
+    @Override
+    public KeyGenerator keyGenerator() {
+        return (target, method, params) -> {
+            String scope = currentUserProvider.currentUserId()
+                    .map(id -> "user:" + id)
+                    .orElse("system");
+            Object methodKey = SimpleKeyGenerator.generateKey(params);
+            return scope + ":" + method.getDeclaringClass().getName() + ":" + method.getName() + ":" + methodKey;
+        };
     }
 }

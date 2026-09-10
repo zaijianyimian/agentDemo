@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS `email_listener_state` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `config_id` BIGINT NOT NULL COMMENT '邮箱配置ID',
     `provider` VARCHAR(40) NOT NULL COMMENT '邮箱提供商',
-    `listen_mode` VARCHAR(40) NOT NULL COMMENT '监听模式',
+    `listen_mode` VARCHAR(40) NOT NULL COMMENT '监听模式: POLLING/IMAP_IDLE/WEBHOOK/DELTA_SYNC',
     `fallback_listen_mode` VARCHAR(40) DEFAULT NULL COMMENT '降级监听模式',
     `cursor_type` VARCHAR(40) DEFAULT NULL COMMENT '游标类型: UID/MESSAGE_COUNT/GMAIL_HISTORY_ID/GRAPH_DELTA_LINK等',
     `cursor_value` LONGTEXT DEFAULT NULL COMMENT '游标值',
@@ -210,7 +210,6 @@ CREATE TABLE IF NOT EXISTS `schedule_event` (
     INDEX `idx_event_date` (`event_date`),
     INDEX `idx_reminder_status` (`reminder_status`),
     INDEX `idx_summary_status` (`summary_status`),
-    -- 按日期范围查未完成事件 + 按状态过滤提醒的复合索引
     INDEX `idx_date_status` (`event_date`, `status`),
     INDEX `idx_reminder_enabled_time` (`reminder_enabled`, `event_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日程事件表';
@@ -238,7 +237,6 @@ CREATE TABLE IF NOT EXISTS `scheduled_task` (
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     INDEX `idx_enabled` (`enabled`),
     INDEX `idx_task_type` (`task_type`),
-    -- JobTriggerThread 每秒扫 enabled=1 且 next_execute_time<=now 的任务，复合索引避免全表扫
     INDEX `idx_enabled_next` (`enabled`, `next_execute_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定时任务表';
 
@@ -265,7 +263,6 @@ CREATE TABLE IF NOT EXISTS `chat_message` (
     `token_count` INT COMMENT 'token数量',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX `idx_session_time` (`session_id`, `create_time`),
-    -- 翻页查询按 session_id + id DESC 的反向索引，覆盖 (session_id, id) 避免回表
     INDEX `idx_session_id` (`session_id`, `id`),
     FOREIGN KEY (`session_id`) REFERENCES `chat_session`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天消息表';
@@ -486,7 +483,6 @@ CREATE TABLE IF NOT EXISTS `system_settings` (
 -- 14. 初始化数据
 -- ============================================
 
--- 系统设置初始化
 INSERT INTO `system_settings` (`category`, `config_key`, `config_value`, `description`) VALUES
 ('system', 'site_name', 'AI Agent', '系统名称'),
 ('system', 'site_logo', '', '系统Logo URL'),
@@ -610,4 +606,159 @@ CREATE TABLE IF NOT EXISTS `email_attachment_analysis` (
 -- ============================================
 -- 数据库初始化完成！
 -- 包含模块：用户认证、AI模型、邮件、文件、日程、任务、聊天、知识库、笔记、工具技能、搜索、设置、派发执行、附件 AI 解析
+-- ============================================
+
+-- =========================================================
+-- 15. 多用户与当前运行时结构追加（2026-09-10）
+--
+-- 说明：保留上方原始初始化结构，在文件末尾追加当前版本需要的字段、索引和外键。
+-- 新库首次初始化直接执行本文件即可；已有数据库请执行 migrant.sql。
+-- =========================================================
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- 当前 ScheduledTask 实体新增字段。
+ALTER TABLE `scheduled_task`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD COLUMN `trigger_status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '触发状态: 0=静止,1=运行中' AFTER `enabled`,
+    ADD COLUMN `requires_ai` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否走 AI 执行路径' AFTER `trigger_status`;
+
+-- JobLog 在原始 schema_init 中没有完整建表定义，这里补齐。
+CREATE TABLE IF NOT EXISTS `job_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL COMMENT '所属用户ID',
+    `job_id` BIGINT NOT NULL COMMENT 'scheduled_task.id',
+    `job_name` VARCHAR(100) NOT NULL COMMENT '任务名',
+    `handler` VARCHAR(100) NOT NULL COMMENT '执行 handler',
+    `trigger_type` VARCHAR(20) NOT NULL DEFAULT 'CRON' COMMENT 'CRON/MANUAL/MISFIRE',
+    `trigger_time` DATETIME NOT NULL COMMENT '触发时间',
+    `handle_start_time` DATETIME DEFAULT NULL COMMENT '执行开始时间',
+    `handle_end_time` DATETIME DEFAULT NULL COMMENT '执行结束时间',
+    `duration_ms` BIGINT DEFAULT NULL COMMENT '执行耗时毫秒',
+    `status` VARCHAR(20) NOT NULL DEFAULT 'RUNNING' COMMENT 'RUNNING/SUCCESS/FAILED',
+    `executor_param` TEXT COMMENT '执行参数快照',
+    `result` MEDIUMTEXT COMMENT '执行结果',
+    `error_message` TEXT COMMENT '失败信息',
+    `alarm_status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '0=无需告警,1=需要告警',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_log_job_id` (`job_id`),
+    KEY `idx_log_trigger_time` (`trigger_time`),
+    KEY `idx_log_status` (`status`),
+    KEY `idx_job_log_user_job_create` (`user_id`, `job_id`, `create_time`),
+    CONSTRAINT `fk_job_log_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_job_log_task` FOREIGN KEY (`job_id`) REFERENCES `scheduled_task`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务执行日志';
+
+-- 强租户隔离表。
+ALTER TABLE `email_config`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    DROP INDEX `uk_email`,
+    ADD UNIQUE KEY `uk_email_config_user_email` (`user_id`, `email`),
+    ADD KEY `idx_email_config_user_enabled` (`user_id`, `enabled`),
+    ADD CONSTRAINT `fk_email_config_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `email_attachment_analysis`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD COLUMN `email_config_id` BIGINT NULL COMMENT '所属邮箱配置ID' AFTER `user_id`,
+    ADD KEY `idx_eaa_user_message_file` (`user_id`, `email_config_id`, `message_id`(128), `file_name`(128)),
+    ADD CONSTRAINT `fk_eaa_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE,
+    ADD CONSTRAINT `fk_eaa_email_config` FOREIGN KEY (`email_config_id`) REFERENCES `email_config`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `chat_session`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_chat_session_user_last_message` (`user_id`, `last_message_time`, `create_time`),
+    ADD CONSTRAINT `fk_chat_session_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `schedule_event`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_schedule_user_date_status` (`user_id`, `event_date`, `status`),
+    ADD CONSTRAINT `fk_schedule_event_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `scheduled_task`
+    ADD KEY `idx_task_user_enabled_next` (`user_id`, `enabled`, `next_execute_time`),
+    ADD CONSTRAINT `fk_scheduled_task_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `note`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_note_user_pinned_update` (`user_id`, `is_pinned`, `update_time`),
+    ADD CONSTRAINT `fk_note_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `code_snippet`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_snippet_user_language` (`user_id`, `language`),
+    ADD CONSTRAINT `fk_code_snippet_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `document`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_document_user_status_create` (`user_id`, `status`, `create_time`),
+    ADD CONSTRAINT `fk_document_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `chat_history`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_chat_history_user_session_time` (`user_id`, `session_id`, `message_time`),
+    ADD CONSTRAINT `fk_chat_history_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `virtual_assistant`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    DROP INDEX `uk_collection_name`,
+    ADD UNIQUE KEY `uk_virtual_assistant_user_collection` (`user_id`, `collection_name`),
+    ADD KEY `idx_virtual_assistant_user_enabled` (`user_id`, `enabled`),
+    ADD CONSTRAINT `fk_virtual_assistant_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `knowledge_base`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_knowledge_base_user_enabled` (`user_id`, `enabled`),
+    ADD CONSTRAINT `fk_knowledge_base_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `knowledge_document`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_knowledge_document_user_base_status` (`user_id`, `base_id`, `status`),
+    ADD CONSTRAINT `fk_knowledge_document_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `search_history`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_search_history_user_create` (`user_id`, `create_time`),
+    ADD CONSTRAINT `fk_search_history_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `user_interest`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    DROP INDEX `uk_tag`,
+    ADD UNIQUE KEY `uk_user_interest_user_tag` (`user_id`, `tag`),
+    ADD CONSTRAINT `fk_user_interest_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `dispatched_task`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_dispatch_user_status_created` (`user_id`, `status`, `created_at`),
+    ADD CONSTRAINT `fk_dispatched_task_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `ai_model_config`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_model_user_enabled_default` (`user_id`, `enabled`, `is_default`),
+    ADD CONSTRAINT `fk_ai_model_config_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+-- 混合范围表：NULL 表示系统内置记录。
+ALTER TABLE `mcp_tool`
+    ADD COLUMN `user_id` BIGINT NULL COMMENT '所属用户ID，NULL=系统工具' AFTER `id`,
+    DROP INDEX `uk_name`,
+    ADD UNIQUE KEY `uk_mcp_tool_user_name` (`user_id`, `name`),
+    ADD KEY `idx_mcp_tool_user_enabled` (`user_id`, `enabled`),
+    ADD CONSTRAINT `fk_mcp_tool_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+ALTER TABLE `skill`
+    ADD COLUMN `user_id` BIGINT NULL COMMENT '所属用户ID，NULL=系统内置技能' AFTER `id`,
+    DROP INDEX `uk_code`,
+    ADD UNIQUE KEY `uk_skill_user_code` (`user_id`, `code`),
+    ADD KEY `idx_skill_user_enabled_category` (`user_id`, `enabled`, `category`),
+    ADD CONSTRAINT `fk_skill_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
+
+-- 子表通过父对象继承租户归属。
+ALTER TABLE `email_listener_state`
+    ADD CONSTRAINT `fk_email_listener_state_config`
+        FOREIGN KEY (`config_id`) REFERENCES `email_config`(`id`) ON DELETE CASCADE;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================
+-- 多用户结构追加完成
 -- ============================================

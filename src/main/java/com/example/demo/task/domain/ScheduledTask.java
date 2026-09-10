@@ -1,16 +1,19 @@
 package com.example.demo.task.domain;
 
-import com.baomidou.mybatisplus.annotation.*;
-import lombok.Data;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * 定时任务实体
- */
+/** 定时任务实体。 */
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,44 +24,28 @@ public class ScheduledTask {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 所属用户，只由服务端租户上下文写入。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long userId;
+
     private String name;
-
     private String description;
-
     private String taskType;
-
     private String cronExpression;
-
     private String params;
-
     private String skillCode;
-
     private LocalDateTime lastExecuteTime;
-
     private String lastExecuteResult;
-
     private LocalDateTime nextExecuteTime;
-
     private Integer executeCount;
-
     private Integer successCount;
-
     private Integer failCount;
-
     private Boolean enabled;
 
-    /**
-     * 是否走 AI 路径（true 时触发定时任务会调用 Claude Code CLI，把 description + params
-     * 作为 prompt 喂进去，并把 stdout 写到 result）。适用于"自动总结"、"代码 review"、
-     * "生成日报"等希望 LLM 介入的场景。
-     */
+    /** 是否走 AI 执行路径。 */
     private Boolean requiresAi;
 
-    /**
-     * 触发状态：0=静止, 1=运行中。
-     * <p>
-     * 对应迁移脚本新增的 {@code trigger_status} 列；由调度线程写入。
-     */
+    /** 0=静止，1=运行中。 */
     private Integer triggerStatus;
 
     @TableField(fill = FieldFill.INSERT)

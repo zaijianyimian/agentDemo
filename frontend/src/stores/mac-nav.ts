@@ -1,18 +1,7 @@
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
 
-/**
- * macOS 风格导航 Store
- *
- * 职责：管理三级导航（Rail → Pane → Inspector）的状态、分组定义、激活态以及最近访问统计。
- * State 形状：
- *  - categories: NavCategory[] - 所有功能分组与各自分组下的路由
- *  - activeCategory: string | null - 当前激活的分组 ID（控制 Pane 显隐）
- *  - quickAccessItems: QuickAccessItem[] - 最近访问记录（持久化于 localStorage）
- *  - inspectorOpen / inspectorContent - 第三层 Inspector 面板状态
- *  - paneAnimating: boolean - Pane 开关动画进行中标记
- *  - currentCategory / topQuickAccess - 派生计算属性
- */
+/** 全局导航分组。 */
 export interface NavCategory {
   id: string
   label: string
@@ -21,6 +10,7 @@ export interface NavCategory {
   routes: NavRoute[]
 }
 
+/** 导航路由元信息。 */
 export interface NavRoute {
   name: string
   path: string
@@ -30,9 +20,7 @@ export interface NavRoute {
   hasInspector?: boolean
 }
 
-/**
- * Quick Access Item - Recently/frequently accessed
- */
+/** 最近访问记录。 */
 export interface QuickAccessItem {
   name: string
   path: string
@@ -43,135 +31,117 @@ export interface QuickAccessItem {
 }
 
 /**
- * macOS Navigation Store
- * Manages three-level navigation: Rail → Pane → Inspector
+ * Agent Workspace 导航 Store。
+ *
+ * 保留旧 Pane/Inspector 状态字段，保证历史组件与调用方继续兼容；新的主界面只使用
+ * categories 与最近访问能力。
  */
 export const useMacNavStore = defineStore('macNav', () => {
-  // Navigation categories - macOS functional grouping
   const categories = ref<NavCategory[]>([
     {
       id: 'workspace',
-      label: '工作空间',
+      label: 'Workspace',
       icon: 'grid',
       color: 'var(--category-workspace)',
       routes: [
-        { name: 'Dashboard', path: '/', label: '仪表盘', description: '全局状态与今日重点', icon: 'home' },
-        { name: 'Inbox', path: '/inbox', label: '收件箱', description: '聚合日程、任务、笔记', icon: 'inbox' },
-        { name: 'Autonomy', path: '/autonomy', label: '自治中心', description: '项目扫描与验证', icon: 'sparkles' },
-        { name: 'Reports', path: '/reports', label: '日报周报', description: '生成与查看报告', icon: 'reader' }
+        { name: 'Dashboard', path: '/', label: '首页', description: '今日重点与 Agent 工作动态', icon: 'home' },
+        { name: 'Chat', path: '/chat', label: 'Agent 对话', description: '向 Agent 下达自然语言任务', icon: 'chatbubbles' },
+        { name: 'Inbox', path: '/inbox', label: '统一收件箱', description: '集中处理邮件、任务和日程事项', icon: 'inbox' }
       ]
     },
     {
-      id: 'engine',
-      label: '核心引擎',
-      icon: 'cpu',
-      color: 'var(--category-engine)',
+      id: 'productivity',
+      label: 'Productivity',
+      icon: 'calendar',
+      color: 'var(--category-automation)',
       routes: [
-        { name: 'Models', path: '/models', label: '模型配置', description: '管理可用模型', icon: 'cube', hasInspector: true },
-        { name: 'Settings', path: '/settings', label: '系统设置', description: 'Qdrant、搜索、代理参数', icon: 'settings', hasInspector: true }
+        { name: 'Schedule', path: '/schedule', label: '日程', description: '查看事件、提醒与邮件解析日程', icon: 'calendar' },
+        { name: 'Tasks', path: '/tasks', label: '定时任务', description: '管理可由 Agent 触发的计划任务', icon: 'time' },
+        { name: 'TaskAdmin', path: '/task-admin', label: '调度管理', description: '查看任务执行状态与日志', icon: 'timer' },
+        { name: 'Notes', path: '/notes', label: '笔记', description: '沉淀知识并调用 AI 总结', icon: 'note' },
+        { name: 'Notifications', path: '/notifications', label: '通知', description: '系统提醒与消息中心', icon: 'bell' },
+        { name: 'Reports', path: '/reports', label: '日报周报', description: '生成并查看个人报告', icon: 'reader' }
       ]
     },
     {
       id: 'knowledge',
-      label: '知识大脑',
+      label: 'Knowledge',
       icon: 'brain',
       color: 'var(--category-knowledge)',
       routes: [
-        { name: 'Knowledge', path: '/knowledge', label: '知识库', description: 'RAG 检索', icon: 'book' },
-        { name: 'KnowledgeSearch', path: '/knowledge-search', label: '知识搜索', description: '语义搜索文档', icon: 'search' },
-        { name: 'Chat', path: '/chat', label: 'AI 聊天', description: '会话式对话', icon: 'chatbubbles' },
+        { name: 'Knowledge', path: '/knowledge', label: '知识库', description: '管理 RAG 文档与知识空间', icon: 'book' },
+        { name: 'KnowledgeSearch', path: '/knowledge-search', label: '知识搜索', description: '语义检索知识库内容', icon: 'search' },
+        { name: 'Files', path: '/files', label: '文件', description: '上传、检索与分析文件资产', icon: 'folder' },
+        { name: 'Search', path: '/search', label: '网络搜索', description: '搜索、总结与历史分析', icon: 'search' },
         { name: 'ChatImport', path: '/chatimport', label: '聊天导入', description: '导入外部聊天记录', icon: 'import' },
-        { name: 'Notes', path: '/notes', label: '笔记', description: '记录与总结', icon: 'note' },
-        { name: 'Files', path: '/files', label: '文件管理', description: '上传与检索文件', icon: 'folder' }
+        { name: 'ScheduleReader', path: '/schedule-reader', label: '日程阅读', description: '以 Markdown 浏览日程文件', icon: 'reader' }
       ]
     },
     {
-      id: 'automation',
-      label: '自动化',
-      icon: 'timer',
-      color: 'var(--category-automation)',
-      routes: [
-        { name: 'Tasks', path: '/tasks', label: '定时任务', description: '配置计划任务', icon: 'time' },
-        { name: 'TaskAdmin', path: '/task-admin', label: '调度管理', description: 'xxl-job 风格调度中心', icon: 'calendar' },
-        { name: 'Schedule', path: '/schedule', label: '日程管理', description: '事件与推送', icon: 'calendar' },
-        { name: 'ScheduleReader', path: '/schedule-reader', label: '日程阅读', description: 'Markdown 日程文件', icon: 'reader' },
-        { name: 'Email', path: '/email', label: '邮件配置', description: '邮箱连接', icon: 'mail' },
-        { name: 'Notifications', path: '/notifications', label: '通知中心', description: '系统通知与消息', icon: 'bell' }
-      ]
-    },
-    {
-      id: 'tools',
-      label: '工具链',
-      icon: 'construct',
+      id: 'agent',
+      label: 'Agent Capability',
+      icon: 'sparkles',
       color: 'var(--category-tools)',
       routes: [
-        { name: 'Tools', path: '/tools', label: '工具管理', description: 'MCP 工具', icon: 'construct' },
-        { name: 'Skills', path: '/skills', label: '技能管理', description: '技能目录', icon: 'rocket' },
-        { name: 'MarkdownSkills', path: '/markdown-skills', label: 'Markdown Skills', description: 'SKILL.md 加载', icon: 'document' },
-        { name: 'Snippets', path: '/snippets', label: '代码片段', description: '代码管理', icon: 'code' },
-        { name: 'Search', path: '/search', label: '网络搜索', description: '搜索与总结', icon: 'search' }
+        { name: 'Autonomy', path: '/autonomy', label: '自治中心', description: '查看 Agent 自主扫描与发现', icon: 'sparkles' },
+        { name: 'Dispatched', path: '/dispatched', label: '派发任务', description: '查看 Agent 派发与执行结果', icon: 'dispatch' },
+        { name: 'Tools', path: '/tools', label: 'MCP 工具', description: '管理 Agent 可调用工具', icon: 'construct' },
+        { name: 'Skills', path: '/skills', label: 'Skills', description: '维护 Agent 技能目录', icon: 'rocket' },
+        { name: 'MarkdownSkills', path: '/markdown-skills', label: 'Markdown Skills', description: '管理 SKILL.md 能力', icon: 'document' },
+        { name: 'Models', path: '/models', label: '模型', description: '管理默认模型与连接状态', icon: 'cube', hasInspector: true },
+        { name: 'Snippets', path: '/snippets', label: '代码片段', description: '管理可复用代码资产', icon: 'code' }
       ]
     },
     {
-      id: 'personal',
-      label: '个人中心',
-      icon: 'person',
-      color: 'var(--category-personal)',
+      id: 'system',
+      label: 'System',
+      icon: 'settings',
+      color: 'var(--category-engine)',
       routes: [
-        { name: 'Personal', path: '/personal', label: '个人中心', description: '效率增强与备份', icon: 'person' }
+        { name: 'Email', path: '/email', label: '邮件配置', description: '维护邮箱连接与监听状态', icon: 'mail' },
+        { name: 'PushConfig', path: '/push-config', label: '推送配置', description: '维护推送邮箱与阈值', icon: 'push' },
+        { name: 'Settings', path: '/settings', label: '系统设置', description: '模型、存储、执行器与基础参数', icon: 'settings', hasInspector: true },
+        { name: 'Personal', path: '/personal', label: '个人中心', description: '个人效率、模板与备份恢复', icon: 'person' }
       ]
     }
   ])
 
-  // Current active category
   const activeCategory = ref<string | null>(null)
-
-  // Quick Access items - tracked in localStorage
   const quickAccessItems = ref<QuickAccessItem[]>([])
-
-  // Inspector panel state
   const inspectorOpen = ref(false)
   const inspectorContent = ref<string | null>(null)
-
-  // Pane animation state
   const paneAnimating = ref(false)
 
-  // Computed: Get current category
   const currentCategory = computed(() =>
-    categories.value.find(c => c.id === activeCategory.value)
+    categories.value.find(category => category.id === activeCategory.value)
   )
 
-  // Computed: Top 3 quick access items sorted by frequency
-  const topQuickAccess = computed(() => {
-    return [...quickAccessItems.value]
+  const topQuickAccess = computed(() =>
+    [...quickAccessItems.value]
       .sort((a, b) => b.accessCount - a.accessCount || b.lastAccessed - a.lastAccessed)
-      .slice(0, 3)
-  })
+      .slice(0, 5)
+  )
 
-  // Load quick access from localStorage
-  /** 从 localStorage 恢复最近访问列表；解析失败时回退为空数组。 */
+  /** 从本地存储恢复最近访问列表。 */
   const loadQuickAccess = () => {
     try {
       const stored = localStorage.getItem('macNavQuickAccess')
-      if (stored) {
-        quickAccessItems.value = JSON.parse(stored)
-      }
+      quickAccessItems.value = stored ? JSON.parse(stored) : []
     } catch {
       quickAccessItems.value = []
     }
   }
 
-  // Save quick access to localStorage
+  /** 持久化最近访问列表。 */
   const saveQuickAccess = () => {
     localStorage.setItem('macNavQuickAccess', JSON.stringify(quickAccessItems.value))
   }
 
-  // Track route access
-  /** 记录一次路由访问：累加已存在项的访问次数与最近访问时间，并新增条目，触发持久化。 */
+  /** 记录一次路由访问。 */
   const trackAccess = (routeName: string, routePath: string, label: string, icon: string) => {
     const existing = quickAccessItems.value.find(item => item.name === routeName)
     if (existing) {
-      existing.accessCount++
+      existing.accessCount += 1
       existing.lastAccessed = Date.now()
     } else {
       quickAccessItems.value.push({
@@ -186,53 +156,39 @@ export const useMacNavStore = defineStore('macNav', () => {
     saveQuickAccess()
   }
 
-  // Set active category (opens pane)
   let paneAnimTimer: ReturnType<typeof setTimeout> | null = null
   const setActiveCategory = (categoryId: string | null) => {
     if (activeCategory.value === categoryId) {
-      // Toggle off
       activeCategory.value = null
-    } else {
-      paneAnimating.value = true
-      activeCategory.value = categoryId
-      // 每次切换前清掉上一次未触发的 timer，避免连续切换时多个 timer 互相覆盖状态
-      if (paneAnimTimer !== null) {
-        clearTimeout(paneAnimTimer)
-      }
-      paneAnimTimer = setTimeout(() => {
-        paneAnimating.value = false
-        paneAnimTimer = null
-      }, 200)
+      return
     }
+    paneAnimating.value = true
+    activeCategory.value = categoryId
+    if (paneAnimTimer) clearTimeout(paneAnimTimer)
+    paneAnimTimer = setTimeout(() => {
+      paneAnimating.value = false
+      paneAnimTimer = null
+    }, 200)
   }
 
-  // Sync pane category with current route - opens pane if route matches
-  const syncPaneWithRoute = (routeName: string) => {
-    const category = getCategoryForRoute(routeName)
-    if (category && activeCategory.value !== category.id) {
-      // Auto-set the category when route changes (optional)
-      // activeCategory.value = category.id
-    }
+  const syncPaneWithRoute = (_routeName: string) => {
+    // 新 Workspace 使用常驻导航，不再自动弹出二级 Pane；保留方法用于旧组件兼容。
   }
 
-  // Close pane
   const closePane = () => {
     activeCategory.value = null
   }
 
-  // Open inspector panel
   const openInspector = (contentId: string) => {
     inspectorContent.value = contentId
     inspectorOpen.value = true
   }
 
-  // Close inspector panel
   const closeInspector = () => {
     inspectorOpen.value = false
     inspectorContent.value = null
   }
 
-  // Toggle inspector
   const toggleInspector = (contentId?: string) => {
     if (inspectorOpen.value) {
       closeInspector()
@@ -241,29 +197,20 @@ export const useMacNavStore = defineStore('macNav', () => {
     }
   }
 
-  // Get route by name across all categories
   const getRouteByName = (routeName: string): NavRoute | undefined => {
     for (const category of categories.value) {
-      const route = category.routes.find(r => r.name === routeName)
+      const route = category.routes.find(item => item.name === routeName)
       if (route) return route
     }
     return undefined
   }
 
-  // Get category containing route
-  const getCategoryForRoute = (routeName: string): NavCategory | undefined => {
-    return categories.value.find(c =>
-      c.routes.some(r => r.name === routeName)
-    )
-  }
+  const getCategoryForRoute = (routeName: string): NavCategory | undefined =>
+    categories.value.find(category => category.routes.some(item => item.name === routeName))
 
-  // Get first route of a category
-  const getFirstRouteOfCategory = (categoryId: string): NavRoute | undefined => {
-    const category = categories.value.find(c => c.id === categoryId)
-    return category?.routes[0]
-  }
+  const getFirstRouteOfCategory = (categoryId: string): NavRoute | undefined =>
+    categories.value.find(category => category.id === categoryId)?.routes[0]
 
-  // Initialize
   loadQuickAccess()
 
   return {

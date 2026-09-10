@@ -1,0 +1,58 @@
+name: Refactor Check
+
+on:
+  push:
+    branches:
+      - refactor/replit-ui-api
+      - feat/graph-gateway-multi-user
+  pull_request:
+    branches:
+      - improve
+      - refactor/replit-ui-api
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend type-check and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Build frontend
+        run: npm run build
+
+  backend:
+    name: Backend compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Compile backend
+        run: ./gradlew compileJava --no-daemon

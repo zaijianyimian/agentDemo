@@ -1,8 +1,9 @@
 package com.example.demo.model.application;
 
+import com.example.demo.infrastructure.properties.OpenAiChatProperties;
+import com.example.demo.infrastructure.security.CurrentUserProvider;
 import com.example.demo.model.domain.AiModelConfig;
 import com.example.demo.model.persistence.AiModelConfigMapper;
-import com.example.demo.infrastructure.properties.OpenAiChatProperties;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
@@ -11,37 +12,33 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * AI 模型管理器
- * 管理多个 ChatModel 实例
- * 当数据库没有配置模型时，fallback 到 Spring Bean 配置
+ * 多用户 AI 模型管理器。
+ *
+ * <p>数据库模型配置由 TenantLine 按 user_id 隔离；Spring Bean 模型仍作为系统级 fallback。
+ * 即使模型对象已进入 JVM 缓存，每次按 ID 取模型前也必须先查一次当前用户可见配置，防止通过猜测 ID
+ * 命中另一个用户之前加载过的缓存对象。</p>
  */
 @Slf4j
 @Service
 public class ModelManager {
 
+    public static final Long FALLBACK_MODEL_ID = -1L;
+
     private final AiModelConfigMapper configMapper;
     private final EncodingService encodingService;
-
-    // Spring Bean fallback models (from AiConfiguration)
     private final ChatModel fallbackChatModel;
     private final StreamingChatModel fallbackStreamingModel;
     private final OpenAiChatProperties chatProperties;
+    private final CurrentUserProvider currentUserProvider;
 
-    // Fallback model ID constant
-    public static final Long FALLBACK_MODEL_ID = -1L;
-
-    // ChatModel 缓存
     private final Map<Long, ChatModel> chatModelCache = new ConcurrentHashMap<>();
     private final Map<Long, StreamingChatModel> streamingModelCache = new ConcurrentHashMap<>();
-
-    // 按 purpose 缓存的 ChatModel（用于附件解析等场景）
     private final Map<String, ChatModel> chatModelByPurposeCache = new ConcurrentHashMap<>();
 
     public ModelManager(
@@ -49,39 +46,20 @@ public class ModelManager {
             EncodingService encodingService,
             @Qualifier("chatModel") ChatModel fallbackChatModel,
             @Qualifier("streamingChatModel") StreamingChatModel fallbackStreamingModel,
-            OpenAiChatProperties chatProperties) {
+            OpenAiChatProperties chatProperties,
+            CurrentUserProvider currentUserProvider) {
         this.configMapper = configMapper;
         this.encodingService = encodingService;
         this.fallbackChatModel = fallbackChatModel;
         this.fallbackStreamingModel = fallbackStreamingModel;
         this.chatProperties = chatProperties;
+        this.currentUserProvider = currentUserProvider;
     }
 
-    @PostConstruct
-    public void init() {
-        // 加载所有启用的模型
-        List<AiModelConfig> configs = configMapper.selectEnabled();
-        for (AiModelConfig config : configs) {
-            try {
-                chatModelCache.put(config.getId(), createChatModel(config));
-                streamingModelCache.put(config.getId(), createStreamingChatModel(config));
-                log.info("Loaded model: {} ({})", config.getName(), config.getModelName());
-            } catch (Exception e) {
-                log.error("Failed to load model: {}", config.getName(), e);
-            }
-        }
-        log.info("Loaded {} AI models", configs.size());
-    }
-
-    /**
-     * 创建 ChatModel 实例
-     */
     private ChatModel createChatModel(AiModelConfig config) {
-        String decodedApiKey = encodingService.decode(config.getApiKey());
-
         return OpenAiChatModel.builder()
                 .baseUrl(config.getBaseUrl())
-                .apiKey(decodedApiKey)
+                .apiKey(encodingService.decode(config.getApiKey()))
                 .modelName(config.getModelName())
                 .timeout(Duration.ofSeconds(120))
                 .maxRetries(3)
@@ -90,131 +68,73 @@ public class ModelManager {
                 .build();
     }
 
-    /**
-     * 创建 StreamingChatModel 实例
-     */
     private StreamingChatModel createStreamingChatModel(AiModelConfig config) {
-        String decodedApiKey = encodingService.decode(config.getApiKey());
-
         return OpenAiStreamingChatModel.builder()
                 .baseUrl(config.getBaseUrl())
-                .apiKey(decodedApiKey)
+                .apiKey(encodingService.decode(config.getApiKey()))
                 .modelName(config.getModelName())
                 .timeout(Duration.ofSeconds(180))
                 .build();
     }
 
-    /**
-     * 获取 ChatModel
-     */
+    /** 获取当前用户可见的 ChatModel。 */
     public ChatModel getChatModel(Long id) {
-        // Fallback to Spring Bean when using fallback ID
-        if (id.equals(FALLBACK_MODEL_ID)) {
+        if (FALLBACK_MODEL_ID.equals(id)) {
             return fallbackChatModel;
         }
-
-        return chatModelCache.computeIfAbsent(id, key -> {
-            AiModelConfig config = configMapper.selectById(id);
-            if (config == null || !Boolean.TRUE.equals(config.getEnabled())) {
-                throw new IllegalArgumentException("模型不存在或未启用: " + id);
-            }
-            return createChatModel(config);
-        });
+        AiModelConfig config = requireVisibleEnabledConfig(id);
+        return chatModelCache.computeIfAbsent(id, ignored -> createChatModel(config));
     }
 
-    /**
-     * 获取 StreamingChatModel
-     */
+    /** 获取当前用户可见的 StreamingChatModel。 */
     public StreamingChatModel getStreamingChatModel(Long id) {
-        // Fallback to Spring Bean when using fallback ID
-        if (id.equals(FALLBACK_MODEL_ID)) {
+        if (FALLBACK_MODEL_ID.equals(id)) {
             return fallbackStreamingModel;
         }
-
-        return streamingModelCache.computeIfAbsent(id, key -> {
-            AiModelConfig config = configMapper.selectById(id);
-            if (config == null || !Boolean.TRUE.equals(config.getEnabled())) {
-                throw new IllegalArgumentException("模型不存在或未启用: " + id);
-            }
-            return createStreamingChatModel(config);
-        });
+        AiModelConfig config = requireVisibleEnabledConfig(id);
+        return streamingModelCache.computeIfAbsent(id, ignored -> createStreamingChatModel(config));
     }
 
-    /**
-     * 获取默认模型ID
-     * 如果数据库没有配置，返回 FALLBACK_MODEL_ID 使用 Spring Bean 配置
-     */
+    /** 获取当前用户默认模型 ID；无数据库配置则使用系统 fallback。 */
     public Long getDefaultModelId() {
         AiModelConfig defaultConfig = configMapper.selectDefault();
         if (defaultConfig != null) {
             return defaultConfig.getId();
         }
-
-        // 如果没有默认模型，返回第一个启用的模型
         List<AiModelConfig> enabledConfigs = configMapper.selectEnabled();
-        if (!enabledConfigs.isEmpty()) {
-            return enabledConfigs.get(0).getId();
-        }
-
-        // Fallback to Spring Bean configuration
-        log.info("No AI models configured in database, using Spring Bean fallback");
-        return FALLBACK_MODEL_ID;
+        return enabledConfigs.isEmpty() ? FALLBACK_MODEL_ID : enabledConfigs.get(0).getId();
     }
 
-    /**
-     * 检查是否有数据库配置的模型
-     */
     public boolean hasDatabaseModels() {
-        List<AiModelConfig> enabledConfigs = configMapper.selectEnabled();
-        return !enabledConfigs.isEmpty();
+        return !configMapper.selectEnabled().isEmpty();
     }
 
-    /**
-     * 获取默认模型
-     */
     public ChatModel getDefaultChatModel() {
         return getChatModel(getDefaultModelId());
     }
 
-    /**
-     * 获取默认流式模型
-     */
     public StreamingChatModel getDefaultStreamingChatModel() {
         return getStreamingChatModel(getDefaultModelId());
     }
 
-    /**
-     * 刷新模型缓存
-     */
+    /** 刷新当前用户可见模型缓存。 */
     public void refreshModel(Long id) {
-        chatModelCache.remove(id);
-        streamingModelCache.remove(id);
-        // purpose 维度的缓存也要清掉，避免拿到旧配置
-        chatModelByPurposeCache.clear();
-
+        removeModel(id);
         AiModelConfig config = configMapper.selectById(id);
         if (config != null && Boolean.TRUE.equals(config.getEnabled())) {
             chatModelCache.put(id, createChatModel(config));
             streamingModelCache.put(id, createStreamingChatModel(config));
-            log.info("Refreshed model: {}", config.getName());
         }
     }
 
-    /**
-     * 移除模型缓存
-     */
     public void removeModel(Long id) {
         chatModelCache.remove(id);
         streamingModelCache.remove(id);
         chatModelByPurposeCache.clear();
-        log.info("Removed model cache: {}", id);
     }
 
-    /**
-     * 测试模型连接（传入的 apiKey 是原始密钥，不需要解密）
-     */
+    /** 测试用户提交的新模型连接。 */
     public String testConnection(AiModelConfig config) {
-        // 直接使用传入的 API Key，不进行解密（测试连接时传入的是原始密钥）
         ChatModel testModel = OpenAiChatModel.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
@@ -222,32 +142,38 @@ public class ModelManager {
                 .timeout(Duration.ofSeconds(10))
                 .maxRetries(0)
                 .build();
-
         try {
             String response = testModel.chat("Hello, please respond with 'OK' to confirm connection.");
-            return "连接成功: " + (response != null && response.length() > 50 ? response.substring(0, 50) + "..." : response);
-        } catch (Exception e) {
-            return "连接失败: " + e.getMessage();
+            return "连接成功: " + (response != null && response.length() > 50
+                    ? response.substring(0, 50) + "..." : response);
+        } catch (Exception error) {
+            return "连接失败: " + error.getMessage();
         }
     }
 
     /**
-     * 按 purpose 查找第一个启用的 ChatModel；返回 null 表示未配置。
-     * 用于附件解析等专用场景。
+     * 按 purpose 获取当前用户模型。缓存键包含 userId，避免不同用户共用 purpose 缓存。
      */
     public ChatModel getChatModelByPurpose(String purpose) {
         if (purpose == null || purpose.isBlank()) {
             return null;
         }
-        return chatModelByPurposeCache.computeIfAbsent(purpose, key -> {
-            List<AiModelConfig> configs = configMapper.selectEnabledByPurpose(key);
+        long userId = currentUserProvider.requireUserId();
+        String cacheKey = userId + ":" + purpose;
+        return chatModelByPurposeCache.computeIfAbsent(cacheKey, ignored -> {
+            List<AiModelConfig> configs = configMapper.selectEnabledByPurpose(purpose);
             if (configs == null || configs.isEmpty()) {
                 return null;
             }
-            AiModelConfig config = configs.get(0);
-            log.info("Resolved ChatModel by purpose={} -> modelId={}, modelName={}",
-                    key, config.getId(), config.getModelName());
-            return createChatModel(config);
+            return createChatModel(configs.get(0));
         });
+    }
+
+    private AiModelConfig requireVisibleEnabledConfig(Long id) {
+        AiModelConfig config = configMapper.selectById(id);
+        if (config == null || !Boolean.TRUE.equals(config.getEnabled())) {
+            throw new IllegalArgumentException("模型不存在、无权访问或未启用: " + id);
+        }
+        return config;
     }
 }

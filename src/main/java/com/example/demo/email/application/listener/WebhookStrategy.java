@@ -72,6 +72,12 @@ public class WebhookStrategy implements ListenStrategy {
                 if (!stateService.rememberMessageKey(config, message.key())) {
                     continue;
                 }
+
+                // Webhook 回调本身不携带可信用户身份，必须使用服务端邮箱配置和 Adapter 元数据。
+                message.emailMessage().setUserId(config.getUserId());
+                message.emailMessage().setEmailConfigId(config.getId());
+                message.emailMessage().setProvider(config.getProvider());
+                message.emailMessage().setExternalId(message.key().stableKey());
                 publisher.publish(message.emailMessage(), "webhook");
                 adapter.acknowledge(config, message);
                 stateService.updateCursor(config, message.cursorAfter());

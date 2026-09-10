@@ -1,99 +1,33 @@
 <template>
-  <div class="mac-shell" :data-theme="actualTheme">
-    <!-- Skip Link for accessibility -->
+  <div class="workspace-shell" :data-theme="actualTheme">
     <a href="#main-content" class="skip-link">跳转到主要内容</a>
 
-    <!-- Global Rail - Layer 1 -->
-    <MacGlobalRail
-      :compact="railCompact"
-      @categorySelect="handleCategorySelect"
-      @userAction="handleUserAction"
-    />
+    <AppSidebar :collapsed="sidebarCollapsed" @toggle="toggleSidebar" />
 
-    <!-- Functional Pane - Layer 2 -->
-    <MacFunctionalPane
-      @routeSelect="handleRouteSelect"
-      @inspectorToggle="handleInspectorToggle"
-      @close="handlePaneClose"
-    />
+    <main id="main-content" class="workspace-main">
+      <AppTopbar
+        :title="currentTitle"
+        :category="currentCategoryLabel"
+        :user-name="userDisplayName"
+        :user-initial="userInitial"
+        :user-email="authStore.user?.email || '-'"
+        :user-role="authStore.user?.role || 'USER'"
+        :model-status="systemStatus.model"
+        :qdrant-status="systemStatus.qdrant"
+        :search-status="systemStatus.search"
+        :notification-count="notificationCount"
+        :logout-loading="logoutLoading"
+        @search="openCommandPalette"
+        @status="handleStatusClick"
+        @logout="handleLogout"
+        @user-action="handleUserMenuSelect"
+      />
 
-    <!-- Inspector Panel - Layer 3 (optional, per page) -->
-    <slot name="inspector"></slot>
-
-    <!-- Built-in Inspector Panel for routes with hasInspector flag -->
-    <aside
-      v-if="showInspector && currentRouteHasInspector"
-      class="inspector-panel"
-      :class="{ open: showInspector }"
-    >
-      <div class="inspector-header">
-        <span class="inspector-title">{{ inspectorTitle }}</span>
-        <button class="inspector-close-btn" @click="closeInspectorPanel" title="关闭">
-          <n-icon size="16"><ChevronForwardOutline /></n-icon>
-        </button>
-      </div>
-      <div class="inspector-content">
-        <slot name="inspector-content">
-          <div class="inspector-placeholder">
-            <p>在此页面添加 Inspector 内容</p>
-          </div>
-        </slot>
-      </div>
-    </aside>
-
-    <!-- Main Content Area -->
-    <main class="main-canvas" id="main-content">
-      <!-- Top Header Bar -->
-      <header class="canvas-header">
-        <!-- Left: Current page info -->
-        <div class="header-left">
-          <div class="page-info">
-            <span class="page-category">{{ currentCategoryLabel }}</span>
-            <h1 class="page-title">{{ currentTitle }}</h1>
-          </div>
-        </div>
-
-        <!-- Center: Control Center -->
-        <MacControlCenter
-          :modelStatus="systemStatus.model"
-          :qdrantStatus="systemStatus.qdrant"
-          :searchStatus="systemStatus.search"
-          :notificationCount="notificationCount"
-          @statusClick="handleStatusClick"
-          @searchClick="openCommandPalette"
-        />
-
-        <!-- Right: User menu -->
-        <div class="header-right">
-          <n-button
-            class="logout-button"
-            type="warning"
-            secondary
-            size="small"
-            :loading="logoutLoading"
-            @click="handleLogout"
-          >
-            <template #icon>
-              <n-icon><LogOutOutline /></n-icon>
-            </template>
-            <span class="logout-label">退出</span>
-          </n-button>
-          <n-dropdown :options="userMenuOptions" @select="handleUserMenuSelect">
-            <button class="user-menu-btn">
-              <span class="user-avatar">{{ userInitial }}</span>
-              <span class="user-name">{{ userDisplayName }}</span>
-            </button>
-          </n-dropdown>
-        </div>
-      </header>
-
-      <!-- Content Frame -->
-      <div class="content-frame">
+      <div class="workspace-content">
         <slot></slot>
       </div>
     </main>
 
-    <!-- Command Palette Modal -->
     <n-modal v-model:show="showCommandPalette" :mask-closable="true" :close-on-esc="true">
       <div class="command-palette" @click.stop>
         <div class="command-header">
@@ -113,6 +47,7 @@
             v-for="(item, index) in filteredCommands"
             :key="item.id"
             :class="['command-item', { selected: selectedIndex === index }]"
+            type="button"
             @click="executeCommand(item)"
             @mouseenter="selectedIndex = index"
           >
@@ -128,7 +63,6 @@
       </div>
     </n-modal>
 
-    <!-- Password Modal -->
     <n-modal v-model:show="showPasswordModal" preset="card" title="修改密码" style="width: min(480px, 90vw)">
       <n-form label-placement="top">
         <n-form-item label="当前密码">
@@ -149,9 +83,14 @@
       </template>
     </n-modal>
 
-    <!-- Mobile Bottom Nav (if needed) -->
-    <nav v-if="isMobile" class="mobile-nav">
-      <button v-for="item in mobileNavItems" :key="item.key" :class="['mobile-nav-item', { active: item.active }]" @click="handleMobileNav(item)">
+    <nav v-if="isMobile" class="mobile-nav" aria-label="移动端主导航">
+      <button
+        v-for="item in mobileNavItems"
+        :key="item.key"
+        :class="['mobile-nav-item', { active: item.active }]"
+        type="button"
+        @click="router.push(item.path)"
+      >
         <n-icon size="20"><component :is="item.icon" /></n-icon>
         <span>{{ item.label }}</span>
       </button>
@@ -160,46 +99,52 @@
 </template>
 
 <script setup lang="ts">
-// macOS 风格应用主框架：整合全局导航栏、功能面板、控制中心、命令面板与密码修改等核心交互
-import { computed, ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+/**
+ * Agent Workspace 应用主框架。
+ *
+ * 负责全局导航、顶部状态、命令面板和账户级操作。业务页面通过默认 slot 渲染，
+ * Shell 不再承担二级浮动 Pane 与页面业务逻辑。
+ */
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
 import {
-  NModal,
-  NDropdown,
-  NIcon,
-  NInput,
   NButton,
   NForm,
   NFormItem,
+  NIcon,
+  NInput,
+  NModal,
   NSpace,
   createDiscreteApi
 } from 'naive-ui'
 import {
-  SearchOutline,
-  HomeOutline,
-  ChatbubblesOutline,
-  FileTrayFullOutline,
-  DocumentTextOutline,
-  SettingsOutline,
-  CubeOutline,
-  CloudOutline,
-  GridOutline,
   BookOutline,
-  TimerOutline,
-  ConstructOutline,
-  PersonOutline,
-  SparklesOutline,
-  ReaderOutline,
-  FolderOutline,
   CalendarOutline,
-  MailOutline,
-  RocketOutline,
-  CodeSlashOutline,
+  ChatbubblesOutline,
+  CloudOutline,
   CloudUploadOutline,
-  ChevronForwardOutline,
-  LogOutOutline
+  CodeSlashOutline,
+  ConstructOutline,
+  CubeOutline,
+  DocumentTextOutline,
+  FileTrayFullOutline,
+  FolderOutline,
+  GridOutline,
+  HomeOutline,
+  MailOutline,
+  NotificationsOutline,
+  PersonOutline,
+  ReaderOutline,
+  RocketOutline,
+  SearchOutline,
+  SendOutline,
+  SettingsOutline,
+  SparklesOutline,
+  TimeOutline
 } from '@vicons/ionicons5'
+import AppSidebar from '@/components/AppSidebar.vue'
+import AppTopbar from '@/components/AppTopbar.vue'
 import { useMacNavStore } from '@/stores/mac-nav'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -208,24 +153,29 @@ import { inboxService } from '@/services/api/inbox'
 import { modelService } from '@/services/api/model'
 import { searchService } from '@/services/api/search'
 import { settingsService } from '@/services/api/settings'
-import MacGlobalRail from '@/components/MacGlobalRail.vue'
-import MacFunctionalPane from '@/components/MacFunctionalPane.vue'
-import MacControlCenter from '@/components/MacControlCenter.vue'
+
+interface CommandItem {
+  id: string
+  label: string
+  description: string
+  icon: string
+  path: string
+}
+
+type ServiceStatus = 'active' | 'inactive' | 'error'
 
 const router = useRouter()
 const route = useRoute()
 const { width: windowWidth } = useWindowSize()
-const macNavStore = useMacNavStore()
+const navStore = useMacNavStore()
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
 const { message } = createDiscreteApi(['message'])
+
 const logoutLoading = ref(false)
-
-// Responsive
+const sidebarCollapsed = ref(localStorage.getItem('workspace.sidebar.collapsed') === 'true')
 const isMobile = computed(() => windowWidth.value < 768)
-const railCompact = computed(() => windowWidth.value < 1024)
 
-// Theme
 const actualTheme = computed(() => {
   if (themeStore.mode === 'auto') {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -233,39 +183,13 @@ const actualTheme = computed(() => {
   return themeStore.mode
 })
 
-// User info
+const currentTitle = computed(() => (route.meta.title as string) || 'Agent Workspace')
+const currentCategoryLabel = computed(() =>
+  navStore.getCategoryForRoute(route.name as string)?.label || 'Workspace'
+)
 const userDisplayName = computed(() => authStore.user?.displayName || authStore.user?.username || 'User')
 const userInitial = computed(() => userDisplayName.value.slice(0, 1).toUpperCase())
-const userMenuOptions = computed(() => [
-  { key: 'email', label: authStore.user?.email || '-' },
-  { key: 'role', label: `角色: ${authStore.user?.role || 'USER'}` },
-  { type: 'divider', key: 'd1' },
-  { key: 'password', label: '修改密码' },
-  { key: 'logout', label: '退出登录' }
-])
 
-// Current page info
-const currentTitle = computed(() => route.meta.title as string || '仪表盘')
-const currentCategoryLabel = computed(() => {
-  const category = macNavStore.getCategoryForRoute(route.name as string)
-  return category?.label || 'Console'
-})
-
-// Inspector Panel - Layer 3
-const showInspector = computed(() => macNavStore.inspectorOpen)
-const currentRouteHasInspector = computed(() => {
-  const routeInfo = macNavStore.getRouteByName(route.name as string)
-  return routeInfo?.hasInspector || false
-})
-const inspectorTitle = computed(() => currentTitle.value + ' 参数')
-
-const closeInspectorPanel = () => {
-  macNavStore.closeInspector()
-}
-
-type ServiceStatus = 'active' | 'inactive' | 'error'
-
-// System status
 const systemStatus = ref<{
   model: ServiceStatus
   qdrant: ServiceStatus
@@ -313,38 +237,32 @@ const loadSystemStatus = async () => {
   }
 }
 
-// Command palette
 const showCommandPalette = ref(false)
 const commandQuery = ref('')
 const selectedIndex = ref(0)
 const commandInputRef = ref<HTMLInputElement | null>(null)
 
-const allCommands = computed(() => {
-  const commands: any[] = []
-  macNavStore.categories.forEach(cat => {
-    cat.routes.forEach(r => {
-      commands.push({
-        id: r.name,
-        label: r.label,
-        description: r.description,
-        icon: r.icon,
-        type: 'route',
-        path: r.path
-      })
-    })
-  })
-  return commands
-})
+const allCommands = computed<CommandItem[]>(() =>
+  navStore.categories.flatMap(category =>
+    category.routes.map(item => ({
+      id: item.name,
+      label: item.label,
+      description: item.description,
+      icon: item.icon,
+      path: item.path
+    }))
+  )
+)
 
 const filteredCommands = computed(() => {
-  const q = commandQuery.value.trim().toLowerCase()
-  if (!q) return allCommands.value.slice(0, 10)
-  return allCommands.value.filter(c =>
-    c.label.toLowerCase().includes(q) || c.description.toLowerCase().includes(q)
+  const query = commandQuery.value.trim().toLowerCase()
+  if (!query) return allCommands.value.slice(0, 12)
+  return allCommands.value.filter(item =>
+    item.label.toLowerCase().includes(query)
+    || item.description.toLowerCase().includes(query)
   )
 })
 
-// Password modal
 const showPasswordModal = ref(false)
 const changingPassword = ref(false)
 const passwordForm = ref({
@@ -353,53 +271,64 @@ const passwordForm = ref({
   confirmPassword: ''
 })
 
-// Mobile nav
 const mobileNavItems = computed(() => [
   { key: 'home', label: '首页', icon: HomeOutline, path: '/', active: route.path === '/' },
-  { key: 'chat', label: '对话', icon: ChatbubblesOutline, path: '/chat', active: route.path.startsWith('/chat') },
+  { key: 'chat', label: 'Agent', icon: ChatbubblesOutline, path: '/chat', active: route.path.startsWith('/chat') },
   { key: 'inbox', label: '收件箱', icon: FileTrayFullOutline, path: '/inbox', active: route.path.startsWith('/inbox') },
-  { key: 'notes', label: '笔记', icon: DocumentTextOutline, path: '/notes', active: route.path.startsWith('/notes') },
+  { key: 'schedule', label: '日程', icon: CalendarOutline, path: '/schedule', active: route.path.startsWith('/schedule') },
   { key: 'settings', label: '设置', icon: SettingsOutline, path: '/settings', active: route.path.startsWith('/settings') }
 ])
 
-// Icon map
 const iconMap: Record<string, any> = {
-  grid: GridOutline, home: HomeOutline, inbox: FileTrayFullOutline, sparkles: SparklesOutline,
-  reader: ReaderOutline, cube: CubeOutline, settings: SettingsOutline, book: BookOutline,
-  chatbubbles: ChatbubblesOutline, import: CloudUploadOutline, note: DocumentTextOutline, folder: FolderOutline,
-  time: TimerOutline, calendar: CalendarOutline, mail: MailOutline, rocket: RocketOutline,
-  code: CodeSlashOutline, search: SearchOutline, construct: ConstructOutline, person: PersonOutline,
-  cpu: CubeOutline, brain: CloudOutline, timer: TimerOutline
+  home: HomeOutline,
+  grid: GridOutline,
+  inbox: FileTrayFullOutline,
+  chatbubbles: ChatbubblesOutline,
+  calendar: CalendarOutline,
+  time: TimeOutline,
+  timer: TimeOutline,
+  note: DocumentTextOutline,
+  reader: ReaderOutline,
+  book: BookOutline,
+  brain: CloudOutline,
+  search: SearchOutline,
+  folder: FolderOutline,
+  import: CloudUploadOutline,
+  sparkles: SparklesOutline,
+  dispatch: SendOutline,
+  construct: ConstructOutline,
+  rocket: RocketOutline,
+  document: DocumentTextOutline,
+  code: CodeSlashOutline,
+  cube: CubeOutline,
+  cpu: CubeOutline,
+  mail: MailOutline,
+  bell: NotificationsOutline,
+  push: NotificationsOutline,
+  settings: SettingsOutline,
+  person: PersonOutline
 }
+
 const getIconComponent = (icon: string) => iconMap[icon] || GridOutline
 
-// Handlers
-const handleCategorySelect = (_categoryId: string) => {
-  // Pane will auto-open via store
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  localStorage.setItem('workspace.sidebar.collapsed', String(sidebarCollapsed.value))
 }
 
-const handleRouteSelect = (_routeInfo: any) => {
-  // Route navigation handled in pane
-}
-
-const handleInspectorToggle = (_routeInfo: any) => {
-  // Inspector toggle handled in pane
-}
-
-const handlePaneClose = () => {
-  macNavStore.closePane()
-}
-
-const handleUserAction = () => {
-  // Show user dropdown or navigate to profile
+const handleStatusClick = (type: string) => {
+  if (type === 'model') router.push('/models')
+  else if (type === 'qdrant') router.push('/settings')
+  else if (type === 'search') router.push('/search')
+  else if (type === 'notifications') router.push('/inbox')
 }
 
 const handleUserMenuSelect = async (key: string) => {
   if (key === 'password') {
     passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' }
     showPasswordModal.value = true
-  } else if (key === 'logout') {
-    await handleLogout()
+  } else if (key === 'personal') {
+    await router.push('/personal')
   }
 }
 
@@ -419,13 +348,6 @@ const handleLogout = async () => {
   }
 }
 
-const handleStatusClick = (type: string) => {
-  if (type === 'model') router.push('/models')
-  else if (type === 'qdrant') router.push('/settings')
-  else if (type === 'search') router.push('/search')
-  else if (type === 'notifications') router.push('/inbox')
-}
-
 const openCommandPalette = () => {
   showCommandPalette.value = true
   selectedIndex.value = 0
@@ -433,23 +355,21 @@ const openCommandPalette = () => {
   nextTick(() => commandInputRef.value?.focus())
 }
 
-const handleCommandKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'ArrowDown') {
+const handleCommandKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'ArrowDown') {
     selectedIndex.value = Math.min(selectedIndex.value + 1, filteredCommands.value.length - 1)
-  } else if (e.key === 'ArrowUp') {
+  } else if (event.key === 'ArrowUp') {
     selectedIndex.value = Math.max(selectedIndex.value - 1, 0)
-  } else if (e.key === 'Enter' && filteredCommands.value[selectedIndex.value]) {
+  } else if (event.key === 'Enter' && filteredCommands.value[selectedIndex.value]) {
     executeCommand(filteredCommands.value[selectedIndex.value])
-  } else if (e.key === 'Escape') {
+  } else if (event.key === 'Escape') {
     showCommandPalette.value = false
   }
 }
 
-const executeCommand = (cmd: any) => {
+const executeCommand = (command: CommandItem) => {
   showCommandPalette.value = false
-  if (cmd.type === 'route') {
-    router.push(cmd.path)
-  }
+  router.push(command.path)
 }
 
 const submitPasswordChange = async () => {
@@ -461,17 +381,18 @@ const submitPasswordChange = async () => {
     message.warning('两次输入的新密码不一致')
     return
   }
+
   changingPassword.value = true
   try {
-    const res = await authService.changePassword({
+    const response = await authService.changePassword({
       currentPassword: passwordForm.value.currentPassword,
       newPassword: passwordForm.value.newPassword
     })
-    if (res.success) {
-      message.success(res.message || '密码修改成功')
+    if (response.success) {
+      message.success(response.message || '密码修改成功')
       showPasswordModal.value = false
     } else {
-      message.error(res.message || '密码修改失败')
+      message.error(response.message || '密码修改失败')
     }
   } catch {
     message.error('密码修改失败')
@@ -480,31 +401,27 @@ const submitPasswordChange = async () => {
   }
 }
 
-const handleMobileNav = (item: any) => {
-  router.push(item.path)
-}
-
-// Track route access
-watch(() => route.name, (name) => {
-  if (name) {
-    const routeInfo = macNavStore.getRouteByName(name as string)
-    if (routeInfo) {
-      macNavStore.trackAccess(name as string, routeInfo.path, routeInfo.label, routeInfo.icon)
-    }
-  }
-})
-
-// Global keyboard handler
-const handleGlobalKeydown = (e: KeyboardEvent) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-    e.preventDefault()
+const handleGlobalKeydown = (event: KeyboardEvent) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
     openCommandPalette()
   }
 }
 
+watch(() => route.name, name => {
+  if (!name) return
+  const routeInfo = navStore.getRouteByName(name as string)
+  if (routeInfo) {
+    navStore.trackAccess(name as string, routeInfo.path, routeInfo.label, routeInfo.icon)
+  }
+})
+
+watch(actualTheme, theme => {
+  document.documentElement.setAttribute('data-theme', theme)
+})
+
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
-  // Apply theme to document
   document.documentElement.setAttribute('data-theme', actualTheme.value)
   loadSystemStatus()
   statusRefreshTimer = window.setInterval(loadSystemStatus, 60000)
@@ -512,498 +429,186 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
-  if (statusRefreshTimer) {
-    window.clearInterval(statusRefreshTimer)
-  }
-})
-
-// Watch theme changes
-watch(actualTheme, (theme) => {
-  document.documentElement.setAttribute('data-theme', theme)
+  if (statusRefreshTimer) window.clearInterval(statusRefreshTimer)
 })
 </script>
 
 <style scoped>
-/* ============================================
- * macOS Shell - Root Container
- * Strict 100vh lock, proper flex hierarchy
- * ============================================ */
-.mac-shell {
+.workspace-shell {
   display: flex;
-  height: 100vh;
   width: 100vw;
-  overflow: hidden;
-  background:
-    linear-gradient(var(--bg-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--bg-grid-line) 1px, transparent 1px),
-    var(--bg-page-tint),
-    var(--bg-base);
-  background-size: 28px 28px, 28px 28px, auto, auto;
-  transition: background var(--transition-base);
-}
-
-/* Main Canvas - Content area (flex: 1, fills remaining space) */
-.main-canvas {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  position: relative;
-  overflow: hidden;
-  padding: 0;
-  gap: 0;
-}
-
-/* Canvas Header - macOS style (fixed at top, left offset for rail) */
-.canvas-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 10px 16px;
-  margin-left: 96px;
-  margin-right: 24px;
-  margin-top: 24px;
-  background: var(--bg-glass-strong);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--surface-border);
-  box-shadow:
-    inset 0 1px 0 var(--border-hairline),
-    var(--shadow-card);
-  backdrop-filter: blur(var(--blur-md));
-  z-index: 10;
-  min-width: 0;
-  flex-shrink: 0;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.page-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.page-category {
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--text-muted) !important;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.page-title {
-  font-size: 1.02rem;
-  font-weight: 600;
-  color: var(--text-primary) !important;
-  margin: 0;
-  max-width: 28vw;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-name {
-  font-size: 0.85rem;
-  color: var(--text-secondary) !important;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.logout-button {
-  --n-border-radius: var(--radius-md);
-  font-weight: 700;
-  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.16);
-}
-
-.logout-label {
-  line-height: 1;
-}
-
-.user-menu-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.user-menu-btn:hover {
-  background: var(--bg-menu-item-hover);
-  border-color: var(--border-accent);
-}
-
-.user-avatar {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  background: var(--gradient-sunset);
-  color: white;
-  font-weight: 700;
-  font-size: 0.85rem;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.15);
-}
-
-/* Content Frame - Scrollable main content area
- * Prevents squeezing when pane/sidebar opens */
-.content-frame {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 22px 24px 24px;
-  padding-left: 120px; /* 72px rail + 48px gap */
-  padding-right: 24px;
-  scrollbar-width: thin;
-  position: relative;
-  z-index: 1;
-  min-width: 0;
-  /* macOS style scrollbar overlay */
-  scrollbar-color: rgba(142, 142, 147, 0.24) transparent;
-}
-
-/* macOS floating scrollbar */
-.content-frame::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.content-frame::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.content-frame::-webkit-scrollbar-thumb {
-  background: rgba(142, 142, 147, 0.24);
-  border-radius: 4px;
-  transition: background 0.2s ease;
-}
-
-.content-frame::-webkit-scrollbar-thumb:hover {
-  background: rgba(142, 142, 147, 0.40);
-}
-
-/* Dark mode scrollbar */
-:global([data-theme="dark"]) .content-frame::-webkit-scrollbar-thumb {
-  background: rgba(142, 142, 147, 0.32);
-}
-
-:global([data-theme="dark"]) .content-frame::-webkit-scrollbar-thumb:hover {
-  background: rgba(142, 142, 147, 0.48);
-}
-
-/* ============================================
- * Inspector Panel - Layer 3
- * Right sidebar for detailed parameters
- * ============================================ */
-  .inspector-panel {
-  position: fixed;
-  right: 0;
-  top: 0;
   height: 100vh;
-  width: var(--inspector-width);
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-card);
-  border-left: 2px solid var(--border-light);
-  box-shadow: var(--shadow-sidebar);
-  transform: translateX(100%);
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1),
-    opacity 0.25s ease,
-    visibility 0s 0.25s;
-}
-
-.inspector-panel.open {
-  transform: translateX(0);
-  opacity: 1;
-  visibility: visible;
-  transition:
-    transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1),
-    opacity 0.25s ease,
-    visibility 0s 0s;
-}
-
-.inspector-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.inspector-title {
-  font-size: 0.9rem;
-  font-weight: 600;
+  overflow: hidden;
+  background: var(--bg-base);
   color: var(--text-primary);
 }
 
-.inspector-close-btn {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.inspector-close-btn:hover {
-  background: var(--bg-menu-item-hover);
-  color: var(--text-secondary);
-}
-
-.inspector-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-  scrollbar-width: thin;
-}
-
-.inspector-placeholder {
+.workspace-main {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-/* Command Palette - macOS Spotlight style */
+.workspace-content {
+  flex: 1;
+  min-height: 0;
+  padding: 24px 28px 32px;
+  overflow: auto;
+}
+
+.skip-link {
+  position: fixed;
+  left: 16px;
+  top: -60px;
+  z-index: 9999;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: #fff;
+  text-decoration: none;
+  transition: top 120ms ease;
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
 .command-palette {
-  width: min(560px, 90vw);
-  background: var(--bg-glass-strong);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
-  backdrop-filter: blur(var(--blur-lg));
+  width: min(660px, calc(100vw - 32px));
+  max-height: min(72vh, 680px);
   overflow: hidden;
+  border: 1px solid var(--workspace-border, var(--border-light));
+  border-radius: 16px;
+  background: var(--bg-card);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.18);
 }
 
 .command-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.command-header .n-icon {
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--workspace-border, var(--border-light));
   color: var(--text-muted);
 }
 
 .command-input {
   flex: 1;
-  background: transparent;
-  border: none;
-  font-size: 1rem;
-  color: var(--text-primary);
+  min-width: 0;
+  border: 0;
   outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
 }
 
-.command-input::placeholder {
-  color: var(--text-muted);
-}
-
-.command-header kbd {
-  padding: 4px 8px;
+.command-header kbd,
+.command-footer kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--workspace-border, var(--border-light));
+  border-radius: 6px;
   background: var(--bg-input);
-  border-radius: var(--radius-xs);
-  font-size: 0.75rem;
   color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.68rem;
 }
 
 .command-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
-  max-height: 320px;
+  max-height: 480px;
+  padding: 8px;
   overflow-y: auto;
 }
 
 .command-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 24px minmax(120px, 0.7fr) minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
   background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: all var(--transition-base);
 }
 
-.command-item:hover,
-.command-item.selected {
-  background: var(--bg-menu-item-hover);
-}
-
-.command-item.selected {
-  background: var(--bg-menu-item-active);
+.command-item.selected,
+.command-item:hover {
+  background: var(--bg-input);
 }
 
 .command-label {
-  font-size: 0.9rem;
   color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 650;
 }
 
 .command-desc {
-  font-size: 0.75rem;
+  overflow: hidden;
   color: var(--text-muted);
-  margin-left: auto;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .command-footer {
   display: flex;
   justify-content: flex-end;
   gap: 16px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border-light);
-  font-size: 0.75rem;
+  padding: 9px 14px;
+  border-top: 1px solid var(--workspace-border, var(--border-light));
   color: var(--text-muted);
+  font-size: 0.68rem;
 }
 
-.command-footer kbd {
-  padding: 2px 6px;
-  background: var(--bg-input);
-  border-radius: var(--radius-xs);
-}
-
-/* Mobile Bottom Nav */
 .mobile-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-around;
-  padding: 8px 16px;
-  background: var(--bg-glass-strong);
-  border-top: 1px solid var(--surface-border);
-  backdrop-filter: blur(var(--blur-md));
-  z-index: 200;
+  display: none;
 }
 
-.mobile-nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.mobile-nav-item.active {
-  color: var(--primary-color);
-}
-
-.mobile-nav-item span {
-  font-size: 0.7rem;
-}
-
-/* Skip Link */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: 0;
-  padding: 8px 16px;
-  background: var(--primary-color);
-  color: white;
-  text-decoration: none;
-  border-radius: var(--radius-md);
-  z-index: 9999;
-  transition: top 0.2s ease;
-}
-
-.skip-link:focus {
-  top: 8px;
-}
-
-/* Responsive adjustments */
-@media (max-width: 1024px) {
-  .canvas-header {
-    margin-left: 88px;
-    margin-right: 16px;
-    margin-top: 16px;
-    min-width: 0;
+@media (max-width: 767px) {
+  .workspace-content {
+    padding: 16px 12px 82px;
   }
 
-  .content-frame {
-    padding-left: 96px;
-    padding-right: 16px;
-    min-width: 0;
+  .mobile-nav {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    padding: 6px;
+    border: 1px solid var(--workspace-border, var(--border-light));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--bg-card) 94%, transparent);
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.14);
+    backdrop-filter: blur(14px);
   }
 
-  .functional-pane {
-    left: 88px;
-  }
-}
-
-@media (max-width: 768px) {
-  .canvas-header {
-    margin: 12px 12px 0;
-    border-radius: var(--radius-lg);
-    min-width: 0;
-    gap: 10px;
-  }
-
-  .content-frame {
-    padding: 12px;
-    padding-bottom: 72px;
-    min-width: 0;
+  .mobile-nav-item {
+    display: grid;
+    place-items: center;
+    gap: 3px;
+    min-height: 48px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.6rem;
   }
 
-  .page-title {
-    max-width: 42vw;
-    font-size: 0.96rem;
-  }
-
-  .canvas-header :deep(.control-center) {
-    max-width: 44vw;
-  }
-
-  .header-right .user-name {
-    display: none;
-  }
-
-  .logout-label {
-    display: none;
-  }
-
-  .functional-pane {
-    left: 16px;
-    top: auto;
-    bottom: 80px;
-    transform: translateY(0) translateX(-100%);
-    max-height: 60vh;
-  }
-
-  .functional-pane.open {
-    transform: translateY(0) translateX(0);
+  .mobile-nav-item.active {
+    background: color-mix(in srgb, var(--primary-color) 12%, var(--bg-card));
+    color: var(--primary-color);
   }
 }
 </style>

@@ -53,6 +53,13 @@ server:
       force-request: true
 
 app:
+  graph:
+    # Python 尚未完成 docs/GRAPH_PYTHON_ADAPTER.md 中的内部 API 前保持 false
+    enabled: ${GRAPH_ENABLED:false}
+    base-url: ${GRAPH_BASE_URL:http://127.0.0.1:8001}
+    internal-token: ${GRAPH_INTERNAL_TOKEN:}
+    connect-timeout-seconds: ${GRAPH_CONNECT_TIMEOUT_SECONDS:5}
+    response-timeout-seconds: ${GRAPH_RESPONSE_TIMEOUT_SECONDS:120}
   email:
     listener:
       # 测试或维护环境可关闭自动连接；手动连接 API 仍然可用

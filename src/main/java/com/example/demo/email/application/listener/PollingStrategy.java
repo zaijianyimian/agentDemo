@@ -12,9 +12,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
-import java.time.LocalTime;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -83,6 +83,13 @@ public class PollingStrategy implements ListenStrategy {
         stateService.markStatus(config, ListenerStatus.STOPPED, null);
     }
 
+    /**
+     * 执行一次增量拉取并发布邮件事件。
+     *
+     * @param config 邮箱配置。
+     * @param adapter 邮箱来源适配器。
+     * @param trigger 触发来源。
+     */
     public void pollOnce(EmailConfig config, MailSourceAdapter adapter, String trigger) {
         if (!isWithinListeningWindow(config)) {
             return;
@@ -99,6 +106,12 @@ public class PollingStrategy implements ListenStrategy {
                 latestCursor = message.cursorAfter();
                 continue;
             }
+
+            // 用户归属和来源信息都来自服务端配置/Adapter，不能由客户端或 Python 自行猜测。
+            message.emailMessage().setUserId(config.getUserId());
+            message.emailMessage().setEmailConfigId(config.getId());
+            message.emailMessage().setProvider(config.getProvider());
+            message.emailMessage().setExternalId(message.key().stableKey());
             publisher.publish(message.emailMessage(), trigger);
             adapter.acknowledge(config, message);
             latestCursor = message.cursorAfter();

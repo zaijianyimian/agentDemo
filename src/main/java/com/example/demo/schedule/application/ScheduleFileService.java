@@ -1,7 +1,8 @@
 package com.example.demo.schedule.application;
 
-import com.example.demo.schedule.domain.ScheduleEvent;
 import com.example.demo.infrastructure.properties.ScheduleProperties;
+import com.example.demo.infrastructure.security.CurrentUserProvider;
+import com.example.demo.schedule.domain.ScheduleEvent;
 import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeUtility;
 import lombok.RequiredArgsConstructor;
@@ -18,11 +19,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
- * 日程文件服务
- * 将日程导出为Markdown格式文件
- * 文件命名格式: schedule-yyyy-MM-dd.md
+ * 日程 Markdown 文件服务。
+ *
+ * <p>多用户模式下每个用户使用独立目录：
+ * {@code ${app.schedule.storage-path}/user-{userId}/}，避免同一天的文件互相覆盖。</p>
  */
 @Slf4j
 @Service
@@ -30,176 +33,207 @@ import java.util.regex.Pattern;
 public class ScheduleFileService {
 
     private final ScheduleProperties scheduleProperties;
+    private final CurrentUserProvider currentUserProvider;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-    private static final Pattern SCHEDULE_FILE_NAME_PATTERN = Pattern.compile("^schedule-\\d{4}-\\d{2}-\\d{2}\\.md$");
+    private static final Pattern SCHEDULE_FILE_NAME_PATTERN =
+            Pattern.compile("^schedule-\\d{4}-\\d{2}-\\d{2}\\.md$");
 
     @PostConstruct
     public void init() {
         try {
-            Path path = Paths.get(scheduleProperties.getStoragePath());
-            if (!Files.exists(path)) {
-                Files.createDirectories(path);
-                log.info("创建日程存储目录: {}", scheduleProperties.getStoragePath());
-            }
-        } catch (IOException e) {
-            log.error("创建日程存储目录失败: {}", scheduleProperties.getStoragePath(), e);
+            Files.createDirectories(baseStorageDir());
+        } catch (IOException error) {
+            log.error("创建日程存储目录失败: {}", scheduleProperties.getStoragePath(), error);
         }
     }
 
-    /**
-     * 保存单个日程到文件
-     * @return 文件路径
-     */
+    /** 保存单个日程到当前用户文件。 */
     public String saveScheduleToFile(ScheduleEvent event) {
         if (event == null || event.getEventDate() == null) {
             return null;
         }
-
         try {
             String dateStr = event.getEventDate().format(DATE_FORMATTER);
-            String fileName = "schedule-" + dateStr + ".md";
-            Path filePath = Paths.get(scheduleProperties.getStoragePath(), fileName);
-
+            Path filePath = userStorageDir().resolve("schedule-" + dateStr + ".md");
+            Files.createDirectories(filePath.getParent());
             String content = buildEventContent(event);
-
-            // 如果文件已存在，追加内容；否则创建新文件
             if (Files.exists(filePath)) {
                 Files.writeString(filePath, content, StandardOpenOption.APPEND);
             } else {
-                // 创建新文件，添加标题
-                String header = "# 日程安排 - " + dateStr + "\n\n";
-                Files.writeString(filePath, header + content);
+                Files.writeString(filePath, "# 日程安排 - " + dateStr + "\n\n" + content);
             }
-
-            log.info("日程已写入文件: {} -> {}", event.getTitle(), filePath);
             return filePath.toString();
-        } catch (IOException e) {
-            log.error("写入日程文件失败: {}", event.getTitle(), e);
+        } catch (IOException error) {
+            log.error("写入日程文件失败: {}", event.getTitle(), error);
             return null;
         }
     }
 
-    /**
-     * 按日期保存日程（用于创建或更新某一天的日程文件）
-     */
+    /** 按日期重写当前用户的日程文件。 */
     public String saveScheduleByDate(LocalDate date, List<ScheduleEvent> events) {
         if (date == null || events == null || events.isEmpty()) {
             return null;
         }
-
         try {
             String dateStr = date.format(DATE_FORMATTER);
-            String fileName = "schedule-" + dateStr + ".md";
-            Path filePath = Paths.get(scheduleProperties.getStoragePath(), fileName);
-
+            Path filePath = userStorageDir().resolve("schedule-" + dateStr + ".md");
+            Files.createDirectories(filePath.getParent());
             StringBuilder content = new StringBuilder();
-            content.append("# 日程安排 - ").append(dateStr).append("\n\n");
-            content.append("**更新时间**: ").append(java.time.LocalDateTime.now().format(TIME_FORMATTER)).append("\n\n");
-            content.append("---\n\n");
-
+            content.append("# 日程安排 - ").append(dateStr).append("\n\n")
+                    .append("**更新时间**: ")
+                    .append(java.time.LocalDateTime.now().format(TIME_FORMATTER))
+                    .append("\n\n---\n\n");
             List<ScheduleEvent> sortedEvents = sortEventsByTime(events);
             for (int i = 0; i < sortedEvents.size(); i++) {
-                ScheduleEvent event = sortedEvents.get(i);
-                content.append("## ").append(i + 1).append(". ").append(event.getTitle()).append("\n\n");
-
-                if (event.getEventTime() != null) {
-                    content.append("- **时间**: ").append(event.getEventTime().format(TIME_FORMATTER)).append("\n");
-                }
-                if (event.getLocation() != null && !event.getLocation().isEmpty()) {
-                    content.append("- **地点**: ").append(event.getLocation()).append("\n");
-                }
-                if (event.getDescription() != null && !event.getDescription().isEmpty()) {
-                    content.append("- **描述**: ").append(event.getDescription()).append("\n");
-                }
-                if (event.getSourceEmail() != null && !event.getSourceEmail().isEmpty()) {
-                    content.append("- **来源邮件**: ").append(formatSourceEmail(event.getSourceEmail())).append("\n");
-                }
-                content.append("\n");
+                appendEvent(content, sortedEvents.get(i), i + 1);
             }
-
             Files.writeString(filePath, content.toString());
-            log.info("日程文件已生成: {}", filePath);
             return filePath.toString();
-
-        } catch (IOException e) {
-            log.error("生成日程文件失败: {}", date, e);
+        } catch (IOException error) {
+            log.error("生成日程文件失败: {}", date, error);
             return null;
         }
     }
 
-    /**
-     * 生成日程汇总文件
-     */
+    /** 生成当前用户的日程汇总文件。 */
     public String generateSummaryFile(String dateStr, List<ScheduleEvent> events) {
         try {
-            String fileName = "summary-" + dateStr + ".md";
-            Path filePath = Paths.get(scheduleProperties.getStoragePath(), fileName);
-
+            Path filePath = userStorageDir().resolve("summary-" + dateStr + ".md");
+            Files.createDirectories(filePath.getParent());
             StringBuilder content = new StringBuilder();
-            content.append("# 日程汇总 - ").append(dateStr).append("\n\n");
-            content.append("**生成时间**: ").append(java.time.LocalDateTime.now().format(TIME_FORMATTER)).append("\n\n");
-            content.append("---\n\n");
-
+            content.append("# 日程汇总 - ").append(dateStr).append("\n\n")
+                    .append("**生成时间**: ")
+                    .append(java.time.LocalDateTime.now().format(TIME_FORMATTER))
+                    .append("\n\n---\n\n");
             List<ScheduleEvent> sortedEvents = sortEventsByTime(events);
             if (sortedEvents.isEmpty()) {
                 content.append("暂无日程安排。\n");
             } else {
                 for (int i = 0; i < sortedEvents.size(); i++) {
-                    ScheduleEvent event = sortedEvents.get(i);
-                    content.append("## ").append(i + 1).append(". ").append(event.getTitle()).append("\n\n");
-
-                    if (event.getEventTime() != null) {
-                        content.append("- **时间**: ").append(event.getEventTime().format(TIME_FORMATTER)).append("\n");
-                    }
-                    if (event.getLocation() != null && !event.getLocation().isEmpty()) {
-                        content.append("- **地点**: ").append(event.getLocation()).append("\n");
-                    }
-                    if (event.getDescription() != null && !event.getDescription().isEmpty()) {
-                        content.append("- **描述**: ").append(event.getDescription()).append("\n");
-                    }
-                    if (event.getSourceEmail() != null && !event.getSourceEmail().isEmpty()) {
-                        content.append("- **来源邮件**: ").append(formatSourceEmail(event.getSourceEmail())).append("\n");
-                    }
-                    content.append("\n");
+                    appendEvent(content, sortedEvents.get(i), i + 1);
                 }
             }
-
             Files.writeString(filePath, content.toString());
-            log.info("日程汇总文件已生成: {}", filePath);
             return filePath.toString();
-
-        } catch (IOException e) {
-            log.error("生成日程汇总文件失败: {}", dateStr, e);
+        } catch (IOException error) {
+            log.error("生成日程汇总文件失败: {}", dateStr, error);
             return null;
         }
     }
 
+    /** 读取当前用户指定日期的日程文件。 */
+    public String readScheduleFile(LocalDate date) {
+        return readFile(userStorageDir().resolve("schedule-" + date.format(DATE_FORMATTER) + ".md"));
+    }
+
+    /** 读取当前用户指定文件名的日程文件。 */
+    public String readScheduleFileByName(String fileName) {
+        if (fileName == null || !SCHEDULE_FILE_NAME_PATTERN.matcher(fileName).matches()) {
+            throw new IllegalArgumentException("非法日程文件名");
+        }
+        Path userDir = userStorageDir();
+        Path filePath = userDir.resolve(fileName).normalize();
+        ensureInside(filePath, userDir);
+        return readFile(filePath);
+    }
+
     /**
-     * 构建单个日程内容
+     * 按完整路径读取日程文件，但只允许访问当前用户目录。
      */
+    public String readScheduleFileByPath(String filePathStr) {
+        Path userDir = userStorageDir();
+        Path filePath = Paths.get(filePathStr).toAbsolutePath().normalize();
+        ensureInside(filePath, userDir);
+        return readFile(filePath);
+    }
+
+    /** 删除当前用户指定日期的文件。 */
+    public void deleteScheduleFile(LocalDate date) {
+        Path filePath = userStorageDir().resolve("schedule-" + date.format(DATE_FORMATTER) + ".md");
+        try {
+            Files.deleteIfExists(filePath);
+        } catch (IOException error) {
+            log.error("删除日程文件失败: {}", date, error);
+        }
+    }
+
+    /** 返回当前用户所有日程文件名。 */
+    public List<String> listScheduleFiles() {
+        Path dir = userStorageDir();
+        if (!Files.exists(dir)) {
+            return List.of();
+        }
+        try (Stream<Path> stream = Files.list(dir)) {
+            return stream
+                    .filter(path -> SCHEDULE_FILE_NAME_PATTERN.matcher(path.getFileName().toString()).matches())
+                    .map(path -> path.getFileName().toString())
+                    .sorted()
+                    .toList();
+        } catch (IOException error) {
+            log.error("获取日程文件列表失败", error);
+            return List.of();
+        }
+    }
+
+    private Path baseStorageDir() {
+        return Paths.get(scheduleProperties.getStoragePath()).toAbsolutePath().normalize();
+    }
+
+    private Path userStorageDir() {
+        long userId = currentUserProvider.requireUserId();
+        Path userDir = baseStorageDir().resolve("user-" + userId).normalize();
+        ensureInside(userDir, baseStorageDir());
+        try {
+            Files.createDirectories(userDir);
+        } catch (IOException error) {
+            throw new IllegalStateException("创建用户日程目录失败", error);
+        }
+        return userDir;
+    }
+
+    private void ensureInside(Path path, Path root) {
+        if (!path.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())) {
+            throw new IllegalArgumentException("非法日程文件路径");
+        }
+    }
+
+    private String readFile(Path filePath) {
+        try {
+            return Files.exists(filePath) ? Files.readString(filePath) : null;
+        } catch (IOException error) {
+            log.error("读取日程文件失败: {}", filePath, error);
+            return null;
+        }
+    }
+
     private String buildEventContent(ScheduleEvent event) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder content = new StringBuilder();
+        appendEvent(content, event, null);
+        content.append("---\n\n");
+        return content.toString();
+    }
 
-        sb.append("## ").append(event.getTitle()).append("\n\n");
-
+    private void appendEvent(StringBuilder content, ScheduleEvent event, Integer index) {
+        content.append("## ");
+        if (index != null) {
+            content.append(index).append(". ");
+        }
+        content.append(event.getTitle()).append("\n\n");
         if (event.getEventTime() != null) {
-            sb.append("- **时间**: ").append(event.getEventTime().format(TIME_FORMATTER)).append("\n");
+            content.append("- **时间**: ").append(event.getEventTime().format(TIME_FORMATTER)).append("\n");
         }
         if (event.getLocation() != null && !event.getLocation().isEmpty()) {
-            sb.append("- **地点**: ").append(event.getLocation()).append("\n");
+            content.append("- **地点**: ").append(event.getLocation()).append("\n");
         }
         if (event.getDescription() != null && !event.getDescription().isEmpty()) {
-            sb.append("- **描述**: ").append(event.getDescription()).append("\n");
+            content.append("- **描述**: ").append(event.getDescription()).append("\n");
         }
         if (event.getSourceEmail() != null && !event.getSourceEmail().isEmpty()) {
-            sb.append("- **来源邮件**: ").append(formatSourceEmail(event.getSourceEmail())).append("\n");
+            content.append("- **来源邮件**: ").append(formatSourceEmail(event.getSourceEmail())).append("\n");
         }
-
-        sb.append("\n---\n\n");
-
-        return sb.toString();
+        content.append("\n");
     }
 
     private List<ScheduleEvent> sortEventsByTime(List<ScheduleEvent> events) {
@@ -217,112 +251,8 @@ public class ScheduleFileService {
         }
         try {
             return MimeUtility.decodeText(sourceEmail);
-        } catch (Exception e) {
+        } catch (Exception ignored) {
             return sourceEmail;
-        }
-    }
-
-    /**
-     * 读取日程文件内容（按日期）
-     */
-    public String readScheduleFile(LocalDate date) {
-        try {
-            String dateStr = date.format(DATE_FORMATTER);
-            String fileName = "schedule-" + dateStr + ".md";
-            Path filePath = Paths.get(scheduleProperties.getStoragePath(), fileName);
-
-            if (Files.exists(filePath)) {
-                return Files.readString(filePath);
-            }
-            return null;
-        } catch (IOException e) {
-            log.error("读取日程文件失败: {}", date, e);
-            return null;
-        }
-    }
-
-    /**
-     * 读取日程文件内容（按文件名）
-     */
-    public String readScheduleFileByName(String fileName) {
-        try {
-            if (fileName == null || !SCHEDULE_FILE_NAME_PATTERN.matcher(fileName).matches()) {
-                throw new IllegalArgumentException("非法日程文件名");
-            }
-            Path baseDir = Paths.get(scheduleProperties.getStoragePath()).toAbsolutePath().normalize();
-            Path filePath = baseDir.resolve(fileName).normalize();
-            if (!filePath.startsWith(baseDir)) {
-                throw new IllegalArgumentException("非法日程文件路径");
-            }
-
-            if (Files.exists(filePath)) {
-                return Files.readString(filePath);
-            }
-            return null;
-        } catch (IOException e) {
-            log.error("读取日程文件失败: {}", fileName, e);
-            return null;
-        }
-    }
-
-    /**
-     * 读取日程文件内容（按完整路径）
-     */
-    public String readScheduleFileByPath(String filePathStr) {
-        try {
-            Path baseDir = Paths.get(scheduleProperties.getStoragePath()).toAbsolutePath().normalize();
-            Path filePath = Paths.get(filePathStr).toAbsolutePath().normalize();
-            if (!filePath.startsWith(baseDir)) {
-                throw new IllegalArgumentException("非法日程文件路径");
-            }
-
-            if (Files.exists(filePath)) {
-                return Files.readString(filePath);
-            }
-            return null;
-        } catch (IOException e) {
-            log.error("读取日程文件失败: {}", filePathStr, e);
-            return null;
-        }
-    }
-
-    /**
-     * 删除日程文件
-     */
-    public void deleteScheduleFile(LocalDate date) {
-        try {
-            String dateStr = date.format(DATE_FORMATTER);
-            String fileName = "schedule-" + dateStr + ".md";
-            Path filePath = Paths.get(scheduleProperties.getStoragePath(), fileName);
-
-            if (Files.exists(filePath)) {
-                Files.delete(filePath);
-                log.info("已删除日程文件: {}", filePath);
-            }
-        } catch (IOException e) {
-            log.error("删除日程文件失败: {}", date, e);
-        }
-    }
-
-    /**
-     * 获取所有日程文件列表
-     */
-    public List<String> listScheduleFiles() {
-        try {
-            Path dir = Paths.get(scheduleProperties.getStoragePath());
-            if (!Files.exists(dir)) {
-                return List.of();
-            }
-
-            return Files.list(dir)
-                    .filter(p -> p.getFileName().toString().startsWith("schedule-"))
-                    .filter(p -> p.getFileName().toString().endsWith(".md"))
-                    .map(p -> p.getFileName().toString())
-                    .sorted()
-                    .toList();
-        } catch (IOException e) {
-            log.error("获取日程文件列表失败", e);
-            return List.of();
         }
     }
 }
