@@ -27,8 +27,7 @@ import java.util.Set;
 public class MybatisPlusConfig implements MetaObjectHandler {
 
     /**
-     * 强租户隔离表。混合范围表（ai_model_config / mcp_tool / skill）不在此集合，
-     * 它们需要同时支持系统全局记录（user_id IS NULL）与当前用户私有记录。
+     * 强租户隔离表。mcp_tool / skill 采用“系统内置 + 用户私有”的混合范围，不在此集合；
      * push_config / system_settings 属于系统运行配置，也保持全局。
      */
     private static final Set<String> USER_SCOPED_TABLES = Set.of(
@@ -47,7 +46,8 @@ public class MybatisPlusConfig implements MetaObjectHandler {
             "knowledge_document",
             "search_history",
             "user_interest",
-            "dispatched_task"
+            "dispatched_task",
+            "ai_model_config"
     );
 
     private final CurrentUserProvider currentUserProvider;
@@ -56,11 +56,7 @@ public class MybatisPlusConfig implements MetaObjectHandler {
         this.currentUserProvider = currentUserProvider;
     }
 
-    /**
-     * 注册多用户隔离与分页插件。
-     *
-     * @return MyBatis Plus 拦截器。
-     */
+    /** 注册多用户隔离与分页插件。 */
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
