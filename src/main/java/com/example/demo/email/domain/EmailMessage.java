@@ -23,6 +23,9 @@ public class EmailMessage {
     /** 邮件所属系统用户 ID。 */
     private Long userId;
 
+    /** MySQL 邮箱配置 ID，用于失败补偿和来源追踪。 */
+    private Long emailConfigId;
+
     /** 邮箱来源，例如 GENERIC_IMAP、GMAIL_API。 */
     private String provider;
 
