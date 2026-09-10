@@ -3,6 +3,7 @@ package com.example.demo.dispatch.application.executor;
 import com.example.demo.dispatch.application.ExecutorToggleService;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "app.agent", name = "mode", havingValue = "legacy", matchIfMissing = true)
 public class ClaudeCodeExecutor implements Executor {
 
     private static final String CLI = "claude";
@@ -38,7 +40,6 @@ public class ClaudeCodeExecutor implements Executor {
 
     @Override
     public boolean isAvailable() {
-        // 双重检查：用户在前端禁用 → 直接不可用，不依赖 CLI
         if (!executorToggleService.isExecutorEnabled("claude-code")) {
             log.debug("claude-code executor disabled via settings");
             return false;
@@ -95,20 +96,10 @@ public class ClaudeCodeExecutor implements Executor {
         }
     }
 
-    /**
-     * 从 Claude Code 的 {@code --output-format json} 输出中提取文本。
-     *
-     * <p>Claude Code 输出一个 JSON 对象，文本通常在 {@code result} 字段；
-     * 这里做一个稳健的提取，失败则回退到原始字符串。</p>
-     */
-    /**
-     * 从 Claude Code 的 {@code --output-format json} 输出中提取文本。失败时回退原始字符串。
-     */
     static String extractTextFromJson(String raw) {
         if (raw == null) {
             return "";
         }
-        // Claude CLI 可能在前置输出"Warning: ..."之类的非 JSON 行，先扫描找到第一个 '{' 起始。
         String trimmed = raw.trim();
         int brace = trimmed.indexOf('{');
         if (brace < 0) {
