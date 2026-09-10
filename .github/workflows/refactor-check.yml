@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - refactor/replit-ui-api
+      - feat/graph-gateway-multi-user
   pull_request:
     branches:
       - improve
+      - refactor/replit-ui-api
 
 permissions:
   contents: read
