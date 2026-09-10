@@ -9,6 +9,7 @@ import dev.langchain4j.service.tool.ToolExecutor;
 import dev.langchain4j.service.tool.ToolProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -16,8 +17,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * MCP Agent 配置
- * 配置支持动态工具调用的 AI 服务
+ * MCP Agent 配置。
+ *
+ * <p>ToolProvider 始终保留给 Java 兼容能力使用；只有两个本地 Agent Bean 会在 Graph 关闭时创建。
+ * Graph 开启后由 {@link GraphMcpAgentConfiguration} 提供同名 Bean。</p>
  */
 @Slf4j
 @Configuration
@@ -29,8 +32,9 @@ public class McpAgentConfiguration {
     private final Map<Object, MessageWindowChatMemory> chatMemories = new ConcurrentHashMap<>();
 
     /**
-     * 动态工具提供者
-     * 从缓存加载启用的工具
+     * 动态工具提供者，从缓存加载启用工具。
+     *
+     * @return 工具提供器。
      */
     @Bean
     public ToolProvider mcpToolProvider() {
@@ -51,9 +55,14 @@ public class McpAgentConfiguration {
     }
 
     /**
-     * MCP Agent 服务（普通响应）
+     * 本地 LangChain4j MCP Agent 服务。
+     *
+     * @param chatModel 聊天模型。
+     * @param toolProvider 工具提供器。
+     * @return 本地 Agent 服务。
      */
     @Bean
+    @ConditionalOnProperty(prefix = "app.graph", name = "enabled", havingValue = "false", matchIfMissing = true)
     public McpAgentService mcpAgentService(ChatModel chatModel, ToolProvider toolProvider) {
         return AiServices.builder(McpAgentService.class)
                 .chatModel(chatModel)
@@ -65,9 +74,14 @@ public class McpAgentConfiguration {
     }
 
     /**
-     * MCP Agent 服务（流式响应）
+     * 本地 LangChain4j MCP Agent 流式服务。
+     *
+     * @param streamingChatModel 流式模型。
+     * @param toolProvider 工具提供器。
+     * @return 本地 Agent 流式服务。
      */
     @Bean("mcpAgentStreamingService")
+    @ConditionalOnProperty(prefix = "app.graph", name = "enabled", havingValue = "false", matchIfMissing = true)
     public McpAgentService mcpAgentStreamingService(
             StreamingChatModel streamingChatModel,
             ToolProvider toolProvider) {
