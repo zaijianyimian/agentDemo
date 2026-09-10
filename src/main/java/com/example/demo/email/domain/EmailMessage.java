@@ -12,7 +12,7 @@ import java.util.List;
  * 邮件信息 DTO。
  *
  * <p>{@code userId} 表示该邮件所属的系统用户，仅由后端根据邮箱配置写入，后续传给 Python Graph
- * 作为 PostgreSQL AI 数据隔离键。</p>
+ * 作为 PostgreSQL AI 数据隔离键。{@code provider + externalId} 用于跨服务幂等。</p>
  */
 @Data
 @Builder
@@ -22,6 +22,12 @@ public class EmailMessage {
 
     /** 邮件所属系统用户 ID。 */
     private Long userId;
+
+    /** 邮箱来源，例如 GENERIC_IMAP、GMAIL_API。 */
+    private String provider;
+
+    /** 来源侧稳定消息标识，用于多用户邮件入库幂等。 */
+    private String externalId;
 
     /** 邮件协议 Message-ID。 */
     private String messageId;
