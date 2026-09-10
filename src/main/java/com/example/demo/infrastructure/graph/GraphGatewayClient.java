@@ -3,13 +3,16 @@ package com.example.demo.infrastructure.graph;
 import com.example.demo.email.domain.EmailMessage;
 import com.example.demo.infrastructure.properties.GraphGatewayProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.netty.channel.ChannelOption;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -33,8 +36,14 @@ public class GraphGatewayClient {
 
     public GraphGatewayClient(GraphGatewayProperties properties, WebClient.Builder webClientBuilder) {
         this.properties = properties;
+        int connectTimeoutMillis = Math.toIntExact(
+                Duration.ofSeconds(properties.getConnectTimeoutSeconds()).toMillis());
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis)
+                .responseTimeout(Duration.ofSeconds(properties.getResponseTimeoutSeconds()));
         this.webClient = webClientBuilder
                 .baseUrl(stripTrailingSlash(properties.getBaseUrl()))
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .build();
     }
 
@@ -133,9 +142,7 @@ public class GraphGatewayClient {
 
     private void applyInternalHeaders(org.springframework.http.HttpHeaders headers, long userId) {
         headers.set(USER_ID_HEADER, String.valueOf(userId));
-        if (properties.getInternalToken() != null && !properties.getInternalToken().isBlank()) {
-            headers.set(INTERNAL_TOKEN_HEADER, properties.getInternalToken());
-        }
+        headers.set(INTERNAL_TOKEN_HEADER, properties.getInternalToken());
     }
 
     private static void putNullable(Map<String, Object> payload, String key, Object value) {
