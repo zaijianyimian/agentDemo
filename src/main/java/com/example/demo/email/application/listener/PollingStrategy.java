@@ -107,8 +107,10 @@ public class PollingStrategy implements ListenStrategy {
                 continue;
             }
 
-            // 用户归属来自 MySQL 邮箱配置，不能由邮件内容或 Python 自行猜测。
+            // 用户归属和来源信息都来自服务端配置/Adapter，不能由客户端或 Python 自行猜测。
             message.emailMessage().setUserId(config.getUserId());
+            message.emailMessage().setProvider(config.getProvider());
+            message.emailMessage().setExternalId(message.key());
             publisher.publish(message.emailMessage(), trigger);
             adapter.acknowledge(config, message);
             latestCursor = message.cursorAfter();
