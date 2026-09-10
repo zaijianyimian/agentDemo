@@ -1,7 +1,7 @@
 @ApplicationModule(
         id = "schedule",
         displayName = "Schedule",
-        allowedDependencies = {"chat::*", "email::*", "infrastructure", "memory::*", "model::*", "shared::*"}
+        allowedDependencies = {"auth::*", "chat::*", "email::*", "infrastructure", "memory::*", "model::*", "shared::*"}
 )
 package com.example.demo.schedule;
 
