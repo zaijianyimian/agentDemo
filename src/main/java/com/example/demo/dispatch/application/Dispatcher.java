@@ -9,9 +9,9 @@ import com.example.demo.dispatch.application.prompt.MemoryRecallService;
 import com.example.demo.dispatch.application.prompt.PromptTemplate;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import com.example.demo.dispatch.domain.PushConfig;
-import com.example.demo.dispatch.application.DispatchProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
@@ -20,22 +20,11 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 任务派发器核心：状态机 RETRY → SWAP → SELF → FAILED。
- *
- * <p>每次执行的工作流：
- * <ol>
- *   <li>WorkspaceManager.create(task)</li>
- *   <li>MemoryRecallService.recall(subject, 5) → memories</li>
- *   <li>HintMerger.merge + PromptTemplate.render → prompt</li>
- *   <li>ExecutorRouter.pick(executor_hint).execute(task, prompt, workspace, timeout)</li>
- *   <li>成功 → WorkspaceManager.archive + 写 md → DONE</li>
- *   <li>失败 → 累计 retries，超过 retry_max → swap → self → FAILED</li>
- * </ol>
- */
+/** LEGACY 模式的本地 Agent 派发器。 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "app.agent", name = "mode", havingValue = "legacy", matchIfMissing = true)
 public class Dispatcher {
 
     private final DispatchProperties properties;
@@ -46,50 +35,30 @@ public class Dispatcher {
     private final ExecutorRouter executorRouter;
     private final DecisionLayerFallback fallback;
 
-    /**
-     * 跑单个任务。抢占由 caller（{@code TaskPoller}）完成。
-     */
-    /**
-     * 跑单个任务的全流程：建工作区 → 召回记忆 → 拼 prompt → 多级 cascade 执行 → 归档落结果。
-     * 抢占由 caller（{@link TaskPoller}）完成。任何抛出都会被捕获并写入 FAILED 状态。
-     */
     public void run(DispatchedTask task) {
         log.info("dispatcher.run start task={}", task.getId());
         PushConfig cfg = workspaceManager.loadPushConfig();
         try {
-            // 1. workspace
             Path workspace = workspaceManager.create(task);
             task.setWorkspacePath(workspace.toString());
-
-            // 2. recall
             List<Map<String, Object>> memories = recallService.recallForTask(task.getSubject(), 5);
-
-            // 3. prompt
             String finalHint = HintMerger.merge(null, task.getFinalHint());
             String prompt = promptTemplate.render(
                     new EmailMetadata(task.getSubject(), null, task.getBodyExcerpt()),
                     memories, finalHint);
-
-            // 4. execute (with cascade)
             String result = executeWithCascade(task, prompt, workspace, cfg);
-
-            // 5. archive workspace + write md
             Path archive = workspaceManager.archive(task);
             Path mdPath = writeResultMd(task, result);
             taskService.markDone(task.getId(), task.getExecutorUsed(), result, mdPath.toString());
-
-            // 6. evict LRU for this email
             workspaceManager.evict(task.getEmailId(), cfg);
-
-            log.info("dispatcher.run done task={} archived={} md={}",
-                    task.getId(), archive, mdPath);
+            log.info("dispatcher.run done task={} archived={} md={}", task.getId(), archive, mdPath);
         } catch (Exception e) {
             log.error("dispatcher.run unhandled error task={}", task.getId(), e);
             try {
                 workspaceManager.archive(task);
                 taskService.markFailed(task.getId(), task.getExecutorUsed(), e.getMessage());
-            } catch (Exception ee) {
-                log.error("dispatcher.run archive/fail bookkeeping failed task={}", task.getId(), ee);
+            } catch (Exception bookkeepingError) {
+                log.error("dispatcher.run archive/fail bookkeeping failed task={}", task.getId(), bookkeepingError);
             }
         }
     }
@@ -99,7 +68,6 @@ public class Dispatcher {
         int timeout = cfg.getExecutorTimeoutSeconds() == null
                 ? properties.getExecutorTimeoutSeconds() : cfg.getExecutorTimeoutSeconds();
 
-        // ---- Stage 1: primary executor with retries ----
         String currentHint = task.getExecutorHint();
         task.setExecutorUsed(currentHint);
         try {
@@ -108,43 +76,39 @@ public class Dispatcher {
             log.warn("primary executor {} failed for task {}: {}", currentHint, task.getId(), primaryErr.getMessage());
         }
 
-        // ---- Stage 2: swap to fallback executor ----
         String fallbackHint = task.getFallbackExecutor();
         if (fallbackHint != null && !fallbackHint.equals(currentHint)) {
             taskService.switchExecutor(task.getId(), fallbackHint);
             task.setExecutorUsed(fallbackHint);
             try {
                 return runWithRetries(task, prompt, workspace, fallbackHint, retryMax, timeout);
-            } catch (Exception fbErr) {
-                log.warn("fallback executor {} failed for task {}: {}", fallbackHint, task.getId(), fbErr.getMessage());
+            } catch (Exception fallbackError) {
+                log.warn("fallback executor {} failed for task {}: {}", fallbackHint, task.getId(), fallbackError.getMessage());
             }
         }
 
-        // ---- Stage 3: decision-layer self-execution ----
         taskService.switchExecutor(task.getId(), DispatchedTask.EXECUTOR_DECISION_LAYER_SELF);
         task.setExecutorUsed(DispatchedTask.EXECUTOR_DECISION_LAYER_SELF);
         try {
-            String selfResult = fallback.answer(prompt);
-            return selfResult;
-        } catch (Exception selfErr) {
-            // ---- Stage 4: FAILED (outer Dispatcher.run catch will mark failed) ----
-            throw new CascadeFailedException("cascade failed for task " + task.getId(), selfErr);
+            return fallback.answer(prompt);
+        } catch (Exception selfError) {
+            throw new CascadeFailedException("cascade failed for task " + task.getId(), selfError);
         }
     }
 
     private String runWithRetries(DispatchedTask task, String prompt, Path workspace,
-                                   String hint, int retryMax, int timeout) {
-        Executor exec = executorRouter.pick(hint);
+                                  String hint, int retryMax, int timeout) {
+        Executor executor = executorRouter.pick(hint);
         Exception last = null;
         for (int attempt = 0; attempt <= retryMax; attempt++) {
             try {
-                return exec.execute(task, prompt, workspace, timeout);
-            } catch (Exception e) {
-                last = e;
+                return executor.execute(task, prompt, workspace, timeout);
+            } catch (Exception error) {
+                last = error;
                 if (attempt < retryMax) {
                     taskService.appendRetry(task.getId());
                     log.warn("executor {} attempt {}/{} failed for task {}: {}",
-                            hint, attempt + 1, retryMax + 1, task.getId(), e.getMessage());
+                            hint, attempt + 1, retryMax + 1, task.getId(), error.getMessage());
                 }
             }
         }
@@ -186,8 +150,8 @@ public class Dispatcher {
         return md;
     }
 
-    private static String nullSafe(String s) {
-        return s == null ? "" : s;
+    private static String nullSafe(String value) {
+        return value == null ? "" : value;
     }
 
     public static class CascadeFailedException extends RuntimeException {
