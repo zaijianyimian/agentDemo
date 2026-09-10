@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { buildLoginRedirectUrl, hasAccessToken } from '@/services/auth-token'
 
-// Route meta type definition
 declare module 'vue-router' {
   interface RouteMeta {
     title?: string
@@ -35,13 +34,13 @@ const routes = [
     path: '/',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard.vue'),
-    meta: { title: '仪表盘', icon: 'dashboard', description: '查看全局状态、模块入口和今日重点事项。' }
+    meta: { title: '工作台', icon: 'dashboard', description: '查看今日重点、待处理事项和 Agent 最近活动。' }
   },
   {
     path: '/inbox',
     name: 'Inbox',
     component: () => import('@/views/Inbox.vue'),
-    meta: { title: '统一收件箱', icon: 'inbox', description: '聚合日程、任务、笔记、搜索、邮件与自治发现项。' }
+    meta: { title: '统一收件箱', icon: 'inbox', description: '聚合邮件、任务、日程、笔记和 Agent 发现项。' }
   },
   {
     path: '/autonomy',
@@ -59,7 +58,7 @@ const routes = [
     path: '/models',
     name: 'Models',
     component: () => import('@/views/Models.vue'),
-    meta: { title: '模型配置', icon: 'cube', description: '管理可用模型、默认模型和连接测试。' }
+    meta: { title: '模型', icon: 'cube', description: '管理可用模型、默认模型和连接测试。' }
   },
   {
     path: '/files',
@@ -71,7 +70,7 @@ const routes = [
     path: '/chat',
     name: 'Chat',
     component: () => import('@/views/Chat.vue'),
-    meta: { title: 'AI聊天', icon: 'chat', description: '会话式对话、模型切换和流式响应入口。' }
+    meta: { title: 'Agent 对话', icon: 'chat', description: '向 Agent 下达自然语言目标，并查看请求执行状态。' }
   },
   {
     path: '/knowledge',
@@ -83,13 +82,13 @@ const routes = [
     path: '/tasks',
     name: 'Tasks',
     component: () => import('@/views/Tasks.vue'),
-    meta: { title: '定时任务', icon: 'time', description: '配置计划任务、执行技能和定时流程。' }
+    meta: { title: '定时任务', icon: 'time', description: '配置 Cron 触发器、执行 Skill 或 Agent 任务。' }
   },
   {
     path: '/task-admin',
     name: 'TaskAdmin',
     component: () => import('@/views/TaskAdmin.vue'),
-    meta: { title: '调度管理', icon: 'calendar', description: 'xxl-job 风格的调度中心：任务列表、执行日志、状态一站管理。' }
+    meta: { title: '调度管理', icon: 'calendar', description: '查看计划任务、执行日志和运行状态。' }
   },
   {
     path: '/notes',
@@ -107,7 +106,7 @@ const routes = [
     path: '/schedule',
     name: 'Schedule',
     component: () => import('@/views/Schedule.vue'),
-    meta: { title: '日程管理', icon: 'calendar', description: '统一查看事件、解析邮件并接收实时推送。' }
+    meta: { title: '日程', icon: 'calendar', description: '统一查看事件、解析邮件并接收实时推送。' }
   },
   {
     path: '/email',
@@ -131,37 +130,37 @@ const routes = [
     path: '/tools',
     name: 'Tools',
     component: () => import('@/views/Tools.vue'),
-    meta: { title: '工具管理', icon: 'tool', description: '管理 MCP 工具、验证配置并执行调用。' }
+    meta: { title: 'MCP 工具', icon: 'tool', description: '管理 Agent 可调用工具、验证配置并执行测试。' }
   },
   {
     path: '/skills',
     name: 'Skills',
     component: () => import('@/views/Skills.vue'),
-    meta: { title: '技能管理', icon: 'skill', description: '维护技能目录、分类、绑定关系与执行能力。' }
+    meta: { title: 'Skills', icon: 'skill', description: '维护 Agent 技能目录、分类、绑定关系与执行能力。' }
   },
   {
     path: '/markdown-skills',
     name: 'MarkdownSkills',
     component: () => import('@/views/MarkdownSkills.vue'),
-    meta: { title: 'Markdown Skills', icon: 'document', description: '类似 Claude Skills 的 SKILL.md 管理：自动加载、LLM 调用、关键词匹配。' }
+    meta: { title: 'Markdown Skills', icon: 'document', description: '管理 SKILL.md 能力：自动加载、LLM 调用和关键词匹配。' }
   },
   {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/views/Settings.vue'),
-    meta: { title: '系统设置', icon: 'settings', description: '集中调整系统、模型、Qdrant、搜索与文件参数。' }
+    meta: { title: '系统设置', icon: 'settings', description: '集中调整 Agent、模型、Qdrant、搜索与文件参数。' }
   },
   {
     path: '/personal',
     name: 'Personal',
     component: () => import('@/views/PersonalCenter.vue'),
-    meta: { title: '单用户中心', icon: 'person', description: '单用户效率增强、模板中心与备份恢复。' }
+    meta: { title: '个人中心', icon: 'person', description: '个人效率、模板中心与备份恢复。' }
   },
   {
     path: '/chatimport',
     name: 'ChatImport',
     component: () => import('@/views/ChatImport.vue'),
-    meta: { title: '聊天导入', icon: 'chatbubbles', description: '导入微信、QQ、Telegram聊天记录并创建虚拟助手。' }
+    meta: { title: '聊天导入', icon: 'chatbubbles', description: '导入微信、QQ、Telegram 聊天记录并创建虚拟助手。' }
   },
   {
     path: '/schedule-reader',
@@ -191,7 +190,7 @@ const routes = [
     path: '/push-config',
     name: 'PushConfig',
     component: () => import('@/views/PushConfig.vue'),
-    meta: { title: '推送配置', icon: 'push', description: '维护推送邮箱、阈值与批量 cron。' }
+    meta: { title: '推送配置', icon: 'push', description: '维护推送邮箱、阈值与批量 Cron。' }
   }
 ]
 
@@ -200,7 +199,7 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach(async to => {
   const authStore = useAuthStore()
   const isPublic = Boolean(to.meta.public)
   const hasToken = hasAccessToken()
@@ -220,7 +219,7 @@ router.beforeEach(async (to) => {
     }
   }
 
-  document.title = `${to.meta.title || 'AI Agent'} - Dashboard`
+  document.title = `${to.meta.title || 'Agent Workspace'} - Agent Workspace`
   return true
 })
 
