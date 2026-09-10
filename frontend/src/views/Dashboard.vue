@@ -1,408 +1,323 @@
 <template>
-  <div class="dashboard">
-    <section class="home-hero">
+  <div class="dashboard workspace-dashboard">
+    <section class="dashboard-hero">
       <div class="hero-copy">
-        <div class="page-eyebrow">Unified Management Home</div>
-        <h2>统一管理工作台</h2>
-        <p>集中查看今日状态、进入业务模块，并快速启动常用工作流。</p>
+        <span class="page-eyebrow">Agent Workspace</span>
+        <h2>{{ greeting }}，{{ displayName }}</h2>
+        <p>{{ heroSummary }}</p>
+        <div class="hero-actions">
+          <n-button type="primary" size="large" @click="navigate('/chat')">
+            <template #icon><n-icon><ChatIcon /></n-icon></template>
+            Ask Agent
+          </n-button>
+          <n-button size="large" secondary @click="navigate('/inbox')">
+            查看待处理事项
+          </n-button>
+        </div>
       </div>
 
-      <div class="time-panel" :class="{ loading }">
-        <span class="time-display">{{ formattedTime }}</span>
-        <span class="date-display">{{ formattedDate }}</span>
-        <span class="insight-text">{{ timeInsight }}</span>
+      <div class="hero-context">
+        <span>{{ formattedDate }}</span>
+        <strong>{{ formattedTime }}</strong>
+        <small>{{ loading ? '正在同步工作区状态…' : 'Workspace 已同步' }}</small>
       </div>
     </section>
 
-    <section class="status-grid" aria-label="今日状态">
+    <section class="overview-grid" aria-label="今日概览">
       <button
-        v-for="card in statusCards"
+        v-for="card in overviewCards"
         :key="card.key"
-        class="status-card"
         type="button"
+        class="overview-card"
         @click="navigate(card.path)"
       >
-        <span class="status-icon" :class="card.tone">
-          <n-icon size="22"><component :is="card.icon" /></n-icon>
+        <span class="overview-icon">
+          <n-icon size="20"><component :is="card.icon" /></n-icon>
         </span>
-        <span class="status-copy">
-          <strong>
-            <CountUp :end-val="card.value" :duration="1.2" />
-          </strong>
+        <span class="overview-copy">
+          <strong>{{ card.value }}</strong>
           <span>{{ card.label }}</span>
+          <small>{{ card.hint }}</small>
         </span>
       </button>
     </section>
 
-    <div class="home-layout">
-      <section class="management-panel">
+    <div class="dashboard-grid">
+      <section class="dashboard-panel attention-panel">
         <div class="panel-head">
           <div>
-            <div class="page-eyebrow">Module Matrix</div>
-            <h3>模块管理</h3>
+            <span class="page-eyebrow">Needs Attention</span>
+            <h3>需要你处理</h3>
+            <p>优先展示尚未完成的邮件、任务、日程和 Agent 发现项。</p>
           </div>
-          <span class="panel-meta">{{ moduleCount }} 个模块</span>
+          <n-button tertiary size="small" @click="navigate('/inbox')">查看全部</n-button>
         </div>
 
-        <div class="module-grid">
-          <article
-            v-for="category in moduleCategories"
-            :key="category.id"
-            class="module-card"
+        <div v-if="attentionItems.length" class="attention-list">
+          <button
+            v-for="item in attentionItems"
+            :key="itemKey(item)"
+            type="button"
+            class="attention-item"
+            @click="navigate(item.route || '/inbox')"
           >
-            <div class="module-head">
-              <span class="module-icon" :style="{ color: category.color }">
-                <n-icon size="22"><component :is="getIconComponent(category.icon)" /></n-icon>
+            <span class="attention-accent" :style="{ background: item.accent || '#f97316' }"></span>
+            <span class="attention-main">
+              <span class="attention-meta">
+                <n-tag size="small" :bordered="false">{{ categoryLabel(item.category) }}</n-tag>
+                <small>{{ formatItemTime(item.time) }}</small>
               </span>
-              <div>
-                <h4>{{ category.label }}</h4>
-                <p>{{ categorySummary(category.id) }}</p>
-              </div>
-              <span class="route-count">{{ category.routes.length }}</span>
-            </div>
+              <strong>{{ item.title }}</strong>
+              <p>{{ item.summary }}</p>
+            </span>
+            <span :class="['attention-status', statusTone(item.status)]">{{ item.status || '待处理' }}</span>
+          </button>
+        </div>
 
-            <div class="route-list">
-              <button
-                v-for="route in category.routes"
-                :key="route.name"
-                class="route-chip"
-                type="button"
-                @click="navigate(route.path)"
-              >
-                <n-icon size="15"><component :is="getIconComponent(route.icon)" /></n-icon>
-                <span>{{ route.label }}</span>
-              </button>
-            </div>
-          </article>
+        <div v-else class="dashboard-empty">
+          <n-icon size="32"><CheckIcon /></n-icon>
+          <strong>当前没有高优先级事项</strong>
+          <span>你可以直接向 Agent 下达新的任务。</span>
         </div>
       </section>
 
-      <aside class="side-stack">
-        <section class="side-panel">
+      <aside class="dashboard-side">
+        <section class="dashboard-panel">
           <div class="panel-head compact">
             <div>
-              <div class="page-eyebrow">Recent</div>
+              <span class="page-eyebrow">Recent Activity</span>
+              <h3>最近工作动态</h3>
+            </div>
+          </div>
+          <div v-if="activityItems.length" class="activity-list">
+            <button
+              v-for="item in activityItems"
+              :key="`activity-${itemKey(item)}`"
+              type="button"
+              class="activity-item"
+              @click="navigate(item.route || '/inbox')"
+            >
+              <span class="activity-dot" :style="{ background: item.accent || '#f97316' }"></span>
+              <span>
+                <strong>{{ item.title }}</strong>
+                <small>{{ categoryLabel(item.category) }} · {{ formatItemTime(item.time) }}</small>
+              </span>
+            </button>
+          </div>
+          <div v-else class="mini-empty">暂无工作动态</div>
+        </section>
+
+        <section class="dashboard-panel">
+          <div class="panel-head compact">
+            <div>
+              <span class="page-eyebrow">Quick Access</span>
               <h3>最近访问</h3>
             </div>
           </div>
-          <div v-if="recentAccess.length" class="recent-list">
+          <div v-if="recentAccess.length" class="quick-list">
             <button
               v-for="item in recentAccess"
               :key="item.name"
-              class="recent-item"
               type="button"
+              class="quick-item"
               @click="navigate(item.path)"
             >
-              <n-icon size="16"><component :is="getIconComponent(item.icon)" /></n-icon>
               <span>{{ item.label }}</span>
               <small>{{ item.accessCount }} 次</small>
             </button>
           </div>
-          <div v-else class="empty-box">
-            暂无最近访问
-          </div>
-        </section>
-
-        <section class="side-panel">
-          <div class="panel-head compact">
-            <div>
-              <div class="page-eyebrow">Today</div>
-              <h3>今日日程</h3>
-            </div>
-            <button class="text-link" type="button" @click="navigate('/schedule')">查看</button>
-          </div>
-          <div v-if="todaySchedules.length" class="schedule-list">
-            <button
-              v-for="item in todaySchedules"
-              :key="item.id"
-              class="schedule-item"
-              type="button"
-              @click="navigate('/schedule')"
-            >
-              <strong>{{ item.title }}</strong>
-              <span>{{ item.eventTime || '全天' }}</span>
-            </button>
-          </div>
-          <div v-else class="empty-box">
-            今日暂无待跟进事项
-          </div>
-        </section>
-
-        <section class="side-panel">
-          <div class="panel-head compact">
-            <div>
-              <div class="page-eyebrow">Actions</div>
-              <h3>快捷操作</h3>
-            </div>
-          </div>
-          <div class="action-grid">
-            <button
-              v-for="action in quickActions"
-              :key="action.path"
-              class="action-button"
-              type="button"
-              @click="navigate(action.path)"
-            >
-              <n-icon size="18"><component :is="action.icon" /></n-icon>
-              <span>{{ action.label }}</span>
-            </button>
-          </div>
+          <div v-else class="mini-empty">开始使用后会记录常用入口</div>
         </section>
       </aside>
     </div>
+
+    <section v-if="inbox.warnings?.length" class="dashboard-panel warning-panel">
+      <div class="panel-head compact">
+        <div>
+          <span class="page-eyebrow">System Hints</span>
+          <h3>需要关注的系统提示</h3>
+        </div>
+      </div>
+      <div class="warning-list">
+        <div v-for="warning in inbox.warnings" :key="warning" class="warning-item">
+          <n-icon><AlertIcon /></n-icon>
+          <span>{{ warning }}</span>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * 仪表盘主页：聚合展示各模块状态、今日日程、最近访问与快捷操作，支持本地缓存回退。
+ * Agent Workspace 首页。
+ *
+ * 首页只聚焦“今天需要处理什么”和最近工作动态，统一复用 Inbox Summary 接口，避免为了
+ * 展示模块数量而并行调用多个业务接口。
  */
-import { computed, onMounted, onUnmounted, ref, defineComponent, h } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
-import { NIcon } from 'naive-ui'
+import { NButton, NIcon, NTag, useMessage } from 'naive-ui'
 import {
-  BookOutline as BookIcon,
+  AlertCircleOutline as AlertIcon,
   CalendarOutline as CalendarIcon,
   ChatbubblesOutline as ChatIcon,
-  CloudUploadOutline as ImportIcon,
-  CodeSlashOutline as CodeIcon,
-  ConstructOutline as ToolIcon,
-  CubeOutline as ModelIcon,
-  DocumentTextOutline as NoteIcon,
+  CheckmarkCircleOutline as CheckIcon,
   FileTrayFullOutline as InboxIcon,
-  FlashOutline as AutonomyIcon,
-  FolderOutline as FolderIcon,
-  GridOutline as GridIcon,
-  HomeOutline as HomeIcon,
   MailOutline as MailIcon,
-  NotificationsOutline as BellIcon,
-  PersonOutline as PersonIcon,
-  ReaderOutline as ReportIcon,
-  RocketOutline as SkillIcon,
-  SearchOutline as SearchIcon,
-  SettingsOutline as SettingsIcon,
+  SparklesOutline as AgentIcon,
   TimeOutline as TaskIcon
 } from '@vicons/ionicons5'
-import { fileService } from '@/services/api/file'
-import { knowledgeService } from '@/services/api/knowledge'
-import { mcpToolService } from '@/services/api/mcp'
-import { modelService } from '@/services/api/model'
-import { scheduleService } from '@/services/api/schedule'
-import { skillService } from '@/services/api/skill'
-import { taskService } from '@/services/api/task'
-import { personalService } from '@/services/api/personal'
-import type { ScheduleEvent } from '@/types'
+import type { InboxItem, InboxSummary } from '@/types'
+import { inboxService } from '@/services/api/inbox'
 import { readCachedPayload, writeCachedPayload } from '@/services/user-preferences'
+import { useAuthStore } from '@/stores/auth'
 import { useMacNavStore } from '@/stores/mac-nav'
 
 dayjs.locale('zh-cn')
 
 const router = useRouter()
-const macNavStore = useMacNavStore()
-
-const CountUp = defineComponent({
-  props: {
-    endVal: { type: Number, default: 0 },
-    duration: { type: Number, default: 1 }
-  },
-  setup(props) {
-    const displayValue = ref(0)
-    const startTime = ref(0)
-
-    const animateCount = (timestamp: number) => {
-      if (!startTime.value) startTime.value = timestamp
-      const progress = Math.min((timestamp - startTime.value) / (props.duration * 1000), 1)
-      displayValue.value = Math.floor(progress * props.endVal)
-      if (progress < 1) {
-        requestAnimationFrame(animateCount)
-      } else {
-        displayValue.value = props.endVal
-      }
-    }
-
-    onMounted(() => {
-      requestAnimationFrame(animateCount)
-    })
-
-    return () => h('span', displayValue.value.toLocaleString())
-  }
-})
-
-const stats = ref({
-  files: 0,
-  schedules: 0,
-  tools: 0,
-  skills: 0,
-  models: 0,
-  tasks: 0,
-  knowledge: 0
-})
-
-const todaySchedules = ref<ScheduleEvent[]>([])
-const personalInsight = ref<{ totalTokenUsage?: number; avgTokensPerMessage?: number } | null>(null)
-const DASHBOARD_CACHE_KEY = 'cache.dashboard.v2'
-const loading = ref(true)
-
+const message = useMessage()
+const authStore = useAuthStore()
+const navStore = useMacNavStore()
+const loading = ref(false)
 const currentTime = ref(dayjs())
-let clockInterval: ReturnType<typeof setInterval> | null = null
+let clockTimer: ReturnType<typeof setInterval> | null = null
 
+const DASHBOARD_CACHE_KEY = 'cache.dashboard.workspace.v1'
+const inbox = ref<InboxSummary>({
+  generatedAt: '',
+  counts: {},
+  items: [],
+  warnings: []
+})
+
+const displayName = computed(() => authStore.user?.displayName || authStore.user?.username || 'User')
 const formattedTime = computed(() => currentTime.value.format('HH:mm'))
-const formattedDate = computed(() => currentTime.value.format('MM月DD日'))
+const formattedDate = computed(() => currentTime.value.format('M月D日 dddd'))
+const recentAccess = computed(() => navStore.topQuickAccess.slice(0, 4))
 
-const moduleCategories = computed(() => macNavStore.categories)
-const recentAccess = computed(() => macNavStore.topQuickAccess)
-const moduleCount = computed(() =>
-  moduleCategories.value.reduce((total, category) => total + category.routes.length, 0)
-)
+const greeting = computed(() => {
+  const hour = currentTime.value.hour()
+  if (hour < 6) return '夜深了'
+  if (hour < 11) return '早上好'
+  if (hour < 14) return '中午好'
+  if (hour < 18) return '下午好'
+  return '晚上好'
+})
 
-const iconMap: Record<string, any> = {
-  bell: BellIcon,
-  book: BookIcon,
-  brain: BookIcon,
-  calendar: CalendarIcon,
-  chatbubbles: ChatIcon,
-  code: CodeIcon,
-  construct: ToolIcon,
-  cpu: ModelIcon,
-  cube: ModelIcon,
-  folder: FolderIcon,
-  grid: GridIcon,
-  home: HomeIcon,
-  import: ImportIcon,
-  inbox: InboxIcon,
-  mail: MailIcon,
-  note: NoteIcon,
-  person: PersonIcon,
-  reader: ReportIcon,
-  rocket: SkillIcon,
-  search: SearchIcon,
-  settings: SettingsIcon,
-  sparkles: AutonomyIcon,
-  time: TaskIcon,
-  timer: TaskIcon
-}
+const mailCount = computed(() => inbox.value.items.filter(item => item.category === 'mail').length)
+const pendingCount = computed(() => inbox.value.items.filter(item => !isCompleted(item.status)).length)
 
-const getIconComponent = (icon: string) => iconMap[icon] || GridIcon
+const heroSummary = computed(() => {
+  const scheduleCount = Number(inbox.value.counts.todaySchedules || 0)
+  const taskCount = Number(inbox.value.counts.enabledTasks || 0)
+  if (pendingCount.value === 0) {
+    return '当前没有集中待处理事项，可以直接向 Agent 下达新的任务。'
+  }
+  return `当前聚合到 ${pendingCount.value} 项待处理内容，其中今天有 ${scheduleCount} 项日程、${taskCount} 个启用任务。`
+})
 
-const statusCards = computed(() => [
-  { key: 'schedules', label: '今日待跟进', value: todaySchedules.value.length, path: '/schedule', icon: CalendarIcon, tone: 'schedules' },
-  { key: 'files', label: '文件已入库', value: stats.value.files, path: '/files', icon: FolderIcon, tone: 'files' },
-  { key: 'knowledge', label: '知识库条目', value: stats.value.knowledge, path: '/knowledge', icon: BookIcon, tone: 'knowledge' },
-  { key: 'models', label: '模型配置', value: stats.value.models, path: '/models', icon: ModelIcon, tone: 'models' },
-  { key: 'tasks', label: '任务在推进', value: stats.value.tasks, path: '/tasks', icon: TaskIcon, tone: 'tasks' },
-  { key: 'tools', label: '工具已接入', value: stats.value.tools, path: '/tools', icon: ToolIcon, tone: 'tools' },
-  { key: 'skills', label: '技能可调用', value: stats.value.skills, path: '/skills', icon: SkillIcon, tone: 'skills' },
-  { key: 'interactions', label: '交互已记录', value: personalInsight.value?.totalTokenUsage || 0, path: '/personal', icon: PersonIcon, tone: 'personal' }
+const overviewCards = computed(() => [
+  {
+    key: 'pending',
+    label: '待处理',
+    value: pendingCount.value,
+    hint: '统一收件箱中的未完成事项',
+    path: '/inbox',
+    icon: InboxIcon
+  },
+  {
+    key: 'schedule',
+    label: '今日日程',
+    value: Number(inbox.value.counts.todaySchedules || 0),
+    hint: '今天需要跟进的安排',
+    path: '/schedule',
+    icon: CalendarIcon
+  },
+  {
+    key: 'task',
+    label: '启用任务',
+    value: Number(inbox.value.counts.enabledTasks || 0),
+    hint: '当前可触发的自动任务',
+    path: '/tasks',
+    icon: TaskIcon
+  },
+  {
+    key: 'mail',
+    label: '邮件事项',
+    value: mailCount.value,
+    hint: '已聚合到收件箱的邮件内容',
+    path: '/email',
+    icon: MailIcon
+  },
+  {
+    key: 'agent',
+    label: 'Agent 发现',
+    value: Number(inbox.value.counts.autonomyFindings || 0),
+    hint: '最近自治扫描发现的问题',
+    path: '/autonomy',
+    icon: AgentIcon
+  }
 ])
 
-const quickActions = [
-  { label: '开始对话', path: '/chat', icon: ChatIcon },
-  { label: '上传文件', path: '/files', icon: FolderIcon },
-  { label: '添加日程', path: '/schedule', icon: CalendarIcon },
-  { label: '全局搜索', path: '/search', icon: SearchIcon },
-  { label: '生成报告', path: '/reports', icon: ReportIcon },
-  { label: '系统设置', path: '/settings', icon: SettingsIcon }
-]
+const attentionItems = computed(() =>
+  inbox.value.items.filter(item => !isCompleted(item.status)).slice(0, 7)
+)
+const activityItems = computed(() => inbox.value.items.slice(0, 6))
 
-const categoryDescriptions: Record<string, string> = {
-  workspace: '动态、报告和自治任务入口',
-  engine: '模型、系统和基础参数管理',
-  knowledge: '知识、文件、笔记和聊天资产',
-  automation: '日程、通知、邮件和任务流程',
-  tools: 'MCP、技能、代码与搜索工具链',
-  personal: '个人效率、模板和备份恢复'
+const categoryLabels: Record<string, string> = {
+  schedule: '日程',
+  task: '任务',
+  note: '笔记',
+  search: '搜索',
+  mail: '邮件',
+  autonomy: 'Agent'
 }
 
-const categorySummary = (categoryId: string) => categoryDescriptions[categoryId] || '业务模块入口'
+const categoryLabel = (category: string) => categoryLabels[category] || 'Workspace'
 
-const navigate = (path: string) => {
-  router.push(path)
+const isCompleted = (status?: string) => {
+  const normalized = (status || '').toLowerCase()
+  return ['completed', 'complete', 'done', 'success', 'finished', '已完成'].includes(normalized)
 }
 
-const timeInsight = computed(() => {
-  const hour = currentTime.value.hour()
-  const schedulesCount = todaySchedules.value.length
-  const tasksCount = stats.value.tasks
+const statusTone = (status?: string) => {
+  const normalized = (status || '').toLowerCase()
+  if (isCompleted(status)) return 'success'
+  if (normalized.includes('fail') || normalized.includes('error')) return 'error'
+  if (normalized.includes('run') || normalized.includes('process')) return 'running'
+  return 'pending'
+}
 
-  if (hour >= 23 || hour < 5) {
-    return '深夜，适合深度复盘'
-  }
-  if (hour >= 5 && hour < 9) {
-    if (schedulesCount > 0) {
-      return `晨间，今日已有 ${schedulesCount} 项计划`
-    }
-    return '清晨，系统已待命'
-  }
-  if (hour >= 9 && hour < 12) {
-    if (tasksCount > 0) {
-      return `上午，${tasksCount} 项任务推进中`
-    }
-    return '上午，最佳产出时段'
-  }
-  if (hour >= 12 && hour < 14) {
-    return '午间，短暂休憩'
-  }
-  if (hour >= 14 && hour < 18) {
-    if (stats.value.files > 0) {
-      return `下午，${stats.value.files} 份文件待审阅`
-    }
-    return '下午，专注时刻'
-  }
-  if (hour >= 18 && hour < 21) {
-    return '傍晚，收尾与总结'
-  }
-  return '夜间，思考与规划'
-})
+const formatItemTime = (value?: string) => {
+  if (!value) return '刚刚'
+  const date = dayjs(value)
+  return date.isValid() ? date.format('MM-DD HH:mm') : value
+}
 
-/** 并行拉取各模块统计数据并写入本地缓存，请求失败时回退到缓存快照。 */
+const itemKey = (item: InboxItem) => `${item.category}-${item.title}-${item.time}`
+
+const navigate = (path?: string) => {
+  if (path) router.push(path)
+}
+
+/** 加载统一收件箱摘要；失败时使用最近缓存。 */
 const loadDashboard = async () => {
   loading.value = true
   try {
-    const [filesRes, schedulesRes, toolsRes, skillsRes, modelsRes, tasksRes, knowledgeRes, insightRes] = await Promise.all([
-      fileService.list(),
-      scheduleService.list(),
-      mcpToolService.list(),
-      skillService.list(),
-      modelService.list(),
-      taskService.list(),
-      knowledgeService.list(),
-      personalService.insights()
-    ])
-
-    const allSchedules = schedulesRes.data || []
-    const today = dayjs().format('YYYY-MM-DD')
-
-    stats.value = {
-      files: filesRes.data?.length || 0,
-      schedules: allSchedules.length || 0,
-      tools: toolsRes.data?.length || 0,
-      skills: skillsRes.data?.length || 0,
-      models: modelsRes.data?.length || 0,
-      tasks: tasksRes.data?.length || 0,
-      knowledge: knowledgeRes.data?.length || 0
+    const response = await inboxService.summary(24)
+    if (response.success && response.data) {
+      inbox.value = response.data
+      writeCachedPayload(DASHBOARD_CACHE_KEY, response.data)
     }
-
-    todaySchedules.value = allSchedules.filter(item => item.eventDate === today).slice(0, 5)
-    personalInsight.value = insightRes.data || null
-
-    writeCachedPayload(DASHBOARD_CACHE_KEY, {
-      stats: stats.value,
-      todaySchedules: todaySchedules.value,
-      personalInsight: personalInsight.value
-    })
-  } catch (error) {
-    console.error('加载仪表盘失败:', error)
-    const cached = readCachedPayload<{
-      stats: typeof stats.value
-      todaySchedules: ScheduleEvent[]
-      personalInsight: { totalTokenUsage?: number; avgTokensPerMessage?: number } | null
-    }>(DASHBOARD_CACHE_KEY)
+  } catch {
+    const cached = readCachedPayload<InboxSummary>(DASHBOARD_CACHE_KEY)
     if (cached) {
-      stats.value = cached.stats
-      todaySchedules.value = cached.todaySchedules
-      personalInsight.value = cached.personalInsight
+      inbox.value = cached
+      message.info('首页当前使用最近缓存数据')
     }
   } finally {
     loading.value = false
@@ -410,57 +325,42 @@ const loadDashboard = async () => {
 }
 
 onMounted(() => {
+  navStore.loadQuickAccess()
   loadDashboard()
-  macNavStore.loadQuickAccess()
-  clockInterval = setInterval(() => {
+  clockTimer = setInterval(() => {
     currentTime.value = dayjs()
-  }, 1000)
+  }, 30000)
 })
 
 onUnmounted(() => {
-  if (clockInterval) {
-    clearInterval(clockInterval)
-    clockInterval = null
-  }
+  if (clockTimer) clearInterval(clockTimer)
 })
 </script>
 
 <style scoped>
-.dashboard {
+.workspace-dashboard {
   display: grid;
-  gap: 16px;
-  min-height: calc(100vh - 180px);
+  gap: 20px;
+  width: min(100%, 1480px);
+  margin: 0 auto;
   color: var(--text-primary);
 }
 
-.home-hero,
-.management-panel,
-.side-panel,
-.status-card,
-.module-card {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-lg);
-  background:
-    var(--gradient-card),
-    var(--bg-panel);
-  box-shadow:
-    inset 0 1px 0 var(--border-hairline),
-    var(--shadow-card);
+.dashboard-hero,
+.dashboard-panel,
+.overview-card {
+  border: 1px solid var(--workspace-border, var(--border-light));
+  background: var(--bg-card);
+  box-shadow: none;
 }
 
-.home-hero {
+.dashboard-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 220px;
   align-items: stretch;
-  padding: 22px;
-  background:
-    radial-gradient(circle at 90% 8%, var(--primary-glow), transparent 30%),
-    var(--gradient-accent),
-    var(--gradient-workbench),
-    var(--bg-panel);
+  gap: 22px;
+  padding: 28px;
+  border-radius: 18px;
 }
 
 .hero-copy {
@@ -470,398 +370,389 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.hero-copy h2,
-.panel-head h3,
-.module-head h4 {
-  margin: 0;
-  color: var(--text-primary);
+.page-eyebrow {
+  color: var(--primary-color);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .hero-copy h2 {
-  font-size: clamp(1.6rem, 3vw, 2.25rem);
-  line-height: 1.15;
+  margin: 7px 0 0;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  letter-spacing: -0.04em;
 }
 
 .hero-copy p {
-  max-width: 58ch;
-  margin: 10px 0 0;
+  max-width: 760px;
+  margin: 12px 0 0;
   color: var(--text-secondary);
+  line-height: 1.75;
 }
 
-.time-panel {
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.hero-context {
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 6px;
-  min-height: 148px;
-  padding: 20px;
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-md);
-  background: var(--surface-hover);
-}
-
-.time-panel.loading {
-  border-color: var(--border-accent);
-}
-
-.time-display {
-  font-family: var(--font-display);
-  font-size: clamp(2.4rem, 5vw, 3.6rem);
-  font-weight: 800;
-  line-height: 1;
-  color: var(--text-primary);
-  background: var(--gradient-sunset);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.date-display {
-  color: var(--text-secondary);
-  font-weight: 700;
-}
-
-.insight-text {
-  color: var(--text-muted);
-  font-size: 0.88rem;
+  gap: 5px;
+  min-height: 156px;
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--bg-input);
   text-align: center;
 }
 
-.status-grid {
+.hero-context span,
+.hero-context small {
+  color: var(--text-muted);
+}
+
+.hero-context strong {
+  color: var(--text-primary);
+  font-size: 2.35rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.05em;
+}
+
+.overview-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
-.status-card {
+.overview-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  min-width: 0;
-  min-height: 86px;
+  min-height: 108px;
   padding: 16px;
-  border-color: var(--surface-border);
+  border-radius: 14px;
   color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+  transition: border-color 140ms ease, background 140ms ease;
 }
 
-.status-card:hover,
-.module-card:hover,
-.side-panel:hover {
-  transform: translateY(-2px);
-  border-color: var(--surface-border-strong);
-  box-shadow:
-    inset 0 1px 0 var(--border-hairline),
-    var(--shadow-card-hover);
+.overview-card:hover {
+  border-color: color-mix(in srgb, var(--primary-color) 32%, var(--workspace-border, var(--border-light)));
+  background: color-mix(in srgb, var(--primary-color) 3%, var(--bg-card));
 }
 
-.status-icon,
-.module-icon {
+.overview-icon {
   display: grid;
   place-items: center;
-  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--primary-color) 12%, var(--bg-input));
+  color: var(--primary-color);
 }
 
-.status-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-md);
-  color: white;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10);
-}
-
-.status-icon.files { background: linear-gradient(135deg, #FB923C, #EA580C); }
-.status-icon.models { background: linear-gradient(135deg, #F59E0B, #D97706); }
-.status-icon.knowledge { background: linear-gradient(135deg, #4ADE80, #16A34A); }
-.status-icon.tasks { background: linear-gradient(135deg, #14B8A6, #0D9488); }
-.status-icon.tools { background: linear-gradient(135deg, #C084FC, #A855F7); }
-.status-icon.skills { background: linear-gradient(135deg, #F472B6, #EC4899); }
-.status-icon.schedules { background: linear-gradient(135deg, #FBBF24, #F59E0B); }
-.status-icon.personal { background: linear-gradient(135deg, #6366F1, #A855F7); }
-
-.status-copy {
+.overview-copy {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
-  text-align: left;
 }
 
-.status-copy strong {
+.overview-copy strong {
   color: var(--text-primary);
-  font-size: clamp(1.3rem, 2vw, 1.7rem);
+  font-size: 1.45rem;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
 }
 
-.status-copy span {
+.overview-copy span {
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.overview-copy small {
   color: var(--text-muted);
-  font-size: 0.84rem;
+  font-size: 0.66rem;
+  line-height: 1.45;
 }
 
-.home-layout {
+.dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
   gap: 16px;
   align-items: start;
 }
 
-.management-panel,
-.side-panel {
-  padding: 18px;
+.dashboard-side {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-panel {
+  padding: 20px;
+  border-radius: 16px;
 }
 
 .panel-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .panel-head.compact {
-  align-items: center;
+  margin-bottom: 12px;
 }
 
-.panel-meta,
-.route-count {
-  color: var(--text-muted);
-  font-size: 0.78rem;
-}
-
-.panel-meta {
-  padding: 5px 10px;
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-full);
-  background: var(--surface-hover);
-}
-
-.module-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.module-card {
-  padding: 16px;
-  transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
-}
-
-.module-head {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
-  margin-bottom: 14px;
-}
-
-.module-icon {
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-md);
-  background: var(--surface-hover);
-}
-
-.module-head p {
-  margin: 4px 0 0;
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-}
-
-.route-count {
-  display: grid;
-  place-items: center;
-  min-width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  background: var(--bg-active);
-  color: var(--text-accent);
-  font-weight: 700;
-}
-
-.route-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.route-chip,
-.recent-item,
-.schedule-item,
-.action-button,
-.text-link {
-  border: 1px solid transparent;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base), transform var(--transition-base);
-}
-
-.route-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 7px 10px;
-  border-color: var(--surface-border);
-  border-radius: var(--radius-full);
-  background: var(--surface-hover);
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-}
-
-.route-chip:hover,
-.recent-item:hover,
-.schedule-item:hover,
-.action-button:hover {
-  background: var(--bg-active);
-  border-color: var(--border-accent);
+.panel-head h3 {
+  margin: 5px 0 0;
   color: var(--text-primary);
-  transform: translateY(-1px);
+  font-size: 1rem;
 }
 
-.side-stack {
-  display: grid;
-  gap: 16px;
+.panel-head p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.55;
 }
 
-.recent-list,
-.schedule-list {
+.attention-list,
+.activity-list,
+.quick-list,
+.warning-list {
   display: grid;
-  gap: 8px;
 }
 
-.recent-item,
-.schedule-item {
+.attention-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: 3px minmax(0, 1fr) auto;
+  gap: 14px;
   align-items: center;
   width: 100%;
-  min-height: 42px;
-  padding: 10px 12px;
-  border-color: var(--surface-border);
-  border-radius: var(--radius-md);
-  background: var(--surface-hover);
+  padding: 14px 0;
+  border: 0;
+  border-top: 1px solid var(--workspace-border, var(--border-light));
+  background: transparent;
+  color: inherit;
+  font: inherit;
   text-align: left;
+  cursor: pointer;
 }
 
-.recent-item span,
-.schedule-item strong {
+.attention-item:first-child {
+  border-top: 0;
+}
+
+.attention-accent {
+  width: 3px;
+  height: 44px;
+  border-radius: 99px;
+}
+
+.attention-main {
+  display: grid;
   min-width: 0;
+}
+
+.attention-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.attention-meta small,
+.activity-item small {
+  color: var(--text-muted);
+  font-size: 0.66rem;
+}
+
+.attention-main strong {
   overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.attention-main p {
+  display: -webkit-box;
+  margin: 5px 0 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.attention-status {
+  padding: 4px 7px;
+  border-radius: 99px;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-size: 0.64rem;
   white-space: nowrap;
 }
 
-.recent-item small,
-.schedule-item span {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
+.attention-status.success { color: #16a34a; }
+.attention-status.error { color: #dc2626; }
+.attention-status.running { color: #0284c7; }
+.attention-status.pending { color: var(--primary-color); }
 
-.schedule-item {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.empty-box {
+.dashboard-empty {
   display: grid;
   place-items: center;
-  min-height: 76px;
-  border: 1px dashed var(--surface-border);
-  border-radius: var(--radius-md);
+  gap: 6px;
+  min-height: 220px;
+  border-radius: 14px;
+  background: var(--bg-input);
   color: var(--text-muted);
-  background: var(--surface-hover);
-  font-size: 0.86rem;
+  text-align: center;
 }
 
-.text-link {
-  padding: 6px 10px;
-  border-radius: var(--radius-full);
-  color: var(--text-accent);
-  font-size: 0.82rem;
-  font-weight: 700;
+.dashboard-empty strong {
+  color: var(--text-primary);
 }
 
-.text-link:hover {
-  background: var(--bg-active);
+.activity-item,
+.quick-item {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--workspace-border, var(--border-light));
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.action-grid {
+.activity-item:first-child,
+.quick-item:first-child {
+  border-top: 0;
+}
+
+.activity-item {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.action-button {
-  display: flex;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 10px;
-  border-color: var(--surface-border);
-  border-radius: var(--radius-md);
-  background: var(--surface-hover);
-  color: var(--text-secondary);
-  font-weight: 700;
-  font-size: 0.82rem;
+  padding: 11px 2px;
 }
 
-@media (max-width: 1180px) {
-  .status-grid,
-  .module-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.activity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
 
-  .home-layout {
-    grid-template-columns: 1fr;
-  }
+.activity-item span:last-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
 
-  .side-stack {
+.activity-item strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.quick-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 2px;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+}
+
+.quick-item small {
+  color: var(--text-muted);
+}
+
+.warning-panel {
+  padding-bottom: 14px;
+}
+
+.warning-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 0;
+  border-top: 1px solid var(--workspace-border, var(--border-light));
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.warning-item:first-child {
+  border-top: 0;
+}
+
+.warning-item :deep(svg) {
+  color: var(--primary-color);
+}
+
+.mini-empty {
+  padding: 18px 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  text-align: center;
+}
+
+@media (max-width: 1200px) {
+  .overview-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 820px) {
-  .home-hero {
+@media (max-width: 920px) {
+  .dashboard-hero,
+  .dashboard-grid {
     grid-template-columns: 1fr;
   }
 
-  .side-stack {
-    grid-template-columns: 1fr;
+  .hero-context {
+    min-height: 116px;
+  }
+
+  .overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 560px) {
-  .dashboard {
-    gap: 12px;
+  .dashboard-hero,
+  .dashboard-panel {
+    padding: 16px;
   }
 
-  .home-hero,
-  .management-panel,
-  .side-panel {
-    padding: 14px;
-  }
-
-  .status-grid,
-  .module-grid,
-  .action-grid {
+  .overview-grid {
     grid-template-columns: 1fr;
   }
 
-  .status-card {
-    min-height: 76px;
+  .overview-card {
+    min-height: 86px;
   }
 
-  .module-head {
-    grid-template-columns: auto minmax(0, 1fr);
+  .attention-item {
+    grid-template-columns: 3px minmax(0, 1fr);
   }
 
-  .route-count {
-    grid-column: 2;
-    justify-self: start;
+  .attention-status {
+    display: none;
   }
 }
 </style>
