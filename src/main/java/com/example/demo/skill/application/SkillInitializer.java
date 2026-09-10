@@ -1,10 +1,11 @@
 package com.example.demo.skill.application;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.mcp.application.McpToolService;
 import com.example.demo.mcp.domain.McpTool;
+import com.example.demo.mcp.domain.ToolType;
 import com.example.demo.skill.domain.Skill;
 import com.example.demo.skill.domain.SkillToolMapping;
-import com.example.demo.mcp.domain.ToolType;
 import com.example.demo.skill.persistence.SkillMapper;
 import com.example.demo.skill.persistence.SkillToolMappingMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,8 +19,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 预置技能初始化器
- * 启动时自动创建系统内置技能及关联的 MCP 工具
+ * 系统预置技能初始化器。
+ *
+ * <p>启动线程没有用户上下文，所有由本初始化器创建的 Skill/MCP Tool 都属于系统全局 scope
+ * （user_id IS NULL）。检查已存在记录时也只检查系统 scope，绝不会把某个用户的私有记录误判成
+ * 系统内置能力。</p>
  */
 @Slf4j
 @Component
@@ -31,9 +35,6 @@ public class SkillInitializer {
     private final McpToolService mcpToolService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 预置技能定义
-     */
     private static final List<BuiltinSkillDefinition> BUILTIN_SKILLS = List.of(
             BuiltinSkillDefinition.builder()
                     .code("web_search")
@@ -46,16 +47,12 @@ public class SkillInitializer {
                             .displayName("网络搜索工具")
                             .description("执行网络搜索")
                             .toolType(ToolType.HTTP_API)
-                            .config(Map.of(
-                                    "url", "https://api.serper.dev/search",
-                                    "method", "POST",
-                                    "timeout", 30
-                            ))
+                            .config(Map.of("url", "https://api.serper.dev/search", "method", "POST", "timeout", 30))
                             .inputSchema(Map.of(
                                     "type", "object",
-                                    "properties", Map.of("query", Map.of("type", "string", "description", "搜索关键词")),
-                                    "required", List.of("query")
-                            ))
+                                    "properties", Map.of("query", Map.of(
+                                            "type", "string", "description", "搜索关键词")),
+                                    "required", List.of("query")))
                             .build())
                     .build(),
             BuiltinSkillDefinition.builder()
@@ -69,16 +66,12 @@ public class SkillInitializer {
                             .displayName("AI 对话工具")
                             .description("调用大模型进行对话")
                             .toolType(ToolType.HTTP_API)
-                            .config(Map.of(
-                                    "url", "${AI_CHAT_URL}",
-                                    "method", "POST",
-                                    "timeout", 60
-                            ))
+                            .config(Map.of("url", "${AI_CHAT_URL}", "method", "POST", "timeout", 60))
                             .inputSchema(Map.of(
                                     "type", "object",
-                                    "properties", Map.of("message", Map.of("type", "string", "description", "用户消息")),
-                                    "required", List.of("message")
-                            ))
+                                    "properties", Map.of("message", Map.of(
+                                            "type", "string", "description", "用户消息")),
+                                    "required", List.of("message")))
                             .build())
                     .build(),
             BuiltinSkillDefinition.builder()
@@ -92,16 +85,12 @@ public class SkillInitializer {
                             .displayName("天气查询工具")
                             .description("查询城市天气")
                             .toolType(ToolType.HTTP_API)
-                            .config(Map.of(
-                                    "url", "${WEATHER_API_URL}",
-                                    "method", "GET",
-                                    "timeout", 30
-                            ))
+                            .config(Map.of("url", "${WEATHER_API_URL}", "method", "GET", "timeout", 30))
                             .inputSchema(Map.of(
                                     "type", "object",
-                                    "properties", Map.of("city", Map.of("type", "string", "description", "城市名称")),
-                                    "required", List.of("city")
-                            ))
+                                    "properties", Map.of("city", Map.of(
+                                            "type", "string", "description", "城市名称")),
+                                    "required", List.of("city")))
                             .build())
                     .build(),
             BuiltinSkillDefinition.builder()
@@ -115,20 +104,14 @@ public class SkillInitializer {
                             .displayName("邮件发送工具")
                             .description("发送邮件")
                             .toolType(ToolType.HTTP_API)
-                            .config(Map.of(
-                                    "url", "${EMAIL_API_URL}",
-                                    "method", "POST",
-                                    "timeout", 30
-                            ))
+                            .config(Map.of("url", "${EMAIL_API_URL}", "method", "POST", "timeout", 30))
                             .inputSchema(Map.of(
                                     "type", "object",
                                     "properties", Map.of(
                                             "to", Map.of("type", "string", "description", "收件人邮箱"),
                                             "subject", Map.of("type", "string", "description", "邮件主题"),
-                                            "body", Map.of("type", "string", "description", "邮件内容")
-                                    ),
-                                    "required", List.of("to", "subject", "body")
-                            ))
+                                            "body", Map.of("type", "string", "description", "邮件内容")),
+                                    "required", List.of("to", "subject", "body")))
                             .build())
                     .build(),
             BuiltinSkillDefinition.builder()
@@ -142,79 +125,66 @@ public class SkillInitializer {
                             .displayName("文件操作工具")
                             .description("读写本地文件")
                             .toolType(ToolType.LOCAL_SCRIPT)
-                            .config(Map.of(
-                                    "scriptPath", "./scripts/file_ops.sh",
-                                    "timeout", 30
-                            ))
+                            .config(Map.of("scriptPath", "./scripts/file_ops.sh", "timeout", 30))
                             .inputSchema(Map.of(
                                     "type", "object",
                                     "properties", Map.of(
                                             "operation", Map.of("type", "string", "description", "操作类型: read/write"),
                                             "path", Map.of("type", "string", "description", "文件路径"),
-                                            "content", Map.of("type", "string", "description", "写入内容(写操作时需要)")
-                                    ),
-                                    "required", List.of("operation", "path")
-                            ))
+                                            "content", Map.of("type", "string", "description", "写入内容(写操作时需要)")),
+                                    "required", List.of("operation", "path")))
                             .build())
                     .build()
     );
 
+    /** 初始化系统内置 Skill 和 MCP Tool。 */
     @PostConstruct
     public void init() {
         try {
-            log.info("开始初始化预置技能...");
             int created = 0;
-
             for (BuiltinSkillDefinition skillDef : BUILTIN_SKILLS) {
-                // 检查技能是否已存在
                 Skill existing = skillMapper.selectOne(
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Skill>()
+                        new LambdaQueryWrapper<Skill>()
                                 .eq(Skill::getCode, skillDef.getCode())
-                );
-
+                                .isNull(Skill::getUserId)
+                                .last("LIMIT 1"));
                 if (existing != null) {
-                    log.debug("技能已存在: {}", skillDef.getCode());
                     continue;
                 }
-
-                // 创建关联的工具
                 McpTool tool = createTool(skillDef.getToolDefinition());
-                if (tool != null) {
-                    // 创建技能
-                    Skill skill = Skill.builder()
-                            .code(skillDef.getCode())
-                            .name(skillDef.getName())
-                            .description(skillDef.getDescription())
-                            .category(skillDef.getCategory())
-                            .icon(skillDef.getIcon())
-                            .enabled(false)  // 默认禁用，需要用户手动启用
-                            .isBuiltin(true)
-                            .build();
-
-                    skillMapper.insert(skill);
-
-                    // 创建技能-工具映射
-                    createSkillToolMapping(skill.getId(), tool.getId());
-
-                    created++;
-                    log.info("创建预置技能: {} -> {}", skillDef.getCode(), tool.getName());
+                if (tool == null) {
+                    continue;
                 }
+                Skill skill = Skill.builder()
+                        .userId(null)
+                        .code(skillDef.getCode())
+                        .name(skillDef.getName())
+                        .description(skillDef.getDescription())
+                        .category(skillDef.getCategory())
+                        .icon(skillDef.getIcon())
+                        .enabled(false)
+                        .isBuiltin(true)
+                        .createTime(LocalDateTime.now())
+                        .updateTime(LocalDateTime.now())
+                        .build();
+                skillMapper.insert(skill);
+                createSkillToolMapping(skill.getId(), tool.getId());
+                created++;
             }
-
-            log.info("预置技能初始化完成，创建 {} 个技能", created);
-
-        } catch (Exception e) {
-            // 表不存在时不阻止应用启动
-            log.warn("初始化预置技能失败（表可能不存在）: {}", e.getMessage());
+            log.info("系统预置技能初始化完成，创建 {} 个技能", created);
+        } catch (Exception error) {
+            log.warn("初始化预置技能失败（表可能尚未创建）: {}", error.getMessage());
         }
     }
 
-    /**
-     * 创建 MCP 工具
-     */
     private McpTool createTool(ToolDefinition toolDef) {
         try {
+            McpTool existing = mcpToolService.getByName(toolDef.getName());
+            if (existing != null) {
+                return existing;
+            }
             McpTool tool = McpTool.builder()
+                    .userId(null)
                     .name(toolDef.getName())
                     .displayName(toolDef.getDisplayName())
                     .description(toolDef.getDescription())
@@ -223,53 +193,31 @@ public class SkillInitializer {
                     .inputSchema(objectMapper.writeValueAsString(toolDef.getInputSchema()))
                     .enabled(false)
                     .build();
-
-            McpTool existing = mcpToolService.getByName(toolDef.getName());
-            return existing != null ? existing : mcpToolService.create(tool);
-
-        } catch (Exception e) {
-            log.error("创建工具失败: {}", toolDef.getName(), e);
+            return mcpToolService.create(tool);
+        } catch (Exception error) {
+            log.error("创建系统工具失败: {}", toolDef.getName(), error);
             return null;
         }
     }
 
-    /**
-     * 创建技能-工具映射
-     */
     private void createSkillToolMapping(Long skillId, Long toolId) {
-        try {
-            // 检查映射是否已存在
-            SkillToolMapping existing = skillToolMappingMapper.selectOne(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SkillToolMapping>()
-                            .eq(SkillToolMapping::getSkillId, skillId)
-                            .eq(SkillToolMapping::getToolId, toolId)
-            );
-
-            if (existing != null) {
-                log.debug("技能-工具映射已存在: skillId={}, toolId={}", skillId, toolId);
-                return;
-            }
-
-            // 创建新的映射关系
-            SkillToolMapping mapping = SkillToolMapping.builder()
-                    .skillId(skillId)
-                    .toolId(toolId)
-                    .invokeOrder(1)  // 默认调用顺序
-                    .isRequired(true)  // 默认必须
-                    .createTime(LocalDateTime.now())
-                    .build();
-
-            skillToolMappingMapper.insert(mapping);
-            log.debug("创建技能-工具映射: skillId={}, toolId={}", skillId, toolId);
-
-        } catch (Exception e) {
-            log.error("创建技能-工具映射失败: skillId={}, toolId={}", skillId, toolId, e);
+        SkillToolMapping existing = skillToolMappingMapper.selectOne(
+                new LambdaQueryWrapper<SkillToolMapping>()
+                        .eq(SkillToolMapping::getSkillId, skillId)
+                        .eq(SkillToolMapping::getToolId, toolId)
+                        .last("LIMIT 1"));
+        if (existing != null) {
+            return;
         }
+        skillToolMappingMapper.insert(SkillToolMapping.builder()
+                .skillId(skillId)
+                .toolId(toolId)
+                .invokeOrder(1)
+                .isRequired(true)
+                .createTime(LocalDateTime.now())
+                .build());
     }
 
-    /**
-     * 预置技能定义
-     */
     @lombok.Data
     @lombok.Builder
     private static class BuiltinSkillDefinition {
@@ -281,9 +229,6 @@ public class SkillInitializer {
         private ToolDefinition toolDefinition;
     }
 
-    /**
-     * 工具定义
-     */
     @lombok.Data
     @lombok.Builder
     private static class ToolDefinition {
