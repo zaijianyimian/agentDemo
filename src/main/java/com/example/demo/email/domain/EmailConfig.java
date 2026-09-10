@@ -17,7 +17,8 @@ import java.time.LocalTime;
  * 邮箱配置实体。
  *
  * <p>数据库表 {@code email_config} 的 ORM 映射，承载一个邮箱账号的连接信息、认证信息与监听时段配置。
- * 其中 OAuth2 相关字段为非持久化字段（{@code @TableField(exist = false)}），由
+ * {@code userId} 是多用户归属字段，由服务端 JWT 上下文自动写入和过滤，前端不可指定。
+ * OAuth2 相关字段为非持久化字段（{@code @TableField(exist = false)}），由
  * {@link com.example.demo.email.application.EmailAuthConfigService} 在读写时序列化到 {@code remark} JSON 中。</p>
  */
 @Data
@@ -29,197 +30,138 @@ public class EmailConfig {
 
     // ==================== 主键与基础信息 ====================
 
-    /**
-     * 主键 ID
-     */
+    /** 主键 ID。 */
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 邮箱配置所属用户 ID，由服务端写入。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long userId;
+
     // ==================== 账号与认证 ====================
 
-    /**
-     * 邮箱地址
-     */
+    /** 邮箱地址。 */
     private String email;
 
-    /**
-     * 邮箱授权码/密码（密码模式下使用，已加密持久化）
-     */
+    /** 邮箱授权码/密码（密码模式下使用，已加密持久化）。 */
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     // ==================== OAuth2 扩展字段（非持久化） ====================
 
-    /**
-     * 认证方式: password / oauth2_access_token / oauth2_refresh_token
-     */
+    /** 认证方式: password / oauth2_access_token / oauth2_refresh_token。 */
     @TableField(exist = false)
     private String authType;
 
-    /**
-     * OAuth2 客户端ID
-     */
+    /** OAuth2 客户端ID。 */
     @TableField(exist = false)
     private String oauthClientId;
 
-    /**
-     * OAuth2 客户端密钥
-     */
+    /** OAuth2 客户端密钥。 */
     @TableField(exist = false)
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String oauthClientSecret;
 
-    /**
-     * OAuth2 刷新令牌
-     */
+    /** OAuth2 刷新令牌。 */
     @TableField(exist = false)
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String oauthRefreshToken;
 
-    /**
-     * OAuth2 访问令牌（短期，可选）
-     */
+    /** OAuth2 访问令牌（短期，可选）。 */
     @TableField(exist = false)
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String oauthAccessToken;
 
-    /**
-     * OAuth2 token 端点（可选）
-     */
+    /** OAuth2 token 端点（可选）。 */
     @TableField(exist = false)
     private String oauthTokenEndpoint;
 
-    /**
-     * OAuth2 scope（可选）
-     */
+    /** OAuth2 scope（可选）。 */
     @TableField(exist = false)
     private String oauthScope;
 
-    /**
-     * 是否已保存密码/授权码
-     */
+    /** 是否已保存密码/授权码。 */
     @TableField(exist = false)
     private Boolean passwordConfigured;
 
-    /**
-     * 是否已保存 OAuth2 client secret
-     */
+    /** 是否已保存 OAuth2 client secret。 */
     @TableField(exist = false)
     private Boolean oauthClientSecretConfigured;
 
-    /**
-     * 是否已保存 OAuth2 refresh token
-     */
+    /** 是否已保存 OAuth2 refresh token。 */
     @TableField(exist = false)
     private Boolean oauthRefreshTokenConfigured;
 
-    /**
-     * 是否已保存 OAuth2 access token
-     */
+    /** 是否已保存 OAuth2 access token。 */
     @TableField(exist = false)
     private Boolean oauthAccessTokenConfigured;
 
     // ==================== 服务器连接信息 ====================
 
-    /**
-     * 邮箱服务器主机
-     */
+    /** 邮箱服务器主机。 */
     private String host;
 
-    /**
-     * 协议类型: imap, pop3
-     */
+    /** 协议类型: imap, pop3。 */
     private String protocol;
 
-    /**
-     * 邮箱来源提供商: GENERIC_IMAP / GENERIC_POP3 / GMAIL_API / MICROSOFT_GRAPH
-     */
+    /** 邮箱来源提供商: GENERIC_IMAP / GENERIC_POP3 / GMAIL_API / MICROSOFT_GRAPH。 */
     private String provider;
 
-    /**
-     * 监听模式: POLLING / IMAP_IDLE / WEBHOOK / DELTA_SYNC
-     */
+    /** 监听模式: POLLING / IMAP_IDLE / WEBHOOK / DELTA_SYNC。 */
     private String listenMode;
 
-    /**
-     * 监听模式降级值，例如 IMAP_IDLE 失败后降级为 POLLING
-     */
+    /** 监听模式降级值，例如 IMAP_IDLE 失败后降级为 POLLING。 */
     private String fallbackListenMode;
 
-    /**
-     * 提供商扩展配置 JSON，存储非敏感参数
-     */
+    /** 提供商扩展配置 JSON，存储非敏感参数。 */
     private String providerSettings;
 
-    /**
-     * 端口号
-     */
+    /** 端口号。 */
     private Integer port;
 
-    /**
-     * 是否启用SSL
-     */
+    /** 是否启用SSL。 */
     private Boolean sslEnabled;
 
     // ==================== 附件处理 ====================
 
     /**
-     * 单附件大小阈值（字节），null 表示使用 application.yaml 的全局默认 app.email.max-attachment-size-bytes。
+     * 单附件大小阈值（字节），null 表示使用 application.yaml 的全局默认。
      * 0 或负数表示不限制。
      */
     private Long maxAttachmentSizeBytes;
 
     // ==================== 监听时段配置 ====================
 
-    /**
-     * 是否启用监听
-     */
+    /** 是否启用监听。 */
     private Boolean enabled;
 
-    /**
-     * 监听文件夹 (默认INBOX)
-     */
+    /** 监听文件夹，默认 INBOX。 */
     private String folder;
 
-    /**
-     * 轮询间隔(秒)
-     */
+    /** 轮询间隔（秒）。 */
     private Integer pollInterval;
 
-    /**
-     * 监听开始时间，为空表示全天监听
-     */
+    /** 监听开始时间，为空表示全天监听。 */
     private LocalTime listenStartTime;
 
-    /**
-     * 监听结束时间，为空表示全天监听
-     */
+    /** 监听结束时间，为空表示全天监听。 */
     private LocalTime listenEndTime;
 
     // ==================== 备注与时间戳 ====================
 
-    /**
-     * 备注；密码模式下为自由文本，OAuth2 模式下承载 OAuth 元数据 JSON
-     */
+    /** 备注；OAuth2 模式下可承载 OAuth 元数据 JSON。 */
     private String remark;
 
-    /**
-     * 派发执行时该邮箱的默认 agent hint（与邮件中识别的 hint 合并）
-     */
+    /** 派发执行时该邮箱的默认 agent hint。 */
     private String agentDefaultHint;
 
-    /**
-     * 创建时间
-     */
+    /** 创建时间。 */
     private LocalDateTime createTime;
 
-    /**
-     * 更新时间
-     */
+    /** 更新时间。 */
     private LocalDateTime updateTime;
 
     // ==================== Setter 覆写（统一 trim） ====================
-    // 显式覆写 Lombok @Data 生成的 setter，在写入时统一去除首尾空白，避免脏数据进入数据库或内存。
 
     public void setEmail(String email) {
         this.email = trim(email);
