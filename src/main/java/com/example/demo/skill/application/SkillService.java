@@ -1,13 +1,14 @@
 package com.example.demo.skill.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.demo.infrastructure.config.CacheConfig;
+import com.example.demo.infrastructure.security.CurrentUserProvider;
 import com.example.demo.mcp.application.McpToolService;
 import com.example.demo.mcp.domain.McpTool;
 import com.example.demo.skill.domain.Skill;
 import com.example.demo.skill.domain.SkillToolMapping;
 import com.example.demo.skill.persistence.SkillMapper;
 import com.example.demo.skill.persistence.SkillToolMappingMapper;
-import com.example.demo.infrastructure.config.CacheConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -16,12 +17,18 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * 技能服务
+ * 多用户 Skill 服务。
+ *
+ * <p>系统内置 Skill：{@code user_id IS NULL && is_builtin=1}；用户自定义 Skill：
+ * {@code user_id=currentUser && is_builtin=0}。普通用户查询时两者可见，但只有自己的自定义 Skill
+ * 可以修改、删除或调整工具映射。</p>
  */
 @Slf4j
 @Service
@@ -31,300 +38,233 @@ public class SkillService {
     private final SkillMapper skillMapper;
     private final SkillToolMappingMapper skillToolMappingMapper;
     private final McpToolService mcpToolService;
+    private final CurrentUserProvider currentUserProvider;
 
-    // ==================== 查询操作 ====================
-
-    /**
-     * 获取所有技能
-     */
     @Cacheable(cacheNames = CacheConfig.SKILL_LIST_ALL)
     public List<Skill> listAll() {
-        return skillMapper.selectList(null);
+        return skillMapper.selectList(visibleWrapper());
     }
 
-    /**
-     * 获取启用的技能
-     */
     @Cacheable(cacheNames = CacheConfig.SKILL_LIST_ENABLED)
     public List<Skill> listEnabled() {
-        return skillMapper.selectList(
-                new LambdaQueryWrapper<Skill>().eq(Skill::getEnabled, true)
-        );
+        return skillMapper.selectList(visibleWrapper().eq(Skill::getEnabled, true));
     }
 
-    /**
-     * 获取内置技能
-     */
     @Cacheable(cacheNames = CacheConfig.SKILL_LIST_BUILTIN)
     public List<Skill> listBuiltin() {
-        return skillMapper.selectList(
-                new LambdaQueryWrapper<Skill>().eq(Skill::getIsBuiltin, true)
-        );
+        return skillMapper.selectList(new LambdaQueryWrapper<Skill>()
+                .isNull(Skill::getUserId)
+                .eq(Skill::getIsBuiltin, true));
     }
 
-    /**
-     * 按分类获取技能
-     */
     @Cacheable(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, key = "#category")
     public List<Skill> listByCategory(String category) {
-        return skillMapper.selectList(
-                new LambdaQueryWrapper<Skill>()
-                        .eq(Skill::getCategory, category)
-                        .eq(Skill::getEnabled, true)
-        );
+        return skillMapper.selectList(visibleWrapper()
+                .eq(Skill::getCategory, category)
+                .eq(Skill::getEnabled, true));
     }
 
-    /**
-     * 获取所有分类
-     */
     @Cacheable(cacheNames = CacheConfig.SKILL_CATEGORIES)
     public List<String> listCategories() {
-        List<Skill> skills = skillMapper.selectList(
-                new LambdaQueryWrapper<Skill>()
-                        .select(Skill::getCategory)
-                        .isNotNull(Skill::getCategory)
-                        .groupBy(Skill::getCategory)
-        );
-        return skills.stream()
+        return listAll().stream()
                 .map(Skill::getCategory)
-                .collect(Collectors.toList());
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 
-    /**
-     * 根据 ID 获取技能
-     */
     @Cacheable(cacheNames = CacheConfig.SKILL_BY_ID, key = "#id", unless = "#result == null")
     public Skill getById(Long id) {
-        return skillMapper.selectById(id);
+        if (id == null) return null;
+        return skillMapper.selectOne(visibleWrapper().eq(Skill::getId, id).last("LIMIT 1"));
     }
 
-    /**
-     * 根据编码获取技能
-     */
     @Cacheable(cacheNames = CacheConfig.SKILL_BY_CODE, key = "#code", unless = "#result == null")
     public Skill getByCode(String code) {
-        return skillMapper.selectOne(
-                new LambdaQueryWrapper<Skill>().eq(Skill::getCode, code)
-        );
+        List<Skill> matches = skillMapper.selectList(
+                visibleWrapper().eq(Skill::getCode, code).orderByAsc(Skill::getId));
+        Long userId = currentUserProvider.currentUserId().orElse(null);
+        if (userId != null) {
+            for (Skill skill : matches) {
+                if (Objects.equals(userId, skill.getUserId())) return skill;
+            }
+        }
+        return matches.stream().filter(skill -> skill.getUserId() == null).findFirst().orElse(null);
     }
 
-    // ==================== 增删改操作 ====================
-
-    /**
-     * 添加技能
-     */
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
-    })
+    @ClearSkillCaches
     public void add(Skill skill) {
-        // 检查编码是否已存在
-        Skill existing = getByCode(skill.getCode());
-        if (existing != null) {
-            throw new IllegalArgumentException("技能编码已存在: " + skill.getCode());
-        }
-
-        // 设置默认值
-        if (skill.getEnabled() == null) {
-            skill.setEnabled(true);
-        }
-        if (skill.getIsBuiltin() == null) {
+        Long owner = currentUserProvider.currentUserId().orElse(null);
+        if (owner != null) {
+            if (findGlobalByCode(skill.getCode()) != null || getOwnedByCode(skill.getCode(), owner) != null) {
+                throw new IllegalArgumentException("技能编码已被占用: " + skill.getCode());
+            }
+            skill.setUserId(owner);
             skill.setIsBuiltin(false);
+        } else {
+            if (getOwnedByCode(skill.getCode(), null) != null) {
+                throw new IllegalArgumentException("系统技能编码已存在: " + skill.getCode());
+            }
+            skill.setUserId(null);
+            if (skill.getIsBuiltin() == null) skill.setIsBuiltin(true);
         }
-
-        // 设置时间
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (skill.getEnabled() == null) skill.setEnabled(true);
+        LocalDateTime now = LocalDateTime.now();
         skill.setCreateTime(now);
         skill.setUpdateTime(now);
-
         skillMapper.insert(skill);
-        log.info("添加技能: {}", skill.getCode());
     }
 
-    /**
-     * 更新技能
-     */
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
-    })
+    @ClearSkillCaches
     public void update(Skill skill) {
-        Skill existing = skillMapper.selectById(skill.getId());
+        Long owner = currentUserProvider.currentUserId().orElse(null);
+        Skill existing = getOwnedById(skill.getId(), owner);
         if (existing == null) {
-            throw new IllegalArgumentException("技能不存在: " + skill.getId());
+            throw new IllegalArgumentException("技能不存在或无权修改: " + skill.getId());
         }
-
-        // 内置技能不允许修改编码
-        if (Boolean.TRUE.equals(existing.getIsBuiltin()) && !existing.getCode().equals(skill.getCode())) {
-            throw new IllegalArgumentException("内置技能不允许修改编码");
+        if (owner != null && Boolean.TRUE.equals(existing.getIsBuiltin())) {
+            throw new IllegalArgumentException("内置技能不允许修改");
         }
-
+        if (!Objects.equals(existing.getCode(), skill.getCode())) {
+            if (findGlobalByCode(skill.getCode()) != null || getOwnedByCode(skill.getCode(), owner) != null) {
+                throw new IllegalArgumentException("技能编码已被占用: " + skill.getCode());
+            }
+        }
+        skill.setUserId(owner);
+        skill.setIsBuiltin(owner == null && Boolean.TRUE.equals(existing.getIsBuiltin()));
+        skill.setCreateTime(existing.getCreateTime());
+        skill.setUpdateTime(LocalDateTime.now());
         skillMapper.updateById(skill);
-        log.info("更新技能: {}", skill.getCode());
     }
 
-    /**
-     * 删除技能
-     */
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
-    })
+    @ClearSkillCaches
     public void delete(Long id) {
-        Skill skill = skillMapper.selectById(id);
-        if (skill == null) {
-            return;
-        }
-
-        // 内置技能不允许删除
+        Long owner = currentUserProvider.currentUserId().orElse(null);
+        Skill skill = getOwnedById(id, owner);
+        if (skill == null) return;
         if (Boolean.TRUE.equals(skill.getIsBuiltin())) {
             throw new IllegalArgumentException("内置技能不允许删除: " + skill.getCode());
         }
-
-        // 删除关联映射
         skillToolMappingMapper.delete(
-                new LambdaQueryWrapper<SkillToolMapping>().eq(SkillToolMapping::getSkillId, id)
-        );
-
+                new LambdaQueryWrapper<SkillToolMapping>().eq(SkillToolMapping::getSkillId, id));
         skillMapper.deleteById(id);
-        log.info("删除技能: {}", skill.getCode());
     }
 
-    /**
-     * 切换启用状态
-     */
-    @Caching(evict = {
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
-            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
-    })
+    @ClearSkillCaches
     public void toggleEnabled(Long id) {
-        Skill skill = skillMapper.selectById(id);
+        Long owner = currentUserProvider.currentUserId().orElse(null);
+        Skill skill = getOwnedById(id, owner);
         if (skill == null) {
-            throw new IllegalArgumentException("技能不存在: " + id);
+            throw new IllegalArgumentException("技能不存在或无权修改: " + id);
         }
-
+        if (owner != null && Boolean.TRUE.equals(skill.getIsBuiltin())) {
+            throw new IllegalArgumentException("内置技能不允许修改");
+        }
         skill.setEnabled(!Boolean.TRUE.equals(skill.getEnabled()));
+        skill.setUpdateTime(LocalDateTime.now());
         skillMapper.updateById(skill);
-        log.info("切换技能状态: {} -> {}", skill.getCode(), skill.getEnabled());
     }
 
-    // ==================== 技能-工具映射 ====================
-
-    /**
-     * 绑定工具到技能
-     */
     @Transactional
     public void bindTool(Long skillId, Long toolId, Integer invokeOrder, Boolean isRequired) {
-        // 检查技能和工具是否存在
-        Skill skill = skillMapper.selectById(skillId);
-        if (skill == null) {
-            throw new IllegalArgumentException("技能不存在: " + skillId);
-        }
-
+        Skill skill = requireMutableSkill(skillId);
         McpTool tool = mcpToolService.getById(toolId);
-        if (tool == null) {
-            throw new IllegalArgumentException("工具不存在: " + toolId);
-        }
-
-        // 检查映射是否已存在
+        if (tool == null) throw new IllegalArgumentException("工具不存在或无权访问: " + toolId);
         SkillToolMapping existing = skillToolMappingMapper.selectOne(
                 new LambdaQueryWrapper<SkillToolMapping>()
                         .eq(SkillToolMapping::getSkillId, skillId)
-                        .eq(SkillToolMapping::getToolId, toolId)
-        );
-
+                        .eq(SkillToolMapping::getToolId, toolId));
         if (existing != null) {
-            // 更新现有映射
             existing.setInvokeOrder(invokeOrder != null ? invokeOrder : 0);
             existing.setIsRequired(isRequired != null ? isRequired : true);
             skillToolMappingMapper.updateById(existing);
         } else {
-            // 创建新映射
-            SkillToolMapping mapping = SkillToolMapping.builder()
-                    .skillId(skillId)
+            skillToolMappingMapper.insert(SkillToolMapping.builder()
+                    .skillId(skill.getId())
                     .toolId(toolId)
                     .invokeOrder(invokeOrder != null ? invokeOrder : 0)
                     .isRequired(isRequired != null ? isRequired : true)
-                    .build();
-            skillToolMappingMapper.insert(mapping);
+                    .build());
         }
-
-        log.info("绑定工具到技能: {} -> {}", tool.getName(), skill.getCode());
     }
 
-    /**
-     * 解绑工具
-     */
     @Transactional
     public void unbindTool(Long skillId, Long toolId) {
+        requireMutableSkill(skillId);
         skillToolMappingMapper.delete(
                 new LambdaQueryWrapper<SkillToolMapping>()
                         .eq(SkillToolMapping::getSkillId, skillId)
-                        .eq(SkillToolMapping::getToolId, toolId)
-        );
-        log.info("解绑工具: {} <- {}", skillId, toolId);
+                        .eq(SkillToolMapping::getToolId, toolId));
     }
 
-    /**
-     * 获取技能关联的工具
-     */
     public List<McpTool> getSkillTools(Long skillId) {
-        // 获取映射关系
-        List<SkillToolMapping> mappings = skillToolMappingMapper.selectList(
-                new LambdaQueryWrapper<SkillToolMapping>()
-                        .eq(SkillToolMapping::getSkillId, skillId)
-                        .orderByAsc(SkillToolMapping::getInvokeOrder)
-        );
-
-        if (mappings.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        // 获取工具列表，并按映射顺序返回
-        List<Long> toolIds = mappings.stream()
-                .map(SkillToolMapping::getToolId)
-                .collect(Collectors.toList());
+        if (getById(skillId) == null) return new ArrayList<>();
+        List<SkillToolMapping> mappings = getSkillToolMappings(skillId);
+        if (mappings.isEmpty()) return new ArrayList<>();
+        List<Long> toolIds = mappings.stream().map(SkillToolMapping::getToolId).toList();
         List<McpTool> tools = mcpToolService.listByIds(toolIds);
         java.util.Map<Long, McpTool> toolMap = tools.stream()
                 .collect(Collectors.toMap(McpTool::getId, tool -> tool, (a, b) -> a));
-
-        return toolIds.stream()
-                .map(toolMap::get)
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toList());
+        return toolIds.stream().map(toolMap::get).filter(Objects::nonNull).toList();
     }
 
-    /**
-     * 获取技能的工具映射
-     */
     public List<SkillToolMapping> getSkillToolMappings(Long skillId) {
+        if (getById(skillId) == null) return List.of();
         return skillToolMappingMapper.selectList(
                 new LambdaQueryWrapper<SkillToolMapping>()
                         .eq(SkillToolMapping::getSkillId, skillId)
-                        .orderByAsc(SkillToolMapping::getInvokeOrder)
-        );
+                        .orderByAsc(SkillToolMapping::getInvokeOrder));
     }
+
+    private Skill requireMutableSkill(Long id) {
+        Long owner = currentUserProvider.currentUserId().orElse(null);
+        Skill skill = getOwnedById(id, owner);
+        if (skill == null || (owner != null && Boolean.TRUE.equals(skill.getIsBuiltin()))) {
+            throw new IllegalArgumentException("技能不存在或无权修改: " + id);
+        }
+        return skill;
+    }
+
+    private LambdaQueryWrapper<Skill> visibleWrapper() {
+        Long userId = currentUserProvider.currentUserId().orElse(null);
+        LambdaQueryWrapper<Skill> wrapper = new LambdaQueryWrapper<>();
+        if (userId == null) return wrapper.isNull(Skill::getUserId);
+        return wrapper.and(scope -> scope.isNull(Skill::getUserId).or().eq(Skill::getUserId, userId));
+    }
+
+    private Skill getOwnedById(Long id, Long owner) {
+        LambdaQueryWrapper<Skill> wrapper = new LambdaQueryWrapper<Skill>().eq(Skill::getId, id);
+        if (owner == null) wrapper.isNull(Skill::getUserId);
+        else wrapper.eq(Skill::getUserId, owner);
+        return skillMapper.selectOne(wrapper.last("LIMIT 1"));
+    }
+
+    private Skill getOwnedByCode(String code, Long owner) {
+        LambdaQueryWrapper<Skill> wrapper = new LambdaQueryWrapper<Skill>().eq(Skill::getCode, code);
+        if (owner == null) wrapper.isNull(Skill::getUserId);
+        else wrapper.eq(Skill::getUserId, owner);
+        return skillMapper.selectOne(wrapper.last("LIMIT 1"));
+    }
+
+    private Skill findGlobalByCode(String code) {
+        return skillMapper.selectOne(new LambdaQueryWrapper<Skill>()
+                .eq(Skill::getCode, code)
+                .isNull(Skill::getUserId)
+                .last("LIMIT 1"));
+    }
+
+    /** 组合清理 Skill 相关缓存。 */
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ALL, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_ENABLED, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BUILTIN, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_CATEGORIES, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_LIST_BY_CATEGORY, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_ID, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.SKILL_BY_CODE, allEntries = true)
+    })
+    private @interface ClearSkillCaches {}
 }
