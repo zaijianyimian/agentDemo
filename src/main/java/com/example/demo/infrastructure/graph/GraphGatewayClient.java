@@ -3,7 +3,6 @@ package com.example.demo.infrastructure.graph;
 import com.example.demo.email.domain.EmailMessage;
 import com.example.demo.infrastructure.properties.GraphGatewayProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -23,7 +22,6 @@ import java.util.Map;
  * <p>本客户端是 Java 与 Python Agent 服务之间唯一的 HTTP/SSE 边界。Java 不连接 Python 使用的
  * PostgreSQL，也不感知其表结构；所有 AI 数据写入与查询均由 Python API 完成。</p>
  */
-@Slf4j
 @Component
 public class GraphGatewayClient {
 
@@ -54,6 +52,7 @@ public class GraphGatewayClient {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("user_id", emailMessage.getUserId());
+        putNullable(payload, "email_config_id", emailMessage.getEmailConfigId());
         putNullable(payload, "provider", emailMessage.getProvider());
         putNullable(payload, "external_id", emailMessage.getExternalId());
         putNullable(payload, "message_id", emailMessage.getMessageId());
