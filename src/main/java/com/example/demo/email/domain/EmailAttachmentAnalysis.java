@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,50 +34,48 @@ public class EmailAttachmentAnalysis {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    /** 邮件 Message-ID（来自 RFC822 header） */
+    /** 所属系统用户。只由后端租户上下文写入。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long userId;
+
+    /** 所属邮箱配置 ID。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long emailConfigId;
+
+    /** 邮件 Message-ID（来自 RFC822 header）。 */
     private String messageId;
 
-    /** 所属邮箱账号（冗余，便于按账户过滤） */
+    /** 所属邮箱账号（冗余，便于展示）。 */
     private String accountEmail;
 
-    /** 原始文件名 */
+    /** 原始文件名。 */
     private String fileName;
 
-    /** MIME 类型 */
+    /** MIME 类型。 */
     private String contentType;
 
-    /** 字节数 */
+    /** 字节数。 */
     private Long sizeBytes;
 
-    /** 服务端落盘路径 */
+    /** 服务端落盘路径。 */
     private String filePath;
 
-    /**
-     * 状态：
-     * <ul>
-     *   <li>PENDING - 排队中</li>
-     *   <li>RUNNING - 解析中</li>
-     *   <li>SUCCESS - 成功</li>
-     *   <li>FAILED - 失败</li>
-     *   <li>SKIPPED_SIZE - 超过大小阈值</li>
-     *   <li>SKIPPED_TYPE - 不支持的类型</li>
-     * </ul>
-     */
+    /** 解析状态。 */
     private String status;
 
-    /** 跳过原因或失败原因（人类可读） */
+    /** 跳过原因或失败原因。 */
     private String skipReason;
 
-    /** AI 摘要 */
+    /** AI 摘要。 */
     private String summary;
 
-    /** 文档类附件抽取出的原始文本（图片类为空） */
+    /** 文档类附件抽取出的原始文本。 */
     private String rawText;
 
-    /** 实际使用的模型名（gemma3:4b 等） */
+    /** 实际使用的模型名。 */
     private String modelName;
 
-    /** 失败时异常信息 */
+    /** 失败时异常信息。 */
     private String errorDetail;
 
     @TableField(fill = FieldFill.INSERT)
