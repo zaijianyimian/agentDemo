@@ -29,6 +29,7 @@ public class MybatisPlusConfig implements MetaObjectHandler {
     /**
      * 强租户隔离表。混合范围表（ai_model_config / mcp_tool / skill）不在此集合，
      * 它们需要同时支持系统全局记录（user_id IS NULL）与当前用户私有记录。
+     * push_config / system_settings 属于系统运行配置，也保持全局。
      */
     private static final Set<String> USER_SCOPED_TABLES = Set.of(
             "email_config",
@@ -46,8 +47,7 @@ public class MybatisPlusConfig implements MetaObjectHandler {
             "knowledge_document",
             "search_history",
             "user_interest",
-            "dispatched_task",
-            "push_config"
+            "dispatched_task"
     );
 
     private final CurrentUserProvider currentUserProvider;
@@ -85,22 +85,12 @@ public class MybatisPlusConfig implements MetaObjectHandler {
         return interceptor;
     }
 
-    /**
-     * 插入时自动填充时间字段。
-     *
-     * @param metaObject MyBatis 元对象。
-     */
     @Override
     public void insertFill(MetaObject metaObject) {
         this.strictInsertFill(metaObject, "createTime", LocalDateTime.class, LocalDateTime.now());
         this.strictInsertFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
     }
 
-    /**
-     * 更新时自动填充更新时间。
-     *
-     * @param metaObject MyBatis 元对象。
-     */
     @Override
     public void updateFill(MetaObject metaObject) {
         this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
