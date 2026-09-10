@@ -1,24 +1,24 @@
 package com.example.demo.dispatch.application.prompt;
 
-import com.example.demo.memory.application.MemoryApplicationService;
 import com.example.demo.dispatch.application.DispatchProperties;
+import com.example.demo.memory.application.MemoryApplicationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-/**
- * 对外暴露的 Qdrant topK 召回封装。带超时降级。
- *
- * <p>召回线程池由 {@link com.example.demo.dispatch.application.DispatchExecutors}
- * 统一提供并由 Spring 容器负责 shutdown。</p>
- */
+/** LEGACY dispatch 使用的 Qdrant topK 召回封装。 */
 @Slf4j
 @Service
+@ConditionalOnProperty(prefix = "app.agent", name = "mode", havingValue = "legacy", matchIfMissing = true)
 public class MemoryRecallService {
 
     private final MemoryApplicationService memoryApplicationService;
@@ -33,9 +33,6 @@ public class MemoryRecallService {
         this.recallExecutor = recallExecutor;
     }
 
-    /**
-     * 异步调用 Qdrant topK 召回，带超时降级 —— 超时或失败返回空列表而不阻塞派发主链。
-     */
     public List<Map<String, Object>> recallForTask(String subject, int topK) {
         if (subject == null || subject.isBlank()) {
             return Collections.emptyList();
