@@ -1,9 +1,9 @@
 package com.example.demo.dispatch.domain;
 
 import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,12 +11,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * 派发任务实体。
- *
- * <p>由决策层（{@code DecisionRouter}）在邮件事件落库时同步创建，
- * 异步 dispatcher 拉取后流转至终态（{@code DONE} / {@code FAILED} / {@code CANCELLED}）。</p>
- */
+/** 派发任务实体。 */
 @Data
 @Builder
 @NoArgsConstructor
@@ -24,49 +19,31 @@ import java.time.LocalDateTime;
 @TableName("dispatched_task")
 public class DispatchedTask {
 
-    /** 状态：等待执行 */
     public static final String STATUS_PENDING = "PENDING";
-    /** 状态：执行中 */
     public static final String STATUS_RUNNING = "RUNNING";
-    /** 状态：已完成 */
     public static final String STATUS_DONE = "DONE";
-    /** 状态：失败 */
     public static final String STATUS_FAILED = "FAILED";
-    /** 状态：用户取消 */
     public static final String STATUS_CANCELLED = "CANCELLED";
-
-    /** 执行器：Claude Code */
     public static final String EXECUTOR_CLAUDE_CODE = "claude-code";
-    /** 执行器：Codex */
     public static final String EXECUTOR_CODEX = "codex";
-    /** 执行器：OpenClaw */
     public static final String EXECUTOR_OPENCLAW = "openclaw";
-    /** 执行器：决策层自答 */
     public static final String EXECUTOR_DECISION_LAYER_SELF = "decision-layer-self";
-
-    /** 沙箱：只读 */
     public static final String SANDBOX_READ_ONLY = "read-only";
-    /** 沙箱：工作区可写 */
     public static final String SANDBOX_WORKSPACE_WRITE = "workspace-write";
-    /** 沙箱：完全访问 */
     public static final String SANDBOX_DANGER_FULL = "danger-full-access";
-
-    /** 重要性：高 */
     public static final String IMPORTANCE_HIGH = "high";
-    /** 重要性：中 */
     public static final String IMPORTANCE_MEDIUM = "medium";
-    /** 重要性：低 */
     public static final String IMPORTANCE_LOW = "low";
-
-    /** 推送状态：等待 */
     public static final String PUSH_PENDING = "pending";
-    /** 推送状态：已发 */
     public static final String PUSH_SENT = "sent";
-    /** 推送状态：推送失败 */
     public static final String PUSH_FAILED = "PUSH_FAILED";
 
     @TableId(type = IdType.AUTO)
     private Long id;
+
+    /** 所属用户，只由服务端租户上下文写入。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long userId;
 
     private Long emailId;
     private String emailUid;
@@ -76,12 +53,7 @@ public class DispatchedTask {
     private String executorHint;
     private String fallbackExecutor;
     private String sandboxLevel;
-
-    /**
-     * 工具白名单（JSON 数组字符串）。
-     */
     private String toolAllowlist;
-
     private String workspacePath;
     private String userHint;
     private String finalHint;
