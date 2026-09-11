@@ -6,7 +6,7 @@ spring:
   modulith:
     detection-strategy: explicitly-annotated
   datasource:
-    url: jdbc:mysql://localhost:3306/agent?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowPublicKeyRetrieval=true&useSSL=false
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/agent?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowPublicKeyRetrieval=true&useSSL=false}
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${MYSQL_USERNAME:your_db_user}
     password: ${MYSQL_PASSWORD:your_db_password}
@@ -21,27 +21,6 @@ spring:
       max-file-size: 10MB
       max-request-size: 20MB
 
-langchain4j:
-  open-ai:
-    chat-model:
-      api-key: ${OPENAI_API_KEY:your_llm_api_key}
-      base-url: ${OPENAI_BASE_URL:https://your-llm-compatible-endpoint.example.com/v1}
-      model-name: ${OPENAI_MODEL_NAME:your_model_name}
-      # 请求/响应可能包含用户对话、邮件正文和 Authorization，生产环境保持关闭
-      log-requests: ${OPENAI_LOG_REQUESTS:false}
-      log-responses: ${OPENAI_LOG_RESPONSES:false}
-    embedding-model:
-      enabled: ${OPENAI_EMBEDDING_ENABLED:false}
-      base-url: ${OPENAI_EMBEDDING_BASE_URL:https://api.openai.com/v1}
-      api-key: ${OPENAI_EMBEDDING_API_KEY:your_openai_compatible_embedding_api_key}
-      model-name: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
-      dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:0}
-      timeout-seconds: ${OPENAI_EMBEDDING_TIMEOUT_SECONDS:30}
-  ollama:
-    embedding-model:
-      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
-      model-name: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text:latest}
-
 server:
   port: ${SERVER_PORT:8000}
   servlet:
@@ -53,61 +32,33 @@ server:
       force-request: true
 
 app:
+  # Python Agent Engine 的唯一 Java 边界。LLM、Memory、RAG、MCP、Skill、Tool 均由 Python 管理。
   graph:
-    # Python 尚未完成 docs/GRAPH_PYTHON_ADAPTER.md 中的内部 API 前保持 false
-    enabled: ${GRAPH_ENABLED:false}
+    enabled: ${GRAPH_ENABLED:true}
     base-url: ${GRAPH_BASE_URL:http://127.0.0.1:8001}
     internal-token: ${GRAPH_INTERNAL_TOKEN:}
     connect-timeout-seconds: ${GRAPH_CONNECT_TIMEOUT_SECONDS:5}
     response-timeout-seconds: ${GRAPH_RESPONSE_TIMEOUT_SECONDS:120}
+
   email:
     listener:
-      # 测试或维护环境可关闭自动连接；手动连接 API 仍然可用
       enabled: ${EMAIL_LISTENER_ENABLED:true}
-  memory:
-    collection-name: ${MEMORY_COLLECTION_NAME:agent_memory}
-    vector-size: 768
-    top-k: 5
-    min-score: 0.5
-  qdrant:
-    host: ${QDRANT_HOST:localhost}
-    # LangChain4j/Qdrant Java 客户端使用的 gRPC/SDK 端口，REST 管理接口默认使用 6333
-    port: ${QDRANT_GRPC_PORT:6334}
-    rest-port: ${QDRANT_REST_PORT:6333}
-    api-key: ${QDRANT_API_KEY:}
-    use-tls: ${QDRANT_USE_TLS:false}
-    # true 时环境变量优先于数据库 system_settings，适合 Docker/云端部署
-    prefer-env: ${QDRANT_PREFER_ENV:false}
-  mcp:
-    auto-sync:
-      enabled: ${MCP_AUTO_SYNC_ENABLED:false}
-      url: ${MCP_AUTO_SYNC_URL:}
-      token: ${MCP_AUTO_SYNC_TOKEN:}
-      cron: ${MCP_AUTO_SYNC_CRON:"0 */5 * * * ?"}
-      connect-timeout-seconds: ${MCP_AUTO_SYNC_CONNECT_TIMEOUT_SECONDS:5}
-      read-timeout-seconds: ${MCP_AUTO_SYNC_READ_TIMEOUT_SECONDS:15}
-      sync-enabled-state: ${MCP_AUTO_SYNC_SYNC_ENABLED_STATE:true}
-      disable-missing: ${MCP_AUTO_SYNC_DISABLE_MISSING:true}
-      missing-threshold: ${MCP_AUTO_SYNC_MISSING_THRESHOLD:2}
-  search:
-    enabled: ${SEARCH_ENABLED:false}
-    engine: ${SEARCH_ENGINE:serper}
-    api-key: ${SEARCH_API_KEY:your_search_api_key}
-    max-results: ${SEARCH_MAX_RESULTS:3}
+
   mail:
     smtp-host: ${SMTP_HOST:smtp.example.com}
     smtp-port: ${SMTP_PORT:465}
     smtp-username: ${SMTP_USERNAME:your_mail@example.com}
     smtp-password: ${SMTP_PASSWORD:your_smtp_password_or_app_password}
     smtp-ssl-enabled: ${SMTP_SSL_ENABLED:true}
-    from-name: ${SMTP_FROM_NAME:AI Agent}
+    from-name: ${SMTP_FROM_NAME:Agent Demo}
+
   schedule:
     enabled: ${SCHEDULE_ENABLED:true}
     storage-path: ${SCHEDULE_STORAGE_PATH:./data/schedules}
     user-email: ${SCHEDULE_USER_EMAIL:your_mail@example.com}
-    daily-summary-cron: ${SCHEDULE_DAILY_SUMMARY_CRON:"0 0 20 * * ?"}
     morning-reminder-cron: ${SCHEDULE_MORNING_REMINDER_CRON:"0 0 8 * * ?"}
     file-sort-cron: ${SCHEDULE_FILE_SORT_CRON:"0 0 19 * * ?"}
+
   task:
     scheduler:
       enabled: ${TASK_SCHEDULER_ENABLED:true}
@@ -117,59 +68,18 @@ app:
       pool-size: ${TASK_EXECUTOR_POOL_SIZE:5}
       queue-capacity: ${TASK_EXECUTOR_QUEUE_CAPACITY:200}
       await-seconds: ${TASK_EXECUTOR_AWAIT_SECONDS:60}
-  markdown-skills:
-    enabled: ${MARKDOWN_SKILLS_ENABLED:true}
-    dir: ${MARKDOWN_SKILLS_DIR:./skills}
-    match-threshold: ${MARKDOWN_SKILLS_MATCH_THRESHOLD:0.15}
-    tag-match-bonus: ${MARKDOWN_SKILLS_TAG_MATCH_BONUS:0.2}
-    auto-inject: ${MARKDOWN_SKILLS_AUTO_INJECT:true}
-    inject-body-limit: ${MARKDOWN_SKILLS_INJECT_BODY_LIMIT:4000}
+
   file:
     upload-dir: ${FILE_UPLOAD_DIR:./data/documents}
-    allowed-types: ${FILE_ALLOWED_TYPES:txt,md}
-  autonomy:
-    enabled: ${AUTONOMY_ENABLED:true}
-    workspace-root: ${AUTONOMY_WORKSPACE_ROOT:.}
-    output-dir: ${AUTONOMY_OUTPUT_DIR:./generated/autonomy}
-    allow-backend-verify: ${AUTONOMY_ALLOW_BACKEND_VERIFY:true}
-    allow-frontend-verify: ${AUTONOMY_ALLOW_FRONTEND_VERIFY:true}
-    allow-source-write: ${AUTONOMY_ALLOW_SOURCE_WRITE:false}
-    allow-remote-update: ${AUTONOMY_ALLOW_REMOTE_UPDATE:false}
-    command-timeout-seconds: ${AUTONOMY_COMMAND_TIMEOUT_SECONDS:180}
-  dispatch:
-    enabled: ${DISPATCH_ENABLED:true}
-    workspace-root: ${DISPATCH_WORKSPACE_ROOT:./data/workspaces}
-    dispatched-root: ${DISPATCH_RESULT_ROOT:./data/dispatched}
-    poll-interval-ms: ${DISPATCH_POLL_INTERVAL_MS:5000}
-    poll-grace-seconds: ${DISPATCH_POLL_GRACE_SECONDS:0}
-    executor-timeout-seconds: ${DISPATCH_EXECUTOR_TIMEOUT_SECONDS:600}
-    recall-timeout-seconds: ${DISPATCH_RECALL_TIMEOUT_SECONDS:2}
-    default-executor-hint: ${DISPATCH_DEFAULT_EXECUTOR_HINT:claude-code}
-    default-sandbox-level: ${DISPATCH_DEFAULT_SANDBOX_LEVEL:workspace-write}
-    default-tool-allowlist: ${DISPATCH_DEFAULT_TOOL_ALLOWLIST:Read,Edit,Write,Glob,Grep,Bash}
-    decision-layer-fallback-timeout-seconds: ${DISPATCH_DECISION_LAYER_TIMEOUT_SECONDS:120}
-    openclaw:
-      base-url: ${OPENCLAW_GATEWAY_BASE_URL:http://127.0.0.1:18789}
-      token: ${OPENCLAW_GATEWAY_TOKEN:your_openclaw_gateway_token}
-      model: ${OPENCLAW_GATEWAY_MODEL:openclaw}
-      health-timeout-seconds: ${OPENCLAW_GATEWAY_HEALTH_TIMEOUT_SECONDS:3}
-    push-retry-max: ${DISPATCH_PUSH_RETRY_MAX:3}
-  skills:
-    config-path: ${SKILLS_CONFIG_PATH:skills.yaml}
-    auto-load: ${SKILLS_AUTO_LOAD:true}
-    findskills-enabled: ${FINDSKILLS_ENABLED:false}
-    findskills-url: ${FINDSKILLS_URL:}
-    findskills-token: ${FINDSKILLS_TOKEN:}
-    findskills-timeout-seconds: ${FINDSKILLS_TIMEOUT_SECONDS:10}
-    findskills-cron: ${FINDSKILLS_CRON:"0 */10 * * * ?"}
-    findskills-presync-mcp: ${FINDSKILLS_PRESYNC_MCP:true}
-    findskills-merge-existing: ${FINDSKILLS_MERGE_EXISTING:true}
+    allowed-types: ${FILE_ALLOWED_TYPES:txt,md,pdf,doc,docx}
+
   backup:
     directory: ${BACKUP_DIRECTORY:./data/backups}
     keep-most-recent: ${BACKUP_KEEP_MOST_RECENT:10}
     retention-days: ${BACKUP_RETENTION_DAYS:30}
     max-total-size-mb: ${BACKUP_MAX_TOTAL_SIZE_MB:0}
     file-name-prefix: ${BACKUP_FILE_NAME_PREFIX:agent-data-backup}
+
   security:
     issuer: ${SECURITY_ISSUER:agent-demo}
     jwt-secret: ${JWT_SECRET:replace_with_a_32_plus_byte_secret}

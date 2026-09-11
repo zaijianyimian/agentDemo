@@ -1,19 +1,13 @@
 package com.example.demo.system.application;
 
-import com.example.demo.infrastructure.vector.QdrantVectorExportService;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.sql.DataSource;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -28,109 +22,106 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Types;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
- * 全量数据导入导出服务。
- * 把数据库表、向量数据库以及 {@code data/}、{@code generated/} 目录打包成 ZIP 备份，亦支持从 ZIP 还原。
+ * Java 业务数据归档服务。
+ *
+ * <p>归档内容仅包含 Java 持有的关系型数据库数据以及业务文件目录。Agent Memory、Embedding、
+ * Qdrant 等数据由 Python Agent Engine 独立管理，不再进入 Java 备份。</p>
  */
 @Slf4j
 @Service
 public class DataArchiveService {
 
-    private static final List<String> MANAGED_DIRS = List.of("data", "generated");
     private static final String BACKUP_JSON = "backup.json";
     private static final String FILES_PREFIX = "files/";
+    private static final List<String> MANAGED_DIRS = List.of("data", "generated");
     private static final DateTimeFormatter FILE_TIME = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
-    private static final String BASE64_MARKER = "__base64__";
 
     private final DataSource dataSource;
     private final ObjectMapper objectMapper;
-    private final CacheManager cacheManager;
-    private final QdrantVectorExportService qdrantVectorExportService;
-    private final ApplicationEventPublisher eventPublisher;
 
-    public DataArchiveService(DataSource dataSource,
-                              ObjectMapper objectMapper,
-                              CacheManager cacheManager,
-                              QdrantVectorExportService qdrantVectorExportService,
-                              ApplicationEventPublisher eventPublisher) {
+    public DataArchiveService(DataSource dataSource, ObjectMapper objectMapper) {
         this.dataSource = dataSource;
         this.objectMapper = objectMapper;
-        this.cacheManager = cacheManager;
-        this.qdrantVectorExportService = qdrantVectorExportService;
-        this.eventPublisher = eventPublisher;
     }
 
     /**
-     * 把数据库 + 向量库 + 托管目录写入给定的输出流作为 ZIP 备份。
+     * 将 Java 业务数据库和托管文件目录写入 ZIP。
+     *
+     * @param outputStream ZIP 输出流。
      */
     public void writeArchiveTo(OutputStream outputStream) {
-        try (ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream, StandardCharsets.UTF_8)) {
+        try (ZipOutputStream zipOutputStream =
+                     new ZipOutputStream(outputStream, StandardCharsets.UTF_8)) {
             writeDatabasePayload(zipOutputStream);
-            writeVectorPayload(zipOutputStream);
             int fileCount = appendManagedDirectories(zipOutputStream);
             zipOutputStream.finish();
-            log.info("数据导出完成: files={}", fileCount);
-        } catch (Exception e) {
-            throw new IllegalStateException("导出数据失败: " + e.getMessage(), e);
+            log.info("Java 业务数据导出完成: files={}", fileCount);
+        } catch (IOException | SQLException error) {
+            throw new IllegalStateException("导出 Java 业务数据失败: " + error.getMessage(), error);
         }
     }
 
     /**
-     * 从 ZIP 还原数据库 + 向量库 + 托管目录，导入完成后清空所有缓存并发布导入完成事件。
+     * 生成业务数据备份文件名。
      *
-     * @param replaceExisting true 表示先清空再导入（破坏性）；false 表示按主键跳过已存在行
+     * @return 带时间戳的 ZIP 文件名。
      */
-    public Map<String, Object> importAllDataFromZip(MultipartFile archiveFile, boolean replaceExisting) {
+    public String buildArchiveFileName() {
+        return "agent-data-backup-" + LocalDateTime.now().format(FILE_TIME) + ".zip";
+    }
+
+    /**
+     * 从 ZIP 恢复 Java 业务数据库与托管文件。
+     *
+     * <p>该导入器只识别 {@code backup.json} 与 {@code files/data/**}、
+     * {@code files/generated/**}。旧备份中的 vectors.json 等 Agent 数据会被忽略。</p>
+     *
+     * @param archiveFile ZIP 备份文件。
+     * @param replaceExisting 是否清空已有业务表后恢复。
+     * @return 导入统计。
+     */
+    public Map<String, Object> importAllDataFromZip(
+            MultipartFile archiveFile,
+            boolean replaceExisting) {
         if (archiveFile == null || archiveFile.isEmpty()) {
             throw new IllegalArgumentException("请选择有效的 ZIP 文件");
         }
 
         Path tempRoot = null;
         try {
-            tempRoot = Files.createTempDirectory("agent-data-archive-");
-            ImportArchive importArchive = unzipToTemp(archiveFile, tempRoot);
-
-            if (!StringUtils.hasText(importArchive.backupJson)) {
+            tempRoot = Files.createTempDirectory("java-business-archive-");
+            Path filesRoot = tempRoot.resolve("files");
+            String backupJson = unzipBusinessArchive(archiveFile, tempRoot, filesRoot);
+            if (backupJson == null || backupJson.isBlank()) {
                 throw new IllegalArgumentException("ZIP 中缺少 backup.json");
             }
 
-            Map<String, Object> backupPayload = objectMapper.readValue(
-                    importArchive.backupJson,
-                    new TypeReference<>() {}
-            );
-            @SuppressWarnings("unchecked")
-            Map<String, Object> tablePayload = (Map<String, Object>) backupPayload.getOrDefault("tables", Map.of());
+            Map<String, Object> payload = objectMapper.readValue(
+                    backupJson,
+                    new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> tables = objectMapper.convertValue(
+                    payload.getOrDefault("tables", Map.of()),
+                    new TypeReference<Map<String, Object>>() {});
 
-            Map<String, Object> summary = restoreDatabaseAndFiles(tablePayload, importArchive.tempFilesRoot, replaceExisting, tempRoot);
-            eventPublisher.publishEvent(new com.example.demo.system.events.DataArchiveImportedEvent());
-            evictAllCaches();
-
-            // 导入向量数据
-            Map<String, Object> vectorSummary = importVectorsData(importArchive.vectorsJson, replaceExisting);
-            summary.put("vectors", vectorSummary);
-
+            Map<String, Object> summary = restoreDatabase(tables, replaceExisting);
+            summary.put("files", restoreManagedFiles(filesRoot, replaceExisting));
             summary.put("importedAt", LocalDateTime.now());
+            summary.put("agentData", "ignored");
             return summary;
-        } catch (Exception e) {
-            throw new IllegalStateException("导入数据失败: " + e.getMessage(), e);
+        } catch (Exception error) {
+            throw new IllegalStateException("导入 Java 业务数据失败: " + error.getMessage(), error);
         } finally {
             if (tempRoot != null) {
                 deleteRecursively(tempRoot);
@@ -138,60 +129,25 @@ public class DataArchiveService {
         }
     }
 
-    /**
-     * 导入向量数据
-     */
-    private Map<String, Object> importVectorsData(String vectorsJson, boolean replaceExisting) {
-        if (vectorsJson == null || vectorsJson.isBlank()) {
-            return Map.of("message", "备份中不包含向量数据");
-        }
-
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> vectorData = objectMapper.readValue(vectorsJson, new TypeReference<Map<String, Object>>() {});
-
-            // 检查是否有错误
-            if (vectorData.containsKey("error") && !vectorData.containsKey("collections")) {
-                return Map.of("message", "向量数据导出时出错，无法导入", "error", vectorData.get("error"));
-            }
-
-            return qdrantVectorExportService.importVectors(vectorData, replaceExisting);
-        } catch (Exception e) {
-            log.warn("导入向量数据失败: {}", e.getMessage());
-            return Map.of("message", "向量数据导入失败", "error", e.getMessage());
-        }
-    }
-
-    /**
-     * 生成默认的备份文件名（含时间戳）。
-     */
-    public String buildArchiveFileName() {
-        return "agent-data-backup-" + LocalDateTime.now().format(FILE_TIME) + ".zip";
-    }
-
-    private void writeDatabasePayload(ZipOutputStream zipOutputStream) throws IOException, SQLException {
-        ZipEntry backupEntry = new ZipEntry(BACKUP_JSON);
-        zipOutputStream.putNextEntry(backupEntry);
-
+    private void writeDatabasePayload(ZipOutputStream zipOutputStream)
+            throws IOException, SQLException {
+        zipOutputStream.putNextEntry(new ZipEntry(BACKUP_JSON));
         JsonGenerator generator = objectMapper.getFactory().createGenerator(zipOutputStream);
         generator.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
         try (Connection connection = dataSource.getConnection()) {
             DatabaseMetaData metadata = connection.getMetaData();
             String quote = safeQuote(metadata.getIdentifierQuoteString());
-            String databaseProduct = metadata.getDatabaseProductName();
-            List<String> tables = listCurrentDatabaseTables(connection, metadata);
-
             generator.writeStartObject();
-            generator.writeStringField("version", "4.0");
+            generator.writeStringField("version", "5.0-java-business-only");
             generator.writeStringField("exportedAt", LocalDateTime.now().toString());
-            generator.writeStringField("databaseProduct", databaseProduct);
+            generator.writeStringField("databaseProduct", metadata.getDatabaseProductName());
             generator.writeArrayFieldStart("managedDirectories");
-            for (String dir : MANAGED_DIRS) {
-                generator.writeString(dir);
+            for (String directory : MANAGED_DIRS) {
+                generator.writeString(directory);
             }
             generator.writeEndArray();
             generator.writeObjectFieldStart("tables");
-            for (String table : tables) {
+            for (String table : listCurrentDatabaseTables(connection, metadata)) {
                 generator.writeFieldName(table);
                 writeTableRows(generator, connection, table, quote);
             }
@@ -199,53 +155,41 @@ public class DataArchiveService {
             generator.writeEndObject();
             generator.flush();
         }
-
         zipOutputStream.closeEntry();
     }
 
-    /**
-     * 写入向量数据库数据
-     */
-    private void writeVectorPayload(ZipOutputStream zipOutputStream) throws IOException {
-        ZipEntry vectorEntry = new ZipEntry("vectors.json");
-        zipOutputStream.putNextEntry(vectorEntry);
-
-        try {
-            Map<String, Object> vectorData = qdrantVectorExportService.exportAllVectors();
-            String json = objectMapper.writeValueAsString(vectorData);
-            zipOutputStream.write(json.getBytes(StandardCharsets.UTF_8));
-            log.info("向量数据导出完成: collections={}", vectorData.get("totalCollections"));
-        } catch (Exception e) {
-            log.warn("向量数据导出失败，继续导出其他数据: {}", e.getMessage());
-            // 写入空的向量数据
-            Map<String, Object> emptyData = Map.of(
-                    "version", "1.0",
-                    "error", e.getMessage(),
-                    "collections", Map.of()
-            );
-            String json = objectMapper.writeValueAsString(emptyData);
-            zipOutputStream.write(json.getBytes(StandardCharsets.UTF_8));
+    private List<String> listCurrentDatabaseTables(
+            Connection connection,
+            DatabaseMetaData metadata) throws SQLException {
+        List<String> tables = new ArrayList<>();
+        String catalog = connection.getCatalog();
+        try (ResultSet resultSet = metadata.getTables(catalog, null, "%", new String[]{"TABLE"})) {
+            while (resultSet.next()) {
+                String table = resultSet.getString("TABLE_NAME");
+                if (table != null && isSafeIdentifier(table)) {
+                    tables.add(table);
+                }
+            }
         }
-
-        zipOutputStream.closeEntry();
+        tables.sort(String.CASE_INSENSITIVE_ORDER);
+        return tables;
     }
 
-    private void writeTableRows(JsonGenerator generator,
-                                Connection connection,
-                                String tableName,
-                                String quote) throws SQLException, IOException {
-        String sql = "SELECT * FROM " + quoteIdentifier(tableName, quote);
+    private void writeTableRows(
+            JsonGenerator generator,
+            Connection connection,
+            String table,
+            String quote) throws SQLException, IOException {
+        String sql = "SELECT * FROM " + quoteIdentifier(table, quote);
         try (Statement statement = connection.createStatement();
              ResultSet resultSet = statement.executeQuery(sql)) {
-            ResultSetMetaData rsMeta = resultSet.getMetaData();
-            int columns = rsMeta.getColumnCount();
+            ResultSetMetaData metadata = resultSet.getMetaData();
             generator.writeStartArray();
             while (resultSet.next()) {
                 generator.writeStartObject();
-                for (int i = 1; i <= columns; i++) {
-                    String column = rsMeta.getColumnName(i);
-                    generator.writeFieldName(column);
-                    generator.writeObject(normalizeCellValue(resultSet.getObject(i)));
+                for (int index = 1; index <= metadata.getColumnCount(); index++) {
+                    generator.writeFieldName(metadata.getColumnName(index));
+                    generator.writeObject(normalizeCellValue(resultSet.getObject(index)));
                 }
                 generator.writeEndObject();
             }
@@ -254,711 +198,230 @@ public class DataArchiveService {
     }
 
     private int appendManagedDirectories(ZipOutputStream zipOutputStream) throws IOException {
-        int fileCount = 0;
+        int count = 0;
         Path projectRoot = Paths.get(".").toAbsolutePath().normalize();
-        for (String dirName : MANAGED_DIRS) {
-            Path managedDir = projectRoot.resolve(dirName).normalize();
-            if (!managedDir.startsWith(projectRoot) || !Files.exists(managedDir) || !Files.isDirectory(managedDir)) {
+        for (String directory : MANAGED_DIRS) {
+            Path root = projectRoot.resolve(directory).normalize();
+            if (!root.startsWith(projectRoot) || !Files.isDirectory(root)) {
                 continue;
             }
-            try (var stream = Files.walk(managedDir)) {
+            try (var stream = Files.walk(root)) {
                 for (Path file : stream.filter(Files::isRegularFile).toList()) {
-                    Path relative = projectRoot.relativize(file);
-                    String entryName = FILES_PREFIX + relative.toString().replace('\\', '/');
-                    ZipEntry entry = new ZipEntry(entryName);
-                    zipOutputStream.putNextEntry(entry);
+                    String relative = projectRoot.relativize(file).toString().replace('\\', '/');
+                    zipOutputStream.putNextEntry(new ZipEntry(FILES_PREFIX + relative));
                     Files.copy(file, zipOutputStream);
                     zipOutputStream.closeEntry();
-                    fileCount++;
+                    count++;
                 }
             }
         }
-        return fileCount;
+        return count;
     }
 
-    private ImportArchive unzipToTemp(MultipartFile archiveFile, Path tempRoot) throws IOException {
+    private String unzipBusinessArchive(
+            MultipartFile archiveFile,
+            Path tempRoot,
+            Path filesRoot) throws IOException {
         String backupJson = null;
-        String vectorsJson = null;
-        Path tempFilesRoot = tempRoot.resolve("files").normalize();
-        int extractedFiles = 0;
-        try (ZipInputStream zipInputStream = new ZipInputStream(archiveFile.getInputStream(), StandardCharsets.UTF_8)) {
+        try (ZipInputStream zipInputStream =
+                     new ZipInputStream(archiveFile.getInputStream(), StandardCharsets.UTF_8)) {
             ZipEntry entry;
             while ((entry = zipInputStream.getNextEntry()) != null) {
-                String name = normalizeZipEntryName(entry.getName());
-                if (!StringUtils.hasText(name) || entry.isDirectory()) {
-                    zipInputStream.closeEntry();
+                if (entry.isDirectory()) {
                     continue;
                 }
-
+                String name = entry.getName().replace('\\', '/');
                 if (BACKUP_JSON.equals(name)) {
-                    backupJson = new String(readAllBytes(zipInputStream), StandardCharsets.UTF_8);
-                    zipInputStream.closeEntry();
+                    backupJson = new String(zipInputStream.readAllBytes(), StandardCharsets.UTF_8);
                     continue;
                 }
-
-                if ("vectors.json".equals(name)) {
-                    vectorsJson = new String(readAllBytes(zipInputStream), StandardCharsets.UTF_8);
-                    zipInputStream.closeEntry();
+                if (!isManagedFileEntry(name)) {
                     continue;
                 }
-
-                if (!name.startsWith(FILES_PREFIX) || !isManagedFileEntry(name)) {
-                    zipInputStream.closeEntry();
-                    continue;
+                Path target = tempRoot.resolve(name).normalize();
+                if (!target.startsWith(filesRoot)) {
+                    throw new IllegalArgumentException("ZIP 条目越界: " + name);
                 }
-
-                Path target = safeResolveInDirectory(tempRoot, name);
                 Files.createDirectories(target.getParent());
-                try (OutputStream outputStream = Files.newOutputStream(target)) {
-                    zipInputStream.transferTo(outputStream);
-                }
-                extractedFiles++;
-                zipInputStream.closeEntry();
+                Files.copy(zipInputStream, target, StandardCopyOption.REPLACE_EXISTING);
             }
         }
-        log.info("读取导入压缩包完成: extractedFiles={}, hasVectors={}", extractedFiles, vectorsJson != null);
-        return new ImportArchive(backupJson, vectorsJson, tempFilesRoot);
+        return backupJson;
     }
 
-    private Map<String, Object> restoreDatabaseAndFiles(Map<String, Object> tablePayload,
-                                                        Path tempFilesRoot,
-                                                        boolean replaceExisting,
-                                                        Path tempRoot) throws Exception {
-        Path projectRoot = Paths.get(".").toAbsolutePath().normalize();
-        FileRestorePlan fileRestorePlan = new FileRestorePlan(projectRoot, tempFilesRoot, replaceExisting, tempRoot.resolve("file-rollback"));
+    private Map<String, Object> restoreDatabase(
+            Map<String, Object> tablePayload,
+            boolean replaceExisting) throws SQLException {
+        Map<String, Object> result = new LinkedHashMap<>();
+        int importedTables = 0;
+        int importedRows = 0;
+        int skippedTables = 0;
 
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
-            String quote = safeQuote(connection.getMetaData().getIdentifierQuoteString());
-            String dbProduct = connection.getMetaData().getDatabaseProductName();
-            String dbProductNormalized = dbProduct == null ? "" : dbProduct.toLowerCase(Locale.ROOT);
-
-            List<String> dbTables = listCurrentDatabaseTables(connection, connection.getMetaData());
-            Map<String, TableMeta> tableMetas = loadTableMetadata(connection, dbTables);
-
-            int importedTableCount = 0;
-            int importedRows = 0;
-            int skippedTables = 0;
-            int skippedRows = 0;
-            boolean fkDisabled = false;
-
+            DatabaseMetaData metadata = connection.getMetaData();
+            String quote = safeQuote(metadata.getIdentifierQuoteString());
+            List<String> currentTables = listCurrentDatabaseTables(connection, metadata);
+            boolean mysql = metadata.getDatabaseProductName() != null
+                    && metadata.getDatabaseProductName().toLowerCase(Locale.ROOT).contains("mysql");
             try {
-                fkDisabled = disableForeignKeys(connection, dbProductNormalized);
-                if (replaceExisting) {
-                    clearTables(connection, dbTables, quote);
+                if (mysql) {
+                    executeStatement(connection, "SET FOREIGN_KEY_CHECKS=0");
                 }
-
                 for (Map.Entry<String, Object> entry : tablePayload.entrySet()) {
                     String table = entry.getKey();
-                    TableMeta tableMeta = tableMetas.get(table);
-                    if (!isSafeIdentifier(table) || tableMeta == null) {
+                    if (!isSafeIdentifier(table) || !currentTables.contains(table)) {
                         skippedTables++;
                         continue;
                     }
-                    @SuppressWarnings("unchecked")
                     List<Map<String, Object>> rows = objectMapper.convertValue(
                             entry.getValue(),
-                            new TypeReference<List<Map<String, Object>>>() {}
-                    );
-                    InsertSummary summary = insertRows(connection, tableMeta, rows, quote, replaceExisting);
-                    importedRows += summary.insertedRows();
-                    skippedRows += summary.skippedRows();
-                    importedTableCount++;
+                            new TypeReference<List<Map<String, Object>>>() {});
+                    if (replaceExisting) {
+                        executeStatement(connection, "DELETE FROM " + quoteIdentifier(table, quote));
+                    }
+                    importedRows += insertRows(connection, table, rows, quote, replaceExisting);
+                    importedTables++;
                 }
-
-                int restoredFiles = fileRestorePlan.apply();
                 connection.commit();
-
-                Map<String, Object> dbSummary = new LinkedHashMap<>();
-                dbSummary.put("databaseProduct", dbProduct);
-                dbSummary.put("importedTables", importedTableCount);
-                dbSummary.put("importedRows", importedRows);
-                dbSummary.put("skippedTables", skippedTables);
-                dbSummary.put("skippedRows", skippedRows);
-                dbSummary.put("replaceExisting", replaceExisting);
-
-                Map<String, Object> result = new LinkedHashMap<>();
-                result.put("db", dbSummary);
-                result.put("files", restoredFiles);
-                result.put("replaceExisting", replaceExisting);
-                return result;
-            } catch (Exception ex) {
+            } catch (RuntimeException | SQLException error) {
                 connection.rollback();
-                fileRestorePlan.rollback();
-                throw ex;
+                throw error;
             } finally {
-                if (fkDisabled) {
-                    enableForeignKeys(connection, dbProductNormalized);
+                if (mysql) {
+                    executeStatement(connection, "SET FOREIGN_KEY_CHECKS=1");
                 }
                 connection.setAutoCommit(true);
-                fileRestorePlan.cleanup();
             }
         }
-    }
-
-    private void clearTables(Connection connection, List<String> dbTables, String quote) throws SQLException {
-        List<String> reverseTables = new ArrayList<>(dbTables);
-        reverseTables.sort(Comparator.reverseOrder());
-        for (String table : reverseTables) {
-            String deleteSql = "DELETE FROM " + quoteIdentifier(table, quote);
-            try (Statement statement = connection.createStatement()) {
-                statement.executeUpdate(deleteSql);
-            }
-        }
-    }
-
-    private InsertSummary insertRows(Connection connection,
-                                     TableMeta tableMeta,
-                                     List<Map<String, Object>> rows,
-                                     String quote,
-                                     boolean replaceExisting) throws SQLException {
-        if (rows == null || rows.isEmpty() || tableMeta.columns().isEmpty()) {
-            return new InsertSummary(0, 0);
-        }
-
-        Set<String> payloadColumns = new LinkedHashSet<>();
-        for (Map<String, Object> row : rows) {
-            if (row != null) {
-                payloadColumns.addAll(row.keySet());
-            }
-        }
-
-        List<ColumnMeta> insertColumns = tableMeta.columns().stream()
-                .filter(col -> payloadColumns.contains(col.name()))
-                .toList();
-        if (insertColumns.isEmpty()) {
-            return new InsertSummary(0, rows.size());
-        }
-
-        String columnSql = joinColumns(insertColumns, quote);
-        String valuesSql = "?,".repeat(insertColumns.size());
-        valuesSql = valuesSql.substring(0, valuesSql.length() - 1);
-        String insertSql = "INSERT INTO " + quoteIdentifier(tableMeta.name(), quote)
-                + " (" + columnSql + ") VALUES (" + valuesSql + ")";
-
-        int inserted = 0;
-        int skipped = 0;
-        try (PreparedStatement ps = connection.prepareStatement(insertSql)) {
-            for (Map<String, Object> row : rows) {
-                if (row == null) {
-                    skipped++;
-                    continue;
-                }
-                if (!replaceExisting && existsByPrimaryKey(connection, tableMeta, row, quote)) {
-                    skipped++;
-                    continue;
-                }
-                for (int i = 0; i < insertColumns.size(); i++) {
-                    ColumnMeta col = insertColumns.get(i);
-                    Object raw = row.get(col.name());
-                    Object value = convertValueForSql(raw, col.sqlType());
-                    if (value == null) {
-                        ps.setNull(i + 1, col.sqlType());
-                    } else {
-                        ps.setObject(i + 1, value);
-                    }
-                }
-                ps.addBatch();
-            }
-            int[] batchResult = ps.executeBatch();
-            for (int item : batchResult) {
-                inserted += item >= 0 ? item : 1;
-            }
-        }
-        return new InsertSummary(inserted, skipped);
-    }
-
-    private boolean existsByPrimaryKey(Connection connection,
-                                       TableMeta tableMeta,
-                                       Map<String, Object> row,
-                                       String quote) throws SQLException {
-        List<String> primaryKeys = tableMeta.primaryKeys();
-        if (primaryKeys.isEmpty()) {
-            return false;
-        }
-        List<ColumnMeta> pkColumns = tableMeta.columns().stream()
-                .filter(column -> primaryKeys.contains(column.name()))
-                .toList();
-        if (pkColumns.size() != primaryKeys.size()) {
-            return false;
-        }
-
-        StringBuilder sql = new StringBuilder("SELECT 1 FROM ")
-                .append(quoteIdentifier(tableMeta.name(), quote))
-                .append(" WHERE ");
-        for (int i = 0; i < pkColumns.size(); i++) {
-            if (i > 0) {
-                sql.append(" AND ");
-            }
-            sql.append(quoteIdentifier(pkColumns.get(i).name(), quote)).append(" = ?");
-        }
-
-        try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
-            for (int i = 0; i < pkColumns.size(); i++) {
-                ColumnMeta column = pkColumns.get(i);
-                Object value = convertValueForSql(row.get(column.name()), column.sqlType());
-                if (value == null) {
-                    return false;
-                }
-                ps.setObject(i + 1, value);
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        }
-    }
-
-    private Object convertValueForSql(Object rawValue, int sqlType) {
-        Object value = decodeBinaryValue(rawValue);
-        if (value == null) {
-            return null;
-        }
-
-        try {
-            switch (sqlType) {
-                case Types.BIGINT -> {
-                    if (value instanceof Number number) {
-                        return number.longValue();
-                    }
-                    return Long.parseLong(String.valueOf(value));
-                }
-                case Types.INTEGER, Types.SMALLINT, Types.TINYINT -> {
-                    if (value instanceof Number number) {
-                        return number.intValue();
-                    }
-                    return Integer.parseInt(String.valueOf(value));
-                }
-                case Types.DOUBLE, Types.REAL, Types.FLOAT -> {
-                    if (value instanceof Number number) {
-                        return number.doubleValue();
-                    }
-                    return Double.parseDouble(String.valueOf(value));
-                }
-                case Types.DECIMAL, Types.NUMERIC -> {
-                    return new java.math.BigDecimal(String.valueOf(value));
-                }
-                case Types.BOOLEAN, Types.BIT -> {
-                    if (value instanceof Boolean b) {
-                        return b;
-                    }
-                    String text = String.valueOf(value).trim();
-                    if ("1".equals(text)) {
-                        return true;
-                    }
-                    if ("0".equals(text)) {
-                        return false;
-                    }
-                    return Boolean.parseBoolean(text);
-                }
-                case Types.DATE -> {
-                    if (value instanceof java.sql.Date) {
-                        return value;
-                    }
-                    String text = String.valueOf(value).trim();
-                    if (text.length() >= 10) {
-                        return java.sql.Date.valueOf(text.substring(0, 10));
-                    }
-                }
-                case Types.TIMESTAMP, Types.TIMESTAMP_WITH_TIMEZONE -> {
-                    if (value instanceof java.sql.Timestamp) {
-                        return value;
-                    }
-                    String text = String.valueOf(value).trim();
-                    return java.sql.Timestamp.valueOf(text.replace('T', ' '));
-                }
-                case Types.TIME, Types.TIME_WITH_TIMEZONE -> {
-                    if (value instanceof java.sql.Time) {
-                        return value;
-                    }
-                    return java.sql.Time.valueOf(String.valueOf(value).trim());
-                }
-                case Types.BINARY, Types.VARBINARY, Types.LONGVARBINARY, Types.BLOB -> {
-                    if (value instanceof byte[]) {
-                        return value;
-                    }
-                    return Base64.getDecoder().decode(String.valueOf(value));
-                }
-                default -> {
-                    return value;
-                }
-            }
-        } catch (Exception ignored) {
-            // 类型转换失败则降级为原始值，交由 JDBC 驱动处理
-        }
-        return value;
-    }
-
-    private Object decodeBinaryValue(Object rawValue) {
-        if (!(rawValue instanceof Map<?, ?> map)) {
-            return rawValue;
-        }
-        Object marker = map.get("type");
-        Object value = map.get("value");
-        if (!BASE64_MARKER.equals(marker) || value == null) {
-            return rawValue;
-        }
-        return Base64.getDecoder().decode(String.valueOf(value));
-    }
-
-    private Map<String, TableMeta> loadTableMetadata(Connection connection, List<String> tables) throws SQLException {
-        Map<String, TableMeta> result = new LinkedHashMap<>();
-        DatabaseMetaData metadata = connection.getMetaData();
-        String catalog = connection.getCatalog();
-        String schema = connection.getSchema();
-        for (String table : tables) {
-            List<ColumnMeta> columns = new ArrayList<>();
-            try (ResultSet rs = metadata.getColumns(catalog, schema, table, "%")) {
-                while (rs.next()) {
-                    columns.add(new ColumnMeta(rs.getString("COLUMN_NAME"), rs.getInt("DATA_TYPE")));
-                }
-            }
-            if (columns.isEmpty()) {
-                try (ResultSet rs = metadata.getColumns(catalog, null, table, "%")) {
-                    while (rs.next()) {
-                        columns.add(new ColumnMeta(rs.getString("COLUMN_NAME"), rs.getInt("DATA_TYPE")));
-                    }
-                }
-            }
-            result.put(table, new TableMeta(table, columns, loadPrimaryKeys(metadata, catalog, schema, table)));
-        }
+        result.put("importedTables", importedTables);
+        result.put("importedRows", importedRows);
+        result.put("skippedTables", skippedTables);
+        result.put("replaceExisting", replaceExisting);
         return result;
     }
 
-    private List<String> loadPrimaryKeys(DatabaseMetaData metadata, String catalog, String schema, String table) throws SQLException {
-        List<String> primaryKeys = new ArrayList<>();
-        try (ResultSet rs = metadata.getPrimaryKeys(catalog, schema, table)) {
-            while (rs.next()) {
-                primaryKeys.add(rs.getString("COLUMN_NAME"));
-            }
+    private int insertRows(
+            Connection connection,
+            String table,
+            List<Map<String, Object>> rows,
+            String quote,
+            boolean replaceExisting) throws SQLException {
+        if (rows == null || rows.isEmpty()) {
+            return 0;
         }
-        if (primaryKeys.isEmpty()) {
-            try (ResultSet rs = metadata.getPrimaryKeys(catalog, null, table)) {
-                while (rs.next()) {
-                    primaryKeys.add(rs.getString("COLUMN_NAME"));
+        int inserted = 0;
+        for (Map<String, Object> row : rows) {
+            if (row == null || row.isEmpty()) {
+                continue;
+            }
+            List<String> columns = row.keySet().stream()
+                    .filter(this::isSafeIdentifier)
+                    .toList();
+            if (columns.isEmpty()) {
+                continue;
+            }
+            String columnSql = columns.stream()
+                    .map(column -> quoteIdentifier(column, quote))
+                    .reduce((left, right) -> left + "," + right)
+                    .orElseThrow();
+            String placeholders = String.join(",", java.util.Collections.nCopies(columns.size(), "?"));
+            String prefix = replaceExisting ? "INSERT INTO " : "INSERT IGNORE INTO ";
+            String sql = prefix + quoteIdentifier(table, quote)
+                    + " (" + columnSql + ") VALUES (" + placeholders + ")";
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                for (int index = 0; index < columns.size(); index++) {
+                    statement.setObject(index + 1, row.get(columns.get(index)));
                 }
+                inserted += statement.executeUpdate();
             }
         }
-        return primaryKeys.stream().filter(Objects::nonNull).distinct().toList();
+        return inserted;
     }
 
-    private List<String> listCurrentDatabaseTables(Connection connection, DatabaseMetaData metadata) throws SQLException {
-        String catalog = connection.getCatalog();
-        String schema = connection.getSchema();
-        List<String> tables = new ArrayList<>();
-        collectTables(metadata, catalog, schema, tables);
-        if (tables.isEmpty()) {
-            collectTables(metadata, catalog, null, tables);
+    private int restoreManagedFiles(Path filesRoot, boolean replaceExisting) throws IOException {
+        if (!Files.isDirectory(filesRoot)) {
+            return 0;
         }
-        if (tables.isEmpty()) {
-            collectTables(metadata, null, schema, tables);
-        }
-        if (tables.isEmpty()) {
-            collectTables(metadata, null, null, tables);
-        }
-        return tables.stream()
-                .filter(this::isSafeIdentifier)
-                .distinct()
-                .sorted()
-                .toList();
-    }
-
-    private void collectTables(DatabaseMetaData metadata, String catalog, String schema, List<String> receiver) throws SQLException {
-        try (ResultSet rs = metadata.getTables(catalog, schema, "%", new String[]{"TABLE"})) {
-            while (rs.next()) {
-                String table = rs.getString("TABLE_NAME");
-                if (StringUtils.hasText(table)) {
-                    receiver.add(table);
+        Path projectRoot = Paths.get(".").toAbsolutePath().normalize();
+        int restored = 0;
+        try (var stream = Files.walk(filesRoot)) {
+            for (Path source : stream.filter(Files::isRegularFile).toList()) {
+                Path relative = filesRoot.relativize(source);
+                if (relative.getNameCount() == 0
+                        || !MANAGED_DIRS.contains(relative.getName(0).toString())) {
+                    continue;
                 }
+                Path target = projectRoot.resolve(relative).normalize();
+                if (!target.startsWith(projectRoot)) {
+                    throw new IllegalArgumentException("恢复文件路径越界: " + relative);
+                }
+                if (!replaceExisting && Files.exists(target)) {
+                    continue;
+                }
+                Files.createDirectories(target.getParent());
+                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                restored++;
             }
         }
+        return restored;
     }
 
-    private boolean disableForeignKeys(Connection connection, String productName) {
-        String sql = null;
-        if (productName.contains("mysql") || productName.contains("mariadb")) {
-            sql = "SET FOREIGN_KEY_CHECKS=0";
-        } else if (productName.contains("h2")) {
-            sql = "SET REFERENTIAL_INTEGRITY FALSE";
-        }
-        if (sql == null) {
+    private boolean isManagedFileEntry(String name) {
+        if (!name.startsWith(FILES_PREFIX)) {
             return false;
         }
+        String relative = name.substring(FILES_PREFIX.length());
+        return MANAGED_DIRS.stream().anyMatch(directory ->
+                relative.equals(directory) || relative.startsWith(directory + "/"));
+    }
+
+    private void executeStatement(Connection connection, String sql) throws SQLException {
         try (Statement statement = connection.createStatement()) {
-            statement.execute(sql);
-            return true;
-        } catch (Exception e) {
-            log.warn("关闭外键约束失败，继续执行: {}", e.getMessage());
-            return false;
+            statement.executeUpdate(sql);
         }
     }
 
-    private void enableForeignKeys(Connection connection, String productName) {
-        String sql = null;
-        if (productName.contains("mysql") || productName.contains("mariadb")) {
-            sql = "SET FOREIGN_KEY_CHECKS=1";
-        } else if (productName.contains("h2")) {
-            sql = "SET REFERENTIAL_INTEGRITY TRUE";
-        }
-        if (sql == null) {
-            return;
-        }
-        try (Statement statement = connection.createStatement()) {
-            statement.execute(sql);
-        } catch (Exception e) {
-            log.warn("恢复外键约束失败: {}", e.getMessage());
+    private void deleteRecursively(Path root) {
+        try (var stream = Files.walk(root)) {
+            stream.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException error) {
+                    log.debug("清理临时文件失败: {}", path, error);
+                }
+            });
+        } catch (IOException error) {
+            log.debug("清理临时目录失败: {}", root, error);
         }
     }
 
     private Object normalizeCellValue(Object value) {
-        if (value == null) {
-            return null;
+        if (value == null
+                || value instanceof Number
+                || value instanceof Boolean
+                || value instanceof String) {
+            return value;
         }
         if (value instanceof byte[] bytes) {
-            Map<String, Object> encoded = new LinkedHashMap<>();
-            encoded.put("type", BASE64_MARKER);
-            encoded.put("value", Base64.getEncoder().encodeToString(bytes));
-            return encoded;
+            return java.util.Base64.getEncoder().encodeToString(bytes);
         }
-        if (value instanceof java.sql.Timestamp
-                || value instanceof java.sql.Date
-                || value instanceof java.sql.Time) {
-            return String.valueOf(value);
-        }
-        return value;
-    }
-
-    private void evictAllCaches() {
-        if (cacheManager == null) {
-            return;
-        }
-        Collection<String> cacheNames = cacheManager.getCacheNames();
-        for (String cacheName : cacheNames) {
-            Cache cache = cacheManager.getCache(cacheName);
-            if (cache != null) {
-                cache.clear();
-            }
-        }
-    }
-
-    private String normalizeZipEntryName(String entryName) {
-        if (!StringUtils.hasText(entryName)) {
-            return "";
-        }
-        String normalized = entryName.replace('\\', '/').trim();
-        if (normalized.startsWith("/") || normalized.startsWith("\\") || normalized.contains("..") || normalized.contains(":")) {
-            throw new IllegalArgumentException("ZIP 中存在非法路径: " + entryName);
-        }
-        return normalized;
-    }
-
-    private boolean isManagedFileEntry(String entryName) {
-        for (String dir : MANAGED_DIRS) {
-            if (entryName.startsWith(FILES_PREFIX + dir + "/")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private Path safeResolveInDirectory(Path root, String relativePath) {
-        Path target = root.resolve(relativePath).normalize();
-        if (!target.startsWith(root)) {
-            throw new IllegalArgumentException("检测到非法路径: " + relativePath);
-        }
-        return target;
-    }
-
-    private void deleteRecursively(Path root) {
-        if (root == null || !Files.exists(root)) {
-            return;
-        }
-        try (var stream = Files.walk(root)) {
-            for (Path path : stream.sorted(Comparator.reverseOrder()).toList()) {
-                Files.deleteIfExists(path);
-            }
-        } catch (IOException e) {
-            log.warn("清理目录失败: {}", root, e);
-        }
-    }
-
-    private byte[] readAllBytes(ZipInputStream zipInputStream) throws IOException {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        zipInputStream.transferTo(buffer);
-        return buffer.toByteArray();
-    }
-
-    private String joinColumns(List<ColumnMeta> columnMetas, String quote) {
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < columnMetas.size(); i++) {
-            if (i > 0) {
-                builder.append(',');
-            }
-            builder.append(quoteIdentifier(columnMetas.get(i).name(), quote));
-        }
-        return builder.toString();
+        return String.valueOf(value);
     }
 
     private String quoteIdentifier(String identifier, String quote) {
         if (!isSafeIdentifier(identifier)) {
-            throw new IllegalArgumentException("非法标识符: " + identifier);
+            throw new IllegalArgumentException("非法数据库标识符: " + identifier);
         }
         return quote + identifier + quote;
     }
 
-    private boolean isSafeIdentifier(String value) {
-        return StringUtils.hasText(value) && value.matches("[A-Za-z0-9_]+");
+    private boolean isSafeIdentifier(String identifier) {
+        return identifier != null && identifier.matches("[A-Za-z0-9_]+")
+                && !identifier.toLowerCase(Locale.ROOT).startsWith("information_schema");
     }
 
     private String safeQuote(String quote) {
-        if (!StringUtils.hasText(quote)) {
-            return "";
-        }
-        String trimmed = quote.trim();
-        return " ".equals(trimmed) ? "" : trimmed;
-    }
-
-    private record ColumnMeta(String name, int sqlType) {
-    }
-
-    private record TableMeta(String name, List<ColumnMeta> columns, List<String> primaryKeys) {
-    }
-
-    private record InsertSummary(int insertedRows, int skippedRows) {
-    }
-
-    private record ImportArchive(String backupJson, String vectorsJson, Path tempFilesRoot) {
-    }
-
-    private static final class FileRestorePlan {
-        private final Path projectRoot;
-        private final Path sourceRoot;
-        private final boolean replaceExisting;
-        private final Path backupRoot;
-        private final Map<String, Path> movedBackupDirs = new LinkedHashMap<>();
-        private final List<Path> createdFiles = new ArrayList<>();
-        private boolean applied;
-
-        private FileRestorePlan(Path projectRoot, Path sourceRoot, boolean replaceExisting, Path backupRoot) {
-            this.projectRoot = projectRoot;
-            this.sourceRoot = sourceRoot;
-            this.replaceExisting = replaceExisting;
-            this.backupRoot = backupRoot;
-        }
-
-        int apply() throws IOException {
-            int restoredCount = 0;
-            if (replaceExisting) {
-                backupManagedDirectories();
-            }
-            if (!Files.exists(sourceRoot) || !Files.isDirectory(sourceRoot)) {
-                applied = true;
-                return 0;
-            }
-
-            try (var stream = Files.walk(sourceRoot)) {
-                for (Path source : stream.filter(Files::isRegularFile).toList()) {
-                    Path relative = sourceRoot.relativize(source);
-                    if (relative.getNameCount() < 1) {
-                        continue;
-                    }
-                    String topDir = relative.getName(0).toString();
-                    if (!MANAGED_DIRS.contains(topDir)) {
-                        continue;
-                    }
-
-                    Path destination = projectRoot.resolve(relative).normalize();
-                    Path allowedRoot = projectRoot.resolve(topDir).normalize();
-                    if (!destination.startsWith(allowedRoot)) {
-                        throw new IllegalStateException("检测到非法文件路径: " + destination);
-                    }
-
-                    Files.createDirectories(destination.getParent());
-                    if (!replaceExisting && Files.exists(destination)) {
-                        continue;
-                    }
-
-                    Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
-                    if (!replaceExisting) {
-                        createdFiles.add(destination);
-                    }
-                    restoredCount++;
-                }
-            }
-            applied = true;
-            return restoredCount;
-        }
-
-        void rollback() {
-            if (!applied && movedBackupDirs.isEmpty()) {
-                return;
-            }
-            try {
-                if (replaceExisting) {
-                    for (String dir : MANAGED_DIRS) {
-                        deleteRecursivelyStatic(projectRoot.resolve(dir));
-                    }
-                    for (Map.Entry<String, Path> entry : movedBackupDirs.entrySet()) {
-                        Path target = projectRoot.resolve(entry.getKey()).normalize();
-                        if (Files.exists(entry.getValue())) {
-                            Files.createDirectories(target.getParent());
-                            Files.move(entry.getValue(), target, StandardCopyOption.REPLACE_EXISTING);
-                        }
-                    }
-                } else {
-                    List<Path> rollbackFiles = new ArrayList<>(createdFiles);
-                    rollbackFiles.sort(Comparator.reverseOrder());
-                    for (Path path : rollbackFiles) {
-                        Files.deleteIfExists(path);
-                        cleanupEmptyParents(path.getParent(), projectRoot);
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("回滚导入文件失败", e);
-            }
-        }
-
-        void cleanup() {
-            deleteRecursivelyStatic(backupRoot);
-        }
-
-        private void backupManagedDirectories() throws IOException {
-            Files.createDirectories(backupRoot);
-            for (String dir : MANAGED_DIRS) {
-                Path sourceDir = projectRoot.resolve(dir).normalize();
-                if (!Files.exists(sourceDir)) {
-                    continue;
-                }
-                Path backupDir = backupRoot.resolve(dir).normalize();
-                Files.createDirectories(backupDir.getParent());
-                Files.move(sourceDir, backupDir, StandardCopyOption.REPLACE_EXISTING);
-                movedBackupDirs.put(dir, backupDir);
-            }
-        }
-
-        private static void cleanupEmptyParents(Path candidate, Path stopAt) throws IOException {
-            Path current = candidate;
-            while (current != null && current.startsWith(stopAt) && !current.equals(stopAt)) {
-                try (var stream = Files.list(current)) {
-                    if (stream.findAny().isPresent()) {
-                        return;
-                    }
-                }
-                Files.deleteIfExists(current);
-                current = current.getParent();
-            }
-        }
-
-        private static void deleteRecursivelyStatic(Path root) {
-            if (root == null || !Files.exists(root)) {
-                return;
-            }
-            try (var stream = Files.walk(root)) {
-                for (Path path : stream.sorted(Comparator.reverseOrder()).toList()) {
-                    Files.deleteIfExists(path);
-                }
-            } catch (IOException e) {
-                log.warn("清理回滚目录失败: {}", root, e);
-            }
-        }
+        return quote == null || quote.isBlank() ? "`" : quote.trim();
     }
 }

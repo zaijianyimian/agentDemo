@@ -2,26 +2,26 @@ package com.example.demo.chat.application;
 
 import com.example.demo.chat.dto.ChatActionRequest;
 import com.example.demo.chat.dto.ChatActionResult;
-import com.example.demo.note.domain.Note;
-import com.example.demo.schedule.domain.ScheduleEvent;
-import com.example.demo.task.domain.ScheduledTask;
-import com.example.demo.memory.application.MemoryApplicationService;
 import com.example.demo.note.application.NoteService;
+import com.example.demo.note.domain.Note;
 import com.example.demo.schedule.application.ScheduleCommandService;
+import com.example.demo.schedule.domain.ScheduleEvent;
 import com.example.demo.task.application.ScheduledTaskService;
+import com.example.demo.task.domain.ScheduledTask;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 聊天动作服务
- * 根据聊天内容生成笔记、定时任务、日程事件或写入长期记忆。
+ * 聊天业务动作服务。
+ *
+ * <p>仅负责调用 Java 业务能力创建笔记、任务和日程。Agent 的长期记忆、语义提取与决策已经迁移
+ * 到 Python，Java 不再保存 Agent Memory。</p>
  */
 @Service
 public class ChatActionService {
@@ -29,20 +29,21 @@ public class ChatActionService {
     private final NoteService noteService;
     private final ScheduledTaskService scheduledTaskService;
     private final ScheduleCommandService scheduleCommandService;
-    private final MemoryApplicationService memoryApplicationService;
 
-    public ChatActionService(NoteService noteService,
-                             ScheduledTaskService scheduledTaskService,
-                             ScheduleCommandService scheduleCommandService,
-                             MemoryApplicationService memoryApplicationService) {
+    public ChatActionService(
+            NoteService noteService,
+            ScheduledTaskService scheduledTaskService,
+            ScheduleCommandService scheduleCommandService) {
         this.noteService = noteService;
         this.scheduledTaskService = scheduledTaskService;
         this.scheduleCommandService = scheduleCommandService;
-        this.memoryApplicationService = memoryApplicationService;
     }
 
     /**
      * 创建一条从聊天内容提炼的笔记。
+     *
+     * @param request 聊天动作请求。
+     * @return 创建结果。
      */
     public ChatActionResult createNote(ChatActionRequest request) {
         String title = buildTitle(request.titleHint(), request.content(), "聊天沉淀笔记");
@@ -57,8 +58,7 @@ public class ChatActionService {
                 title,
                 request.sessionId() != null ? request.sessionId() : "manual",
                 request.role() != null ? request.role() : "assistant",
-                request.content() != null ? request.content().trim() : ""
-        );
+                request.content() != null ? request.content().trim() : "");
 
         Note note = new Note();
         note.setTitle(title);
@@ -77,6 +77,9 @@ public class ChatActionService {
 
     /**
      * 创建一条从聊天内容提炼的提醒任务，默认禁用等待用户启用。
+     *
+     * @param request 聊天动作请求。
+     * @return 创建结果。
      */
     public ChatActionResult createTask(ChatActionRequest request) {
         ScheduledTask task = ScheduledTask.builder()
@@ -104,7 +107,10 @@ public class ChatActionService {
     }
 
     /**
-     * 创建一条从聊天内容提炼的日程事件，自动从内容推断时间。
+     * 创建一条从聊天内容提炼的日程事件。
+     *
+     * @param request 聊天动作请求。
+     * @return 创建结果。
      */
     public ChatActionResult createSchedule(ChatActionRequest request) {
         LocalDateTime eventTime = detectDateTime(request.content());
@@ -117,8 +123,7 @@ public class ChatActionService {
                 truncate(request.content(), 240),
                 eventTime,
                 null,
-                true
-        );
+                true);
 
         return ChatActionResult.builder()
                 .target("schedule")
@@ -126,27 +131,6 @@ public class ChatActionService {
                 .entityId(event.getId())
                 .route("/schedule")
                 .payload(Map.of("title", event.getTitle(), "eventTime", event.getEventTime().toString()))
-                .build();
-    }
-
-    /**
-     * 从聊天内容提取并存储到长期记忆系统。
-     */
-    public ChatActionResult storeMemory(ChatActionRequest request) {
-        String sessionId = request.sessionId() != null ? request.sessionId().toString() : "chat-action";
-        var record = memoryApplicationService.extractAndStore(sessionId, List.of(
-                (request.role() != null ? request.role() : "assistant") + ": " + request.content()
-        ));
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("memoryId", record.getSessionId());
-        payload.put("category", record.getCategory());
-        payload.put("summary", record.getSummary() != null ? record.getSummary() : "");
-
-        return ChatActionResult.builder()
-                .target("memory")
-                .message("已提取并写入长期记忆")
-                .route("/chat")
-                .payload(payload)
                 .build();
     }
 
@@ -179,10 +163,12 @@ public class ChatActionService {
                     .compile("(20\\d{2}-\\d{2}-\\d{2})[ T](\\d{2}:\\d{2})(?::(\\d{2}))?")
                     .matcher(candidate);
             if (matcher.find()) {
-                String base = matcher.group(1) + "T" + matcher.group(2) + ":" + (matcher.group(3) != null ? matcher.group(3) : "00");
+                String base = matcher.group(1) + "T" + matcher.group(2) + ":"
+                        + (matcher.group(3) != null ? matcher.group(3) : "00");
                 try {
                     return LocalDateTime.parse(base, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                 } catch (DateTimeParseException ignored) {
+                    // 继续尝试其他规则。
                 }
             }
         }

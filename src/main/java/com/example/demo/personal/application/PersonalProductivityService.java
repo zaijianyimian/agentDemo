@@ -1,17 +1,15 @@
 package com.example.demo.personal.application;
 
-import com.example.demo.chat.domain.ChatMessageEntity;
-import com.example.demo.code.domain.CodeSnippet;
-import com.example.demo.note.domain.Note;
-import com.example.demo.schedule.domain.ScheduleEvent;
-import com.example.demo.task.domain.ScheduledTask;
-import com.example.demo.system.domain.SystemSettings;
 import com.example.demo.chat.application.ChatHistoryService;
-import com.example.demo.code.application.CodeSnippetService;
+import com.example.demo.chat.domain.ChatMessageEntity;
 import com.example.demo.note.application.NoteService;
+import com.example.demo.note.domain.Note;
 import com.example.demo.schedule.application.ScheduleEventService;
-import com.example.demo.task.application.ScheduledTaskService;
+import com.example.demo.schedule.domain.ScheduleEvent;
 import com.example.demo.system.application.SystemSettingsService;
+import com.example.demo.system.domain.SystemSettings;
+import com.example.demo.task.application.ScheduledTaskService;
+import com.example.demo.task.domain.ScheduledTask;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +24,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 个人生产力服务
- * 汇总任务、笔记、代码片段、日程和聊天记录生成洞察，提供任务模板与备份导入导出能力
+ * 个人生产力业务服务。
+ *
+ * <p>Java 仅汇总任务、笔记、日程、聊天历史与系统设置。Code Agent、AI 报告与自动总结已经迁移
+ * 到 Python Agent Engine。</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -36,143 +36,119 @@ public class PersonalProductivityService {
     private final ObjectMapper objectMapper;
     private final ScheduledTaskService scheduledTaskService;
     private final NoteService noteService;
-    private final CodeSnippetService codeSnippetService;
     private final ScheduleEventService scheduleEventService;
     private final SystemSettingsService systemSettingsService;
     private final ChatHistoryService chatHistoryService;
 
-    /**
-     * 汇总生成个人生产力洞察数据
-     */
+    /** 生成普通业务生产力统计。 */
     public Map<String, Object> insights() {
         List<ScheduledTask> tasks = scheduledTaskService.listTasks();
         List<Note> notes = noteService.getAllNotes();
-        List<CodeSnippet> snippets = codeSnippetService.getAllSnippets();
         List<ScheduleEvent> schedules = scheduleEventService.listAll();
         List<ChatMessageEntity> messages = chatHistoryService.getAllMessages();
 
-        long enabledTasks = tasks.stream().filter(task -> Boolean.TRUE.equals(task.getEnabled())).count();
-        long pinnedNotes = notes.stream().filter(note -> Boolean.TRUE.equals(note.getIsPinned())).count();
-        long todaySchedules = schedules.stream()
-                .filter(item -> item.getEventDate() != null && Objects.equals(item.getEventDate(), LocalDate.now()))
-                .count();
-        long pendingSchedules = schedules.stream()
-                .filter(item -> !"completed".equalsIgnoreCase(item.getStatus()))
-                .count();
-
-        long totalTokens = messages.stream()
-                .mapToLong(message -> {
-                    Integer tokenCount = message.getTokenCount();
-                    if (tokenCount != null && tokenCount >= 0) {
-                        return tokenCount;
-                    }
-                    return estimateTokenCount(message.getContent());
-                })
-                .sum();
-        double avgTokensPerMessage = messages.isEmpty() ? 0 : (double) totalTokens / (double) messages.size();
+        long totalTokens = messages.stream().mapToLong(message -> {
+            Integer count = message.getTokenCount();
+            return count != null && count >= 0 ? count : estimateTokenCount(message.getContent());
+        }).sum();
 
         Map<String, Object> result = new HashMap<>();
         result.put("generatedAt", LocalDateTime.now());
-        result.put("enabledTasks", enabledTasks);
-        result.put("todaySchedules", todaySchedules);
-        result.put("pendingSchedules", pendingSchedules);
-        result.put("pinnedNotes", pinnedNotes);
-        result.put("snippetCount", snippets.size());
+        result.put("enabledTasks", tasks.stream()
+                .filter(task -> Boolean.TRUE.equals(task.getEnabled())).count());
+        result.put("todaySchedules", schedules.stream()
+                .filter(item -> item.getEventDate() != null
+                        && Objects.equals(item.getEventDate(), LocalDate.now())).count());
+        result.put("pendingSchedules", schedules.stream()
+                .filter(item -> !"completed".equalsIgnoreCase(item.getStatus())).count());
+        result.put("pinnedNotes", notes.stream()
+                .filter(note -> Boolean.TRUE.equals(note.getIsPinned())).count());
+        result.put("snippetCount", 0);
         result.put("messageCount", messages.size());
         result.put("totalTokenUsage", totalTokens);
-        result.put("avgTokensPerMessage", Math.round(avgTokensPerMessage * 100.0) / 100.0);
+        result.put("avgTokensPerMessage", messages.isEmpty()
+                ? 0 : Math.round(((double) totalTokens / messages.size()) * 100.0) / 100.0);
         return result;
     }
 
     /**
-     * 返回预置的任务模板列表（日报、晨间提醒、周报等）
+     * 返回 Java 可直接执行的提醒任务模板。
+     *
+     * @return 普通提醒模板。
      */
     public List<Map<String, Object>> taskTemplates() {
         return List.of(
-                template("daily-report", "日报生成", "每天晚 20:00 自动生成日报", "CHAT", "0 0 20 * * ?", "请生成今日工作总结，包含完成事项、风险和明日计划"),
-                template("morning-focus", "晨间提醒", "每天早 08:30 提醒今日三件最重要任务", "REMINDER", "0 30 8 * * ?", "今日专注三件事：1) 2) 3)"),
-                template("weekly-review", "周报生成", "每周五晚 18:00 自动生成周报", "CHAT", "0 0 18 ? * FRI", "请生成本周工作周报，包含里程碑、问题和下周目标"),
-                template("inbox-refresh", "收件箱巡检", "每小时执行一次收件箱巡检任务", "REMINDER", "0 0 * * * ?", "请检查收件箱并提醒待处理项"),
-                template("knowledge-maintain", "知识库巡检", "每天凌晨 02:30 提醒知识库去重与增量更新", "REMINDER", "0 30 2 * * ?", "请执行知识库去重与增量更新检查")
-        );
+                template("morning-focus", "晨间提醒", "每天早 08:30 提醒今日三件最重要任务",
+                        "REMINDER", "0 30 8 * * ?", "今日专注三件事：1) 2) 3)"),
+                template("inbox-refresh", "收件箱巡检", "每小时提醒检查待处理事项",
+                        "REMINDER", "0 0 * * * ?", "请检查收件箱并处理待办"),
+                template("weekly-review", "周复盘提醒", "每周五晚 18:00 提醒进行周复盘",
+                        "REMINDER", "0 0 18 ? * FRI", "请进行本周复盘并整理下周目标"));
     }
 
-    /**
-     * 根据模板 ID 创建一个调度任务
-     *
-     * @param templateId 模板 ID
-     * @return 新建的调度任务
-     */
+    /** 根据模板创建提醒任务。 */
     public ScheduledTask createTaskFromTemplate(String templateId) {
         Map<String, Object> selected = taskTemplates().stream()
                 .filter(item -> templateId.equals(item.get("id")))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("模板不存在: " + templateId));
-
-        ScheduledTask task = ScheduledTask.builder()
+        return scheduledTaskService.createTask(ScheduledTask.builder()
                 .name(String.valueOf(selected.get("name")))
                 .description(String.valueOf(selected.get("description")))
-                .taskType(String.valueOf(selected.get("taskType")))
+                .taskType("REMINDER")
                 .cronExpression(String.valueOf(selected.get("cronExpression")))
                 .params(String.valueOf(selected.get("params")))
-                .build();
-
-        return scheduledTaskService.createTask(task);
+                .build());
     }
 
-    /**
-     * 导出个人设置、任务、笔记、代码片段与日程的备份数据
-     */
+    /** 导出 Java 业务侧个人数据。 */
     public Map<String, Object> exportBackup() {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("version", "1.0");
+        payload.put("version", "2.0-java-business-only");
         payload.put("exportedAt", LocalDateTime.now());
         payload.put("systemSettings", systemSettingsService.listSettings());
         payload.put("scheduledTasks", scheduledTaskService.listTasks());
         payload.put("notes", noteService.getAllNotes());
-        payload.put("snippets", codeSnippetService.getAllSnippets());
+        payload.put("snippets", List.of());
         payload.put("schedules", scheduleEventService.listAll());
         return payload;
     }
 
     /**
-     * 导入备份数据
+     * 导入 Java 业务侧个人数据。
      *
-     * @param payload         备份内容
-     * @param replaceExisting 是否替换现有数据
-     * @return 导入结果统计
+     * @param payload 备份数据。
+     * @param replaceExisting 是否替换已有数据。
+     * @return 导入统计。
      */
     @Transactional
-    public Map<String, Object> importBackup(Map<String, Object> payload, boolean replaceExisting) {
-        List<SystemSettings> settings = objectMapper.convertValue(payload.getOrDefault("systemSettings", List.of()),
+    public Map<String, Object> importBackup(
+            Map<String, Object> payload,
+            boolean replaceExisting) {
+        List<SystemSettings> settings = objectMapper.convertValue(
+                payload.getOrDefault("systemSettings", List.of()),
                 new TypeReference<List<SystemSettings>>() {});
-        List<ScheduledTask> tasks = objectMapper.convertValue(payload.getOrDefault("scheduledTasks", List.of()),
+        List<ScheduledTask> tasks = objectMapper.convertValue(
+                payload.getOrDefault("scheduledTasks", List.of()),
                 new TypeReference<List<ScheduledTask>>() {});
-        List<Note> notes = objectMapper.convertValue(payload.getOrDefault("notes", List.of()),
+        List<Note> notes = objectMapper.convertValue(
+                payload.getOrDefault("notes", List.of()),
                 new TypeReference<List<Note>>() {});
-        List<CodeSnippet> snippets = objectMapper.convertValue(payload.getOrDefault("snippets", List.of()),
-                new TypeReference<List<CodeSnippet>>() {});
-        List<ScheduleEvent> schedules = objectMapper.convertValue(payload.getOrDefault("schedules", List.of()),
+        List<ScheduleEvent> schedules = objectMapper.convertValue(
+                payload.getOrDefault("schedules", List.of()),
                 new TypeReference<List<ScheduleEvent>>() {});
 
         if (replaceExisting) {
             systemSettingsService.replaceSettings(settings);
             scheduledTaskService.replaceTasks(tasks);
             noteService.getAllNotes().forEach(note -> noteService.deleteNote(note.getId()));
-            codeSnippetService.replaceSnippets(snippets);
             scheduleEventService.replaceAll(schedules);
         } else {
             systemSettingsService.upsertSettings(settings);
             scheduledTaskService.appendTasks(tasks);
-            codeSnippetService.appendSnippets(snippets);
             scheduleEventService.appendAll(schedules);
         }
-
-        notes.forEach(item -> {
-            noteService.restoreNote(item);
-        });
-
-        // 确保导入后的启用任务立即进入调度（无需重启应用）
+        notes.forEach(noteService::restoreNote);
         scheduledTaskService.reloadScheduledTasks();
 
         Map<String, Object> result = new HashMap<>();
@@ -181,17 +157,18 @@ public class PersonalProductivityService {
         result.put("settings", settings.size());
         result.put("tasks", tasks.size());
         result.put("notes", notes.size());
-        result.put("snippets", snippets.size());
+        result.put("snippets", 0);
         result.put("schedules", schedules.size());
         return result;
     }
 
-    private Map<String, Object> template(String id,
-                                         String name,
-                                         String description,
-                                         String taskType,
-                                         String cronExpression,
-                                         String params) {
+    private Map<String, Object> template(
+            String id,
+            String name,
+            String description,
+            String taskType,
+            String cronExpression,
+            String params) {
         Map<String, Object> item = new HashMap<>();
         item.put("id", id);
         item.put("name", name);
@@ -208,15 +185,13 @@ public class PersonalProductivityService {
         }
         int cjkCount = 0;
         int otherCount = 0;
-        for (char c : content.toCharArray()) {
-            if (Character.UnicodeScript.of(c) == Character.UnicodeScript.HAN) {
+        for (char character : content.toCharArray()) {
+            if (Character.UnicodeScript.of(character) == Character.UnicodeScript.HAN) {
                 cjkCount++;
-            } else if (!Character.isWhitespace(c)) {
+            } else if (!Character.isWhitespace(character)) {
                 otherCount++;
             }
         }
-        int englishTokens = (int) Math.ceil(otherCount / 4.0);
-        int total = cjkCount + englishTokens;
-        return Math.max(total, 1);
+        return Math.max(cjkCount + (int) Math.ceil(otherCount / 4.0), 1);
     }
 }

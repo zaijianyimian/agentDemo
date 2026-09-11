@@ -10,6 +10,7 @@ import com.example.demo.email.domain.listener.ListenMode;
 import com.example.demo.email.domain.listener.MailCursor;
 import com.example.demo.email.domain.listener.MailProvider;
 import com.example.demo.email.domain.listener.MailboxMessage;
+import com.example.demo.email.persistence.EmailConfigMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -25,6 +26,7 @@ class EmailListenerManagerTest {
     void rejectsUnsupportedProviderModeCombination() {
         EmailAuthConfigService authService = mock(EmailAuthConfigService.class);
         EmailListenerStateService stateService = mock(EmailListenerStateService.class);
+        EmailConfigMapper emailConfigMapper = mock(EmailConfigMapper.class);
         MailSourceAdapter adapter = new MailSourceAdapter() {
             @Override
             public MailProvider provider() {
@@ -48,7 +50,8 @@ class EmailListenerManagerTest {
                 new EmailListenerConfigSupport(),
                 stateService,
                 new MailSourceAdapterRegistry(List.of(adapter)),
-                new ListenStrategyRegistry(List.of(strategy))
+                new ListenStrategyRegistry(List.of(strategy)),
+                emailConfigMapper
         );
         EmailConfig config = EmailConfig.builder()
                 .id(1L)
