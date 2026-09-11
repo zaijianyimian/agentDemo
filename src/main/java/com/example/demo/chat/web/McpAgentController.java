@@ -1,129 +1,99 @@
 package com.example.demo.chat.web;
 
-import com.example.demo.chat.application.ChatHistoryService;
-import com.example.demo.mcp.application.McpAgentService;
+import com.example.demo.infrastructure.graph.GraphGatewayClient;
+import com.example.demo.infrastructure.security.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
-
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * MCP Agent 聊天控制器
- * 提供带工具调用能力的 AI 对话接口
+ * MCP Agent 兼容网关。
+ *
+ * <p>保留旧前端路由，但 Java 不再执行 MCP Agent。所有推理、记忆和工具调用均转发给 Python
+ * Graph，由 Python 决定是否以及如何调用 MCP 工具。</p>
  */
 @RestController
 @RequestMapping("/api/mcp/agent")
 @RequiredArgsConstructor
-@Slf4j
 public class McpAgentController {
 
-    private final McpAgentService mcpAgentService;
-    @Qualifier("mcpAgentStreamingService")
-    private final McpAgentService mcpAgentStreamingService;
-    private final ChatHistoryService chatHistoryService;
+    private final GraphGatewayClient graphGatewayClient;
+    private final CurrentUserProvider currentUserProvider;
 
     /**
-     * 普通对话 - AI 可自动调用工具
+     * 兼容旧 GET 聊天接口。
      *
-     * @param message 用户消息
-     * @return AI 响应
+     * @param message 用户消息。
+     * @return Python Agent 响应。
      */
     @GetMapping("/chat")
     public String chat(@RequestParam String message) {
-        return mcpAgentService.chat(withRuntimeContext(message));
+        return graphGatewayClient.chat(currentUserProvider.requireUserId(), null, message);
     }
 
     /**
-     * POST 方式对话 - AI 可自动调用工具
+     * 兼容旧 POST 聊天接口。
      *
-     * @param request 请求体
-     * @return AI 响应
+     * @param request 聊天请求。
+     * @return Python Agent 响应。
      */
     @PostMapping("/chat")
     public String chatPost(@RequestBody ChatRequest request) {
-        return mcpAgentService.chat(withRuntimeContext(request.message()));
+        return graphGatewayClient.chat(currentUserProvider.requireUserId(), null, request.message());
     }
 
     /**
-     * 带会话记忆的对话 - AI 可自动调用工具
+     * 兼容旧带会话聊天接口。
      *
-     * @param sessionId 会话 ID
-     * @param message   用户消息
-     * @return AI 响应
+     * @param sessionId 会话 ID。
+     * @param message 用户消息。
+     * @return Python Agent 响应。
      */
     @GetMapping("/chat/{sessionId}")
-    public String chatWithMemory(
+    public String chatWithSession(
             @PathVariable String sessionId,
             @RequestParam String message) {
-        Long chatSessionId = parseSessionId(sessionId);
-        if (chatSessionId != null) {
-            chatHistoryService.addMessage(chatSessionId, "user", message, null);
-        }
-        String response = mcpAgentService.chatWithMemory(sessionId, withRuntimeContext(message));
-        if (chatSessionId != null) {
-            chatHistoryService.addMessage(chatSessionId, "assistant", response, "mcp-agent");
-        }
-        return response;
+        return graphGatewayClient.chat(currentUserProvider.requireUserId(), sessionId, message);
     }
 
     /**
-     * 流式对话 - AI 可自动调用工具
+     * 兼容旧流式聊天接口。
      *
-     * @param message 用户消息
-     * @return SSE 流式响应
+     * @param message 用户消息。
+     * @return SSE 响应流。
      */
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStream(@RequestParam String message) {
-        return mcpAgentStreamingService.chatStream(withRuntimeContext(message))
-                .map(chunk -> ServerSentEvent.<String>builder()
-                        .data(chunk)
-                        .build());
+        return toSseStream(graphGatewayClient.streamChat(
+                currentUserProvider.requireUserId(), null, message));
     }
 
     /**
-     * 带会话记忆的流式对话 - AI 可自动调用工具
+     * 兼容旧带会话流式聊天接口。
      *
-     * @param sessionId 会话 ID
-     * @param message   用户消息
-     * @return SSE 流式响应
+     * @param sessionId 会话 ID。
+     * @param message 用户消息。
+     * @return SSE 响应流。
      */
     @GetMapping(value = "/chat/stream/{sessionId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> chatStreamWithMemory(
+    public Flux<ServerSentEvent<String>> chatStreamWithSession(
             @PathVariable String sessionId,
             @RequestParam String message) {
-        Long chatSessionId = parseSessionId(sessionId);
-        if (chatSessionId != null) {
-            chatHistoryService.addMessage(chatSessionId, "user", message, null);
-        }
-        AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
-        Flux<ServerSentEvent<String>> contentStream = mcpAgentStreamingService
-                .chatStreamWithMemory(sessionId, withRuntimeContext(message))
-                .doOnNext(chunk -> fullResponse.get().append(chunk))
-                .doOnComplete(() -> {
-                    if (chatSessionId != null) {
-                        String response = fullResponse.get().toString();
-                        Mono.fromRunnable(() -> chatHistoryService.addMessage(
-                                        chatSessionId, "assistant", response, "mcp-agent"))
-                                .subscribeOn(Schedulers.boundedElastic())
-                                .subscribe(null, error -> log.error(
-                                        "异步保存 Agent 流式响应失败: sessionId={}, error={}",
-                                        chatSessionId, error.getMessage(), error));
-                    }
-                })
-                .map(chunk -> ServerSentEvent.<String>builder()
-                        .data(chunk)
-                        .build());
+        return toSseStream(graphGatewayClient.streamChat(
+                currentUserProvider.requireUserId(), sessionId, message));
+    }
 
+    private Flux<ServerSentEvent<String>> toSseStream(Flux<String> contentStream) {
         return contentStream
+                .map(chunk -> ServerSentEvent.<String>builder().data(chunk).build())
                 .startWith(ServerSentEvent.<String>builder().comment("connected").build())
                 .concatWithValues(ServerSentEvent.<String>builder()
                         .event("done")
@@ -131,29 +101,7 @@ public class McpAgentController {
                         .build());
     }
 
-    /**
-     * 聊天请求
-     */
-    public record ChatRequest(String message) {}
-
-    private String withRuntimeContext(String message) {
-        return """
-                当前服务器时间: %s
-                当用户使用“今天/明天/后天/下周”等相对日期时，请基于这个时间换算为明确日期后再调用工具。
-
-                用户消息:
-                %s
-                """.formatted(
-                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                message
-        );
-    }
-
-    private Long parseSessionId(String sessionId) {
-        try {
-            return Long.parseLong(sessionId);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
+    /** 聊天请求。 */
+    public record ChatRequest(String message) {
     }
 }

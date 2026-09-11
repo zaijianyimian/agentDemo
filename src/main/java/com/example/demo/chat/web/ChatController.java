@@ -1,304 +1,141 @@
 package com.example.demo.chat.web;
 
 import com.example.demo.chat.dto.ChatResponse;
-import com.example.demo.shared.application.ContentAnalysisService;
-import com.example.demo.shared.dto.ContentAnalysis;
-import com.example.demo.chat.application.ChatHistoryService;
-import com.example.demo.model.application.QwenChatService;
-import com.example.demo.chat.application.ChatWithMemoryService;
-import com.example.demo.memory.application.MemoryApplicationService;
-import com.example.demo.mcp.application.McpAgentService;
+import com.example.demo.infrastructure.graph.GraphGatewayClient;
+import com.example.demo.infrastructure.security.CurrentUserProvider;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
-import java.time.Instant;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 聊天控制器
- * 处理AI对话相关接口
+ * 聊天网关控制器。
+ *
+ * <p>Java 仅负责鉴权、用户上下文和 HTTP/SSE 协议适配；所有 Agent、LLM、Memory、Tool
+ * 执行均由 Python Graph 服务负责。</p>
  */
-@Slf4j
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
 public class ChatController {
 
-    private final QwenChatService qwenChatService;
-    private final McpAgentService mcpAgentService;
-    @Qualifier("mcpAgentStreamingService")
-    private final McpAgentService mcpAgentStreamingService;
-    private final ChatWithMemoryService chatWithMemoryService;
-    private final ContentAnalysisService contentAnalysisService;
-    private final ChatHistoryService chatHistoryService;
-    private final MemoryApplicationService memoryApplicationService;
+    private final GraphGatewayClient graphGatewayClient;
+    private final CurrentUserProvider currentUserProvider;
     private final ObjectMapper objectMapper;
 
     /**
-     * 普通聊天接口 - 返回完整响应
+     * 非流式聊天。
+     *
+     * @param message 用户消息。
+     * @return Python Agent 最终响应。
      */
     @GetMapping("/complete")
     public String complete(@RequestParam("message") String message) {
-        return mcpAgentService.chat(withRuntimeContext(message));
+        return graphGatewayClient.chat(currentUserProvider.requireUserId(), null, message);
     }
 
     /**
-     * 流式聊天接口 - SSE 方式返回
-     * 使用 ServerSentEvent 确保标准 SSE 格式
+     * 流式聊天。
+     *
+     * @param message 用户消息。
+     * @return SSE 响应流。
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStream(@RequestParam("message") String message) {
-        return mcpAgentStreamingService.chatStream(withRuntimeContext(message))
-                .map(chunk -> ServerSentEvent.<String>builder()
-                        .data(chunk)
-                        .build());
+        return toSseStream(graphGatewayClient.streamChat(
+                currentUserProvider.requireUserId(), null, message));
     }
 
     /**
-     * 流式聊天接口 - JSON 格式返回
-     * 每个数据块包装为 JSON 格式，便于解析
+     * JSON 格式流式聊天，保留旧前端接口兼容性。
+     *
+     * @param message 用户消息。
+     * @return JSON SSE 响应流。
      */
     @GetMapping(value = "/stream/json", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStreamJson(@RequestParam("message") String message) {
-        AtomicReference<StringBuilder> contentBuilder = new AtomicReference<>(new StringBuilder());
-
-        return mcpAgentStreamingService.chatStream(withRuntimeContext(message))
-                .map(chunk -> {
-                    contentBuilder.get().append(chunk);
-                    try {
-                        String jsonData = objectMapper.writeValueAsString(ChatResponse.contentChunk(chunk));
-                        return ServerSentEvent.<String>builder()
-                                .data(jsonData)
-                                .build();
-                    } catch (JsonProcessingException e) {
-                        return ServerSentEvent.<String>builder()
-                                .data("{\"error\":\"serialization error\"}")
-                                .build();
-                    }
-                })
-                .concatWith(Mono.fromSupplier(() -> {
-                    // 流结束后，添加分析元数据
-                    try {
-                        String fullContent = contentBuilder.get().toString();
-                        ContentAnalysis analysis = contentAnalysisService.analyze(fullContent);
-                        ChatResponse finalResponse = ChatResponse.builder()
-                                .content(fullContent)
-                                .importance(analysis.getImportance())
-                                .tags(analysis.getTags())
-                                .sentiment(analysis.getSentiment() != null ? analysis.getSentiment().name() : "NEUTRAL")
-                                .summary(analysis.getSummary())
-                                .isComplete(true)
-                                .build();
-                        String jsonData = objectMapper.writeValueAsString(finalResponse);
-                        return ServerSentEvent.<String>builder()
-                                .data(jsonData)
-                                .event("complete")
-                                .build();
-                    } catch (JsonProcessingException e) {
-                        return ServerSentEvent.<String>builder()
-                                .data("{\"error\":\"analysis error\"}")
-                                .build();
-                    }
-                }));
+        return toJsonSseStream(graphGatewayClient.streamChat(
+                currentUserProvider.requireUserId(), null, message));
     }
 
     /**
-     * 结构化聊天接口 - 返回含元数据的完整响应
+     * 结构化聊天兼容接口。
+     *
+     * <p>内容分析已经迁移到 Python，因此 Java 只返回 Agent 文本和完成标记。</p>
+     *
+     * @param message 用户消息。
+     * @return 结构化聊天响应。
      */
     @GetMapping("/structured")
     public ChatResponse chatStructured(@RequestParam("message") String message) {
-        // 1. 获取完整响应
-        String content = mcpAgentService.chat(withRuntimeContext(message));
-
-        // 2. 分析内容
-        ContentAnalysis analysis = contentAnalysisService.analyze(content);
-
-        // 3. 构建结构化响应
+        String content = graphGatewayClient.chat(currentUserProvider.requireUserId(), null, message);
         return ChatResponse.builder()
                 .content(content)
-                .importance(analysis.getImportance())
-                .tags(analysis.getTags())
-                .sentiment(analysis.getSentiment() != null ? analysis.getSentiment().name() : "NEUTRAL")
-                .summary(analysis.getSummary())
                 .isComplete(true)
                 .build();
     }
 
-    // ==================== 带会话记忆的接口 ====================
-
     /**
-     * 带记忆的普通聊天接口 - 返回完整响应
-     * @param message 用户消息
-     * @param sessionId 会话ID（用于记忆和历史存储）
+     * 带会话 ID 的非流式聊天。
+     *
+     * @param message 用户消息。
+     * @param sessionId 会话 ID。
+     * @return Python Agent 最终响应。
      */
     @GetMapping("/complete/session")
     public String completeWithSession(
             @RequestParam("message") String message,
             @RequestParam("sessionId") Long sessionId) {
-        Long activeModelId = chatWithMemoryService.resolveActiveModelId();
-        // 1. 保存用户消息
-        chatHistoryService.addMessage(sessionId, "user", message, null);
-        log.info("保存用户消息: sessionId={}, message={}, activeModelId={}", sessionId, message, activeModelId);
-
-        // 2. 获取带记忆的AI响应
-        String response = chatWithMemoryService.chat(sessionId, message);
-
-        // 3. 保存AI响应
-        chatHistoryService.addMessage(sessionId, "assistant", response, "model-" + activeModelId);
-        log.info("保存AI响应: sessionId={}, responseLength={}", sessionId, response.length());
-
-        // 4. 提取并存储记忆
-        try {
-            memoryApplicationService.extractAndStore(
-                    sessionId.toString(),
-                    List.of("user: " + message, "assistant: " + response));
-            log.info("提取记忆成功: sessionId={}", sessionId);
-        } catch (Exception e) {
-            log.warn("提取记忆失败: sessionId={}, error={}", sessionId, e.getMessage());
-        }
-
-        return response;
+        return graphGatewayClient.chat(
+                currentUserProvider.requireUserId(), String.valueOf(sessionId), message);
     }
 
     /**
-     * 带记忆的流式聊天接口 - SSE 方式返回
-     * 同时保存用户消息和AI响应到数据库
-     * @param message 用户消息
-     * @param sessionId 会话ID（用于记忆和历史存储）
+     * 带会话 ID 的流式聊天。
+     *
+     * @param message 用户消息。
+     * @param sessionId 会话 ID。
+     * @return SSE 响应流。
      */
     @GetMapping(value = "/stream/session", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStreamWithSession(
             @RequestParam("message") String message,
             @RequestParam("sessionId") Long sessionId) {
-        Long activeModelId = chatWithMemoryService.resolveActiveModelId();
-
-        // 1. 保存用户消息
-        chatHistoryService.addMessage(sessionId, "user", message, null);
-        log.info("保存用户消息: sessionId={}, message={}, activeModelId={}", sessionId, message, activeModelId);
-
-        // 2. 收集完整响应的容器
-        AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
-
-        // 3. 流式调用带记忆的AI服务
-        Flux<ServerSentEvent<String>> contentStream = chatWithMemoryService.streamChat(sessionId, message)
-                .doOnNext(chunk -> fullResponse.get().append(chunk))
-                .doOnComplete(() -> {
-                    String response = fullResponse.get().toString();
-                    // 持久化可能涉及数据库和向量存储，不能阻塞 SSE 的完成信号。
-                    Mono.fromRunnable(() -> persistCompletedStream(
-                                    sessionId, message, response, "model-" + activeModelId))
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .subscribe(null, error -> log.error(
-                                    "异步保存流式响应失败: sessionId={}, error={}",
-                                    sessionId, error.getMessage(), error));
-                })
-                .doOnError(error -> log.error("流式响应错误: sessionId={}, error={}", sessionId, error.getMessage()))
-                .map(chunk -> ServerSentEvent.<String>builder()
-                        .data(chunk)
-                        .build());
-
-        return contentStream
-                .startWith(ServerSentEvent.<String>builder().comment("connected").build())
-                .concatWithValues(ServerSentEvent.<String>builder()
-                        .event("done")
-                        .data("[DONE]")
-                        .build());
+        return toSseStream(graphGatewayClient.streamChat(
+                currentUserProvider.requireUserId(), String.valueOf(sessionId), message));
     }
 
     /**
-     * 带记忆的流式聊天接口 - JSON 格式返回
-     * 每个数据块包装为 JSON 格式，同时保存消息和记忆
-     * @param message 用户消息
-     * @param sessionId 会话ID（用于记忆和历史存储）
+     * 带会话 ID 的 JSON 流式聊天。
+     *
+     * @param message 用户消息。
+     * @param sessionId 会话 ID。
+     * @return JSON SSE 响应流。
      */
     @GetMapping(value = "/stream/session/json", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStreamWithSessionJson(
             @RequestParam("message") String message,
             @RequestParam("sessionId") Long sessionId) {
-        Long activeModelId = chatWithMemoryService.resolveActiveModelId();
-
-        // 1. 保存用户消息
-        chatHistoryService.addMessage(sessionId, "user", message, null);
-        log.info("保存用户消息: sessionId={}, message={}, activeModelId={}", sessionId, message, activeModelId);
-
-        // 2. 收集完整响应的容器
-        AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
-
-        // 3. 流式调用带记忆的AI服务
-        return chatWithMemoryService.streamChat(sessionId, message)
-                .map(chunk -> {
-                    fullResponse.get().append(chunk);
-                    try {
-                        String jsonData = objectMapper.writeValueAsString(ChatResponse.contentChunk(chunk));
-                        return ServerSentEvent.<String>builder()
-                                .data(jsonData)
-                                .build();
-                    } catch (JsonProcessingException e) {
-                        return ServerSentEvent.<String>builder()
-                                .data("{\"error\":\"serialization error\"}")
-                                .build();
-                    }
-                })
-                .concatWith(Mono.fromRunnable(() -> {
-                    // 4. 流完成后保存AI响应和记忆
-                    String response = fullResponse.get().toString();
-                    chatHistoryService.addMessage(sessionId, "assistant", response, "model-" + activeModelId);
-                    log.info("保存AI响应: sessionId={}, responseLength={}", sessionId, response.length());
-
-                    // 5. 提取并存储记忆
-                    try {
-                        memoryApplicationService.extractAndStore(
-                                sessionId.toString(),
-                                List.of("user: " + message, "assistant: " + response));
-                        log.info("提取记忆成功: sessionId={}", sessionId);
-                    } catch (Exception e) {
-                        log.warn("提取记忆失败: sessionId={}, error={}", sessionId, e.getMessage());
-                    }
-                }))
-                .concatWith(Mono.fromSupplier(() -> {
-                    // 6. 流结束后，添加分析元数据
-                    try {
-                        String fullContent = fullResponse.get().toString();
-                        ContentAnalysis analysis = contentAnalysisService.analyze(fullContent);
-                        ChatResponse finalResponse = ChatResponse.builder()
-                                .content(fullContent)
-                                .importance(analysis.getImportance())
-                                .tags(analysis.getTags())
-                                .sentiment(analysis.getSentiment() != null ? analysis.getSentiment().name() : "NEUTRAL")
-                                .summary(analysis.getSummary())
-                                .isComplete(true)
-                                .build();
-                        String jsonData = objectMapper.writeValueAsString(finalResponse);
-                        return ServerSentEvent.<String>builder()
-                                .data(jsonData)
-                                .event("complete")
-                                .build();
-                    } catch (JsonProcessingException e) {
-                        return ServerSentEvent.<String>builder()
-                                .data("{\"error\":\"analysis error\"}")
-                                .build();
-                    }
-                }));
+        return toJsonSseStream(graphGatewayClient.streamChat(
+                currentUserProvider.requireUserId(), String.valueOf(sessionId), message));
     }
 
-    // ==================== 测试接口 ====================
-
     /**
-     * 不调用模型的确定性 SSE 探针，每 300ms 发送一条，用于隔离 Spring/Vite/浏览器传输层。
+     * SSE 传输层探针，不调用 Agent。
+     *
+     * @return 固定 SSE 数据流。
      */
     @GetMapping("/stream/probe")
     public ResponseEntity<Flux<ServerSentEvent<String>>> streamProbe() {
@@ -310,59 +147,65 @@ public class ChatController {
                         .build());
         Flux<ServerSentEvent<String>> stream = ticks
                 .startWith(ServerSentEvent.<String>builder().comment("connected").build())
-                .concatWithValues(ServerSentEvent.<String>builder()
-                        .event("done")
-                        .data("[DONE]")
-                        .build());
+                .concatWithValues(doneEvent());
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
                 .body(stream);
     }
 
     /**
-     * 测试流式响应 - 用于诊断问题
-     * 每个 token 都会记录时间戳
+     * 旧测试接口兼容入口，实际调用 Python Graph 流式接口。
+     *
+     * @param message 用户消息。
+     * @return SSE 响应流。
      */
     @GetMapping(value = "/stream/test", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> testStream(@RequestParam("message") String message) {
-        log.info("测试流式响应开始: message={}, time={}", message, Instant.now());
+        return toSseStream(graphGatewayClient.streamChat(
+                currentUserProvider.requireUserId(), null, message));
+    }
 
-        return qwenChatService.chat(message)
-                .doOnSubscribe(s -> log.info("客户端订阅: time={}", Instant.now()))
-                .doOnNext(chunk -> log.info("收到 chunk: time={}, content={}", Instant.now(), chunk))
-                .doOnComplete(() -> log.info("流完成: time={}", Instant.now()))
-                .doOnCancel(() -> log.info("客户端取消: time={}", Instant.now()))
-                .map(chunk -> ServerSentEvent.<String>builder()
-                        .data(chunk)
+    private Flux<ServerSentEvent<String>> toSseStream(Flux<String> contentStream) {
+        return contentStream
+                .map(chunk -> ServerSentEvent.<String>builder().data(chunk).build())
+                .startWith(ServerSentEvent.<String>builder().comment("connected").build())
+                .concatWithValues(doneEvent());
+    }
+
+    private Flux<ServerSentEvent<String>> toJsonSseStream(Flux<String> contentStream) {
+        AtomicReference<StringBuilder> fullResponse = new AtomicReference<>(new StringBuilder());
+        Flux<ServerSentEvent<String>> chunks = contentStream.map(chunk -> {
+            fullResponse.get().append(chunk);
+            return ServerSentEvent.<String>builder()
+                    .data(writeJson(ChatResponse.contentChunk(chunk)))
+                    .build();
+        });
+        Mono<ServerSentEvent<String>> completed = Mono.fromSupplier(() ->
+                ServerSentEvent.<String>builder()
+                        .event("complete")
+                        .data(writeJson(ChatResponse.builder()
+                                .content(fullResponse.get().toString())
+                                .isComplete(true)
+                                .build()))
                         .build());
+        return chunks
+                .startWith(ServerSentEvent.<String>builder().comment("connected").build())
+                .concatWith(completed)
+                .concatWithValues(doneEvent());
     }
 
-    private String withRuntimeContext(String message) {
-        return """
-                当前服务器时间: %s
-                当用户使用“今天/明天/后天/下周”等相对日期时，请基于这个时间换算为明确日期后再调用工具。
-
-                用户消息:
-                %s
-                """.formatted(
-                LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                message
-        );
-    }
-
-    private void persistCompletedStream(Long sessionId,
-                                        String userMessage,
-                                        String assistantResponse,
-                                        String modelName) {
-        chatHistoryService.addMessage(sessionId, "assistant", assistantResponse, modelName);
-        log.info("保存AI响应: sessionId={}, responseLength={}", sessionId, assistantResponse.length());
+    private String writeJson(Object value) {
         try {
-            memoryApplicationService.extractAndStore(
-                    sessionId.toString(),
-                    List.of("user: " + userMessage, "assistant: " + assistantResponse));
-            log.info("提取记忆成功: sessionId={}", sessionId);
-        } catch (Exception e) {
-            log.warn("提取记忆失败: sessionId={}, error={}", sessionId, e.getMessage());
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException error) {
+            throw new IllegalStateException("聊天响应 JSON 序列化失败", error);
         }
+    }
+
+    private ServerSentEvent<String> doneEvent() {
+        return ServerSentEvent.<String>builder()
+                .event("done")
+                .data("[DONE]")
+                .build();
     }
 }
