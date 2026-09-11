@@ -54,5 +54,5 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Compile backend
-        run: ./gradlew compileJava --no-daemon
+      - name: Compile backend and tests
+        run: ./gradlew compileJava compileTestJava --no-daemon
