@@ -1,19 +1,28 @@
 package com.example.demo.note.web;
 
-import com.example.demo.shared.dto.ApiResponse;
 import com.example.demo.infrastructure.config.CacheConfig;
-import com.example.demo.note.dto.NoteSemanticHit;
-import com.example.demo.note.domain.Note;
 import com.example.demo.note.application.NoteService;
+import com.example.demo.note.domain.Note;
+import com.example.demo.shared.dto.ApiResponse;
 import jakarta.annotation.Resource;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 /**
- * 笔记控制器
+ * 笔记业务控制器。
+ *
+ * <p>Java 仅提供笔记 CRUD 与关键词搜索。AI 总结和语义检索由 Python Agent Engine 提供。</p>
  */
 @RestController
 @RequestMapping("/api/note")
@@ -22,116 +31,55 @@ public class NoteController {
     @Resource
     private NoteService noteService;
 
-    /**
-     * 获取所有笔记。30 秒 Caffeine 缓存，sync=true 让并发同 key 请求只查一次 DB。
-     */
+    /** 查询全部笔记。 */
     @GetMapping("/list")
     @Cacheable(cacheNames = CacheConfig.NOTE_LIST, sync = true)
     public ApiResponse<List<Note>> getAllNotes() {
-        List<Note> notes = noteService.getAllNotes();
-        return ApiResponse.success(notes);
+        return ApiResponse.success(noteService.getAllNotes());
     }
 
-    /**
-     * 获取笔记详情
-     */
+    /** 查询笔记详情。 */
     @GetMapping("/{id}")
     @Cacheable(cacheNames = CacheConfig.NOTE_DETAIL, key = "#id", sync = true)
     public ApiResponse<Note> getNote(@PathVariable Long id) {
         Note note = noteService.getNote(id);
-        if (note == null) {
-            return ApiResponse.error("笔记不存在");
-        }
-        return ApiResponse.success(note);
+        return note == null ? ApiResponse.error("笔记不存在") : ApiResponse.success(note);
     }
 
-    /**
-     * 创建笔记
-     */
+    /** 创建笔记。 */
     @PostMapping
     @CacheEvict(cacheNames = CacheConfig.NOTE_LIST, allEntries = true)
     public ApiResponse<Note> createNote(@RequestBody Note note) {
-        Note created = noteService.createNote(note);
-        return ApiResponse.success(created);
+        return ApiResponse.success(noteService.createNote(note));
     }
 
-    /**
-     * 更新笔记
-     */
+    /** 更新笔记。 */
     @PutMapping("/{id}")
     @CacheEvict(cacheNames = {CacheConfig.NOTE_LIST, CacheConfig.NOTE_DETAIL}, allEntries = true)
     public ApiResponse<Note> updateNote(@PathVariable Long id, @RequestBody Note note) {
         note.setId(id);
         Note updated = noteService.updateNote(note);
-        if (updated == null) {
-            return ApiResponse.error("笔记不存在");
-        }
-        return ApiResponse.success(updated);
+        return updated == null ? ApiResponse.error("笔记不存在") : ApiResponse.success(updated);
     }
 
-    /**
-     * 删除笔记
-     */
+    /** 删除笔记。 */
     @DeleteMapping("/{id}")
     @CacheEvict(cacheNames = {CacheConfig.NOTE_LIST, CacheConfig.NOTE_DETAIL}, allEntries = true)
     public ApiResponse<Void> deleteNote(@PathVariable Long id) {
-        boolean result = noteService.deleteNote(id);
-        if (!result) {
-            return ApiResponse.error("删除失败");
-        }
-        return ApiResponse.success(null);
+        return noteService.deleteNote(id) ? ApiResponse.success(null) : ApiResponse.error("删除失败");
     }
 
-    /**
-     * 切换置顶状态
-     */
+    /** 切换置顶状态。 */
     @PutMapping("/{id}/pin")
     @CacheEvict(cacheNames = {CacheConfig.NOTE_LIST, CacheConfig.NOTE_DETAIL}, allEntries = true)
     public ApiResponse<Note> togglePin(@PathVariable Long id) {
         Note note = noteService.togglePin(id);
-        if (note == null) {
-            return ApiResponse.error("笔记不存在");
-        }
-        return ApiResponse.success(note);
+        return note == null ? ApiResponse.error("笔记不存在") : ApiResponse.success(note);
     }
 
-    /**
-     * AI 总结笔记
-     */
-    @PostMapping("/{id}/summarize")
-    @CacheEvict(cacheNames = {CacheConfig.NOTE_LIST, CacheConfig.NOTE_DETAIL}, allEntries = true)
-    public ApiResponse<Note> summarizeNote(@PathVariable Long id) {
-        Note note = noteService.summarizeNote(id);
-        if (note == null) {
-            return ApiResponse.error("笔记不存在或内容为空");
-        }
-        return ApiResponse.success(note);
-    }
-
-    /**
-     * 搜索笔记
-     */
+    /** 使用关键词搜索笔记。 */
     @GetMapping("/search")
     public ApiResponse<List<Note>> searchNotes(@RequestParam(required = false) String keyword) {
-        List<Note> notes = noteService.searchNotes(keyword);
-        return ApiResponse.success(notes);
-    }
-
-    /**
-     * 重新索引全部笔记
-     */
-    @PostMapping("/reindex")
-    @CacheEvict(cacheNames = CacheConfig.NOTE_LIST, allEntries = true)
-    public ApiResponse<Integer> reindexNotes() {
-        return ApiResponse.success(noteService.reindexAllNotes());
-    }
-
-    /**
-     * 笔记语义检索
-     */
-    @GetMapping("/semantic-search")
-    public ApiResponse<List<NoteSemanticHit>> semanticSearch(@RequestParam String query,
-                                                             @RequestParam(defaultValue = "5") int topK) {
-        return ApiResponse.success(noteService.semanticSearch(query, topK));
+        return ApiResponse.success(noteService.searchNotes(keyword));
     }
 }
