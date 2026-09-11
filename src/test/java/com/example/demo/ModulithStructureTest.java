@@ -4,7 +4,7 @@ import com.example.demo.auth.application.AuthService;
 import com.example.demo.chat.application.ChatHistoryService;
 import com.example.demo.email.application.EmailListenerService;
 import com.example.demo.infrastructure.config.SecurityConfig;
-import com.example.demo.schedule.application.EmailProcessingService;
+import com.example.demo.schedule.application.ScheduleEventService;
 import com.example.demo.shared.dto.ApiResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
@@ -33,8 +33,8 @@ class ModulithStructureTest {
 
         assertThat(moduleNames)
                 .contains("auth", "chat", "email", "schedule", "task", "note", "file",
-                        "knowledge", "mcp", "skill", "system", "shared", "infrastructure")
-                .doesNotContain("app");
+                        "inbox", "personal", "system", "shared", "infrastructure")
+                .doesNotContain("app", "knowledge", "mcp", "skill", "memory", "autonomy", "dispatch");
 
         assertThat(modules.getModuleByName("auth"))
                 .hasValueSatisfying(module -> assertThat(module.contains(AuthService.class)).isTrue());
@@ -43,7 +43,7 @@ class ModulithStructureTest {
         assertThat(modules.getModuleByName("email"))
                 .hasValueSatisfying(module -> assertThat(module.contains(EmailListenerService.class)).isTrue());
         assertThat(modules.getModuleByName("schedule"))
-                .hasValueSatisfying(module -> assertThat(module.contains(EmailProcessingService.class)).isTrue());
+                .hasValueSatisfying(module -> assertThat(module.contains(ScheduleEventService.class)).isTrue());
         assertThat(modules.getModuleByName("shared"))
                 .hasValueSatisfying(module -> assertThat(module.contains(ApiResponse.class)).isTrue());
         assertThat(modules.getModuleByName("infrastructure"))
