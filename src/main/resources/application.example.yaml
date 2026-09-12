@@ -16,6 +16,13 @@ spring:
       min-idle: 1
       max-wait: 60000
       test-on-borrow: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VIRTUAL_HOST:/}
+    connection-timeout: ${RABBITMQ_CONNECTION_TIMEOUT:5s}
   servlet:
     multipart:
       max-file-size: 10MB
@@ -32,7 +39,7 @@ server:
       force-request: true
 
 app:
-  # Python Agent Engine 的唯一 Java 边界。LLM、Memory、RAG、MCP、Skill、Tool 均由 Python 管理。
+  # Python Graph 是 Java 与智能服务之间的唯一边界。
   graph:
     enabled: ${GRAPH_ENABLED:true}
     base-url: ${GRAPH_BASE_URL:http://127.0.0.1:8001}

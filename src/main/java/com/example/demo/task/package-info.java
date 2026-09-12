@@ -1,7 +1,7 @@
 @ApplicationModule(
         id = "task",
         displayName = "Task",
-        allowedDependencies = {"chat::*", "email::*", "memory::*", "model::*", "shared::*", "skill::*", "system::*"}
+        allowedDependencies = {"chat::*", "email::*", "infrastructure", "shared::*", "system::*"}
 )
 package com.example.demo.task;
 

@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -65,6 +66,17 @@ public class SecurityConfig {
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
+                        .requestMatchers(
+                                "/api/backup/**",
+                                "/api/autonomy/**",
+                                "/api/settings/data/**",
+                                "/api/settings/system/**",
+                                "/api/mcp/tools/sync/**",
+                                "/api/skill/sync/**",
+                                "/api/skill/reload",
+                                "/api/skill/reload-*",
+                                "/api/skill/reload/**"
+                        ).hasAuthority("SCOPE_platform.admin")
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 )
@@ -105,9 +117,11 @@ public class SecurityConfig {
     @Bean
     public JwtDecoder jwtDecoder(AuthSecurityProperties securityProperties) {
         SecretKey secretKey = hmacKey(securityProperties.getJwtSecret());
-        return NimbusJwtDecoder.withSecretKey(secretKey)
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(securityProperties.getIssuer()));
+        return decoder;
     }
 
     /**

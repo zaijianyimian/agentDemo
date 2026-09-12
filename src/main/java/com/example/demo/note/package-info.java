@@ -1,7 +1,7 @@
 @ApplicationModule(
         id = "note",
         displayName = "Note",
-        allowedDependencies = {"infrastructure", "memory::*", "shared::*"}
+        allowedDependencies = {"infrastructure", "shared::*"}
 )
 package com.example.demo.note;
 

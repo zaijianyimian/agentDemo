@@ -6,7 +6,6 @@ import com.example.demo.chat.domain.ChatSession;
 import com.example.demo.chat.persistence.ChatMessageMapper;
 import com.example.demo.chat.persistence.ChatSessionMapper;
 import com.example.demo.infrastructure.security.CurrentUserProvider;
-import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -26,14 +25,17 @@ import java.util.List;
 @Service
 public class ChatHistoryService {
 
-    @Resource
-    private ChatSessionMapper chatSessionMapper;
+    private final ChatSessionMapper chatSessionMapper;
+    private final ChatMessageMapper chatMessageMapper;
+    private final CurrentUserProvider currentUserProvider;
 
-    @Resource
-    private ChatMessageMapper chatMessageMapper;
-
-    @Resource
-    private CurrentUserProvider currentUserProvider;
+    public ChatHistoryService(ChatSessionMapper chatSessionMapper,
+                              ChatMessageMapper chatMessageMapper,
+                              CurrentUserProvider currentUserProvider) {
+        this.chatSessionMapper = chatSessionMapper;
+        this.chatMessageMapper = chatMessageMapper;
+        this.currentUserProvider = currentUserProvider;
+    }
 
     /**
      * 创建当前用户的新会话。

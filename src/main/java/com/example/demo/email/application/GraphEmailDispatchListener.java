@@ -11,6 +11,10 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * 新邮件到 Python Graph 的可靠投递桥接。
  *
@@ -41,7 +45,7 @@ public class GraphEmailDispatchListener {
 
         try {
             GraphGatewayClient.EmailDispatchResponse response = graphGatewayClient
-                    .dispatchEmail(email, event.trigger())
+                    .dispatchEmail(email.getUserId(), payload(email, event.trigger()))
                     .block();
             log.info("邮件已提交 Graph: userId={}, configId={}, emailId={}, duplicate={}",
                     email.getUserId(),
@@ -53,6 +57,35 @@ public class GraphEmailDispatchListener {
             log.error("邮件提交 Graph 失败，已撤销 Java 去重 key: userId={}, configId={}, externalId={}",
                     email.getUserId(), email.getEmailConfigId(), email.getExternalId(), error);
             throw error;
+        }
+    }
+
+    private static Map<String, Object> payload(EmailMessage email, String trigger) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("user_id", email.getUserId());
+        put(payload, "email_config_id", email.getEmailConfigId());
+        put(payload, "provider", email.getProvider());
+        put(payload, "external_id", email.getExternalId());
+        put(payload, "message_id", email.getMessageId());
+        put(payload, "sender", email.getFrom());
+        put(payload, "sender_name", email.getFromName());
+        payload.put("receiver", email.getTo() == null ? List.of() : email.getTo());
+        payload.put("cc", email.getCc() == null ? List.of() : email.getCc());
+        put(payload, "subject", email.getSubject());
+        put(payload, "content", email.getTextContent());
+        put(payload, "html_content", email.getHtmlContent());
+        put(payload, "sent_at", email.getSentDate());
+        put(payload, "received_at", email.getReceivedDate());
+        put(payload, "account_email", email.getAccountEmail());
+        put(payload, "trigger", trigger);
+        payload.put("attachments", email.getAttachments() == null ? List.of() : email.getAttachments());
+        payload.put("attachment_count", email.getAttachments() == null ? 0 : email.getAttachments().size());
+        return payload;
+    }
+
+    private static void put(Map<String, Object> payload, String key, Object value) {
+        if (value != null) {
+            payload.put(key, value);
         }
     }
 }

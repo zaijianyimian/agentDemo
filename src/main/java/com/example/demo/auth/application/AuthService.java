@@ -217,8 +217,29 @@ public class AuthService {
      * 从 JWT 中解析 userId 声明，若缺失则抛出非法参数异常。
      */
     public Long extractUserIdFromJwt(Jwt jwt) {
-        Long userId = jwt.getClaim("userId");
-        if (userId == null) {
+        Object claim = jwt.getClaim("userId");
+        if (!(claim instanceof Number number)) {
+            throw new IllegalArgumentException("无效身份令牌");
+        }
+        long userId;
+        try {
+            if (number instanceof java.math.BigInteger integer) {
+                userId = integer.longValueExact();
+            } else if (number instanceof java.math.BigDecimal decimal) {
+                userId = decimal.longValueExact();
+            } else if (number instanceof Double || number instanceof Float) {
+                double value = number.doubleValue();
+                if (!Double.isFinite(value) || value != Math.rint(value)) {
+                    throw new ArithmeticException("non-integral userId");
+                }
+                userId = java.math.BigDecimal.valueOf(value).longValueExact();
+            } else {
+                userId = number.longValue();
+            }
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException("无效身份令牌", exception);
+        }
+        if (userId <= 0) {
             throw new IllegalArgumentException("无效身份令牌");
         }
         return userId;
@@ -299,15 +320,39 @@ public class AuthService {
      * 校验 JWT 中携带的 tokenVersion 是否与用户当前版本一致，不一致视为已失效。
      */
     public void validateTokenVersion(Jwt jwt, UserAccount user) {
-        Number tokenVersion = jwt.getClaim("tokenVersion");
+        Object claim = jwt.getClaim("tokenVersion");
+        if (!(claim instanceof Number tokenVersion)) {
+            throw new IllegalArgumentException("令牌版本无效");
+        }
         int expectedVersion = safeTokenVersion(user);
-        int tokenValue = tokenVersion == null ? 0 : tokenVersion.intValue();
+        int tokenValue;
+        try {
+            if (tokenVersion instanceof java.math.BigInteger integer) {
+                tokenValue = integer.intValueExact();
+            } else if (tokenVersion instanceof java.math.BigDecimal decimal) {
+                tokenValue = decimal.intValueExact();
+            } else if (tokenVersion instanceof Double || tokenVersion instanceof Float) {
+                double value = tokenVersion.doubleValue();
+                if (!Double.isFinite(value) || value != Math.rint(value)) {
+                    throw new ArithmeticException("non-integral token version");
+                }
+                tokenValue = Math.toIntExact((long) value);
+            } else {
+                long value = tokenVersion.longValue();
+                tokenValue = Math.toIntExact(value);
+            }
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException("令牌版本无效", exception);
+        }
         if (tokenValue != expectedVersion) {
             throw new IllegalArgumentException("令牌已失效，请重新登录");
         }
     }
 
     public void validateTokenVersion(Jwt jwt) {
+        if (!AuthConstants.TOKEN_TYPE_ACCESS.equals(jwt.getClaimAsString("type"))) {
+            throw new IllegalArgumentException("令牌类型无效");
+        }
         Long userId = extractUserIdFromJwt(jwt);
         UserAccount user = requireActiveUser(userAccountCacheService.findById(userId));
         validateTokenVersion(jwt, user);

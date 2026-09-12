@@ -33,8 +33,8 @@ class ModulithStructureTest {
 
         assertThat(moduleNames)
                 .contains("auth", "chat", "email", "schedule", "task", "note", "file",
-                        "inbox", "personal", "system", "shared", "infrastructure")
-                .doesNotContain("app", "knowledge", "mcp", "skill", "memory", "autonomy", "dispatch");
+                        "inbox", "personal", "system", "shared", "infrastructure", "dispatch")
+                .doesNotContain("app", "knowledge", "mcp", "skill", "memory", "autonomy");
 
         assertThat(modules.getModuleByName("auth"))
                 .hasValueSatisfying(module -> assertThat(module.contains(AuthService.class)).isTrue());

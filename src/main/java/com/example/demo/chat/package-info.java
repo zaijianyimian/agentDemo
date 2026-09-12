@@ -1,7 +1,7 @@
 @ApplicationModule(
         id = "chat",
         displayName = "Chat",
-        allowedDependencies = {"email::tools", "infrastructure", "mcp::*", "memory::*", "model::*", "note::*", "schedule::*", "search::*", "shared::*", "task::*"}
+        allowedDependencies = {"infrastructure", "note::*", "schedule::*", "shared::*", "task::*"}
 )
 package com.example.demo.chat;
 

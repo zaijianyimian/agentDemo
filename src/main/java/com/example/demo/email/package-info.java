@@ -1,7 +1,7 @@
 @ApplicationModule(
         id = "email",
         displayName = "Email",
-        allowedDependencies = {"infrastructure", "model::*", "shared::*"}
+        allowedDependencies = {"infrastructure", "shared::*"}
 )
 package com.example.demo.email;
 

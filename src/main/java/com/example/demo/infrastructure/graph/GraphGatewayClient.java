@@ -1,6 +1,5 @@
 package com.example.demo.infrastructure.graph;
 
-import com.example.demo.email.domain.EmailMessage;
 import com.example.demo.infrastructure.properties.GraphGatewayProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.netty.channel.ChannelOption;
@@ -54,36 +53,13 @@ public class GraphGatewayClient {
      * @param trigger 邮件触发来源。
      * @return Python 返回的邮件接收结果。
      */
-    public Mono<EmailDispatchResponse> dispatchEmail(EmailMessage emailMessage, String trigger) {
-        if (emailMessage.getUserId() == null) {
-            return Mono.error(new IllegalArgumentException("邮件缺少 userId，拒绝提交给 Graph"));
+    public Mono<EmailDispatchResponse> dispatchEmail(long userId, Map<String, Object> payload) {
+        if (userId <= 0) {
+            return Mono.error(new IllegalArgumentException("邮件缺少有效 userId，拒绝提交给 Graph"));
         }
-
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("user_id", emailMessage.getUserId());
-        putNullable(payload, "email_config_id", emailMessage.getEmailConfigId());
-        putNullable(payload, "provider", emailMessage.getProvider());
-        putNullable(payload, "external_id", emailMessage.getExternalId());
-        putNullable(payload, "message_id", emailMessage.getMessageId());
-        putNullable(payload, "sender", emailMessage.getFrom());
-        putNullable(payload, "sender_name", emailMessage.getFromName());
-        payload.put("receiver", safeList(emailMessage.getTo()));
-        payload.put("cc", safeList(emailMessage.getCc()));
-        putNullable(payload, "subject", emailMessage.getSubject());
-        putNullable(payload, "content", emailMessage.getTextContent());
-        putNullable(payload, "html_content", emailMessage.getHtmlContent());
-        putNullable(payload, "sent_at", emailMessage.getSentDate());
-        putNullable(payload, "received_at", emailMessage.getReceivedDate());
-        putNullable(payload, "account_email", emailMessage.getAccountEmail());
-        putNullable(payload, "trigger", trigger);
-        payload.put("attachment_count",
-                emailMessage.getAttachments() == null ? 0 : emailMessage.getAttachments().size());
-        payload.put("attachments",
-                emailMessage.getAttachments() == null ? List.of() : emailMessage.getAttachments());
-
         return webClient.post()
                 .uri("/internal/emails/dispatch")
-                .headers(headers -> applyInternalHeaders(headers, emailMessage.getUserId()))
+                .headers(headers -> applyInternalHeaders(headers, userId))
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(payload)
                 .retrieve()
@@ -115,6 +91,28 @@ public class GraphGatewayClient {
     }
 
     /**
+     * Ask the Python Graph service for relevant memory. Java deliberately does
+     * not know the backing vector store or its schema.
+     */
+    public List<Map<String, Object>> recallMemory(long userId, String query, int topK) {
+        Map<String, Object> payload = Map.of("query", query, "top_k", topK);
+        List<Map<String, Object>> result = webClient.post()
+                .uri("/internal/memory/recall")
+                .headers(headers -> applyInternalHeaders(headers, userId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(payload)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
+                .block(Duration.ofSeconds(properties.getResponseTimeoutSeconds()));
+        return result == null ? List.of() : result;
+    }
+
+    /** Delegate the final decision-layer answer to Python Graph. */
+    public String completeDispatch(long userId, String prompt) {
+        return chat(userId, null, prompt);
+    }
+
+    /**
      * 调用 Python Graph 的 SSE Agent 对话接口。
      *
      * @param userId 当前用户 ID。
@@ -143,16 +141,6 @@ public class GraphGatewayClient {
     private void applyInternalHeaders(org.springframework.http.HttpHeaders headers, long userId) {
         headers.set(USER_ID_HEADER, String.valueOf(userId));
         headers.set(INTERNAL_TOKEN_HEADER, properties.getInternalToken());
-    }
-
-    private static void putNullable(Map<String, Object> payload, String key, Object value) {
-        if (value != null) {
-            payload.put(key, value);
-        }
-    }
-
-    private static List<String> safeList(List<String> values) {
-        return values == null ? List.of() : values;
     }
 
     private static String stripTrailingSlash(String value) {
