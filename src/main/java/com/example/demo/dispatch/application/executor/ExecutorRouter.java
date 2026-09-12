@@ -10,14 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 根据 hint 选执行器。
- *
- * <p>两个 hint 之间互为 fallback：
- * <ul>
- *   <li>{@code claude-code} ↔ {@code codex}</li>
- * </ul>
- * 如果两个 hint 都不可用，抛 {@link Executor.ExecutorUnavailableException}，
- * 让 dispatcher 进入 {@code decision-layer-self} 阶段。</p>
+ * 将 Python 执行请求中的 executor 名称映射到已注册的 Java 进程执行器。
+ * 本类不根据任务语义选择执行器，也不提供 fallback 决策。
  */
 @Slf4j
 @Component
@@ -27,30 +21,18 @@ public class ExecutorRouter {
     private final List<Executor> executors;
 
     /**
-     * @return 与 hint 匹配的执行器；不存在则抛异常
+     * @return 与名称精确匹配的执行器；不存在则抛异常。
      */
     public Executor pick(String hint) {
         if (hint == null) {
-            throw new Executor.ExecutorUnavailableException("executor_hint is null");
+            throw new Executor.ExecutorUnavailableException("executor is null");
         }
         for (Executor e : executors) {
             if (hint.equals(e.hint())) {
                 return e;
             }
         }
-        throw new Executor.ExecutorUnavailableException("no executor registered for hint: " + hint);
-    }
-
-    /**
-     * 选 fallback 执行器（与 hint 不同）。
-     */
-    public Executor pickFallback(String primaryHint) {
-        for (Executor e : executors) {
-            if (!primaryHint.equals(e.hint()) && e.isAvailable()) {
-                return e;
-            }
-        }
-        throw new Executor.ExecutorUnavailableException("no fallback executor available");
+        throw new Executor.ExecutorUnavailableException("no executor registered with name: " + hint);
     }
 
     /**

@@ -15,7 +15,7 @@ import java.util.Map;
  *
  * <p>配置存储在 {@code system_settings} 表（category="dispatch", config_key="executor.<hint>.enabled"）。
  * 默认值：claude-code=true, codex=true, openclaw=true。运行时 {@code Executor.isAvailable()} 调用
- * {@link #isExecutorEnabled(String)}，被禁用时调度器走 fallback（decision-layer-self LLM）。</p>
+ * {@link #isExecutorEnabled(String)}，被禁用的指定执行器会使任务直接执行失败。</p>
  */
 @Slf4j
 @Service
@@ -65,7 +65,7 @@ public class ExecutorToggleService {
     }
 
     /**
-     * 启停某个 executor hint。设置为 false 时 {@link com.example.demo.dispatch.application.executor.Executor#isAvailable()} 返回 false，调度降级到 decision-layer-self。
+     * 启停某个 executor。设置为 false 时该执行器不可用，Java 不会自动切换其他执行器。
      */
     public void setExecutorEnabled(String hint, boolean enabled) {
         systemSettingsService.setSetting(

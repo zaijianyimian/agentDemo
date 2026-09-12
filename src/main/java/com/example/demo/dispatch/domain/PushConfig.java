@@ -43,8 +43,6 @@ public class PushConfig {
 
     private Integer workspaceMaxAgeDays;
 
-    private Integer retryMax;
-
     private Integer executorTimeoutSeconds;
 
     private LocalDateTime updatedAt;

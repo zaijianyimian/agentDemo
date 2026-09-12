@@ -67,9 +67,7 @@ public class DispatchedTaskService {
                 .last("LIMIT " + limit));
     }
 
-    /**
-     * 由决策层在邮件事件落库时调用。
-     */
+    /** 保存 Python Agent 已确定的执行任务。 */
     public DispatchedTask create(DispatchedTask task) {
         if (task.getStatus() == null) {
             task.setStatus(DispatchedTask.STATUS_PENDING);
@@ -163,42 +161,13 @@ public class DispatchedTaskService {
         mapper.updateById(t);
     }
 
-    /**
-     * 给单次执行器失败累加 retries 计数（cascade swap 时另请调用 resetRetries）。
-     */
+    /** 给同一执行器的基础设施重试累加计数。 */
     public void appendRetry(Long id) {
         DispatchedTask t = mapper.selectById(id);
         if (t == null) {
             throw new IllegalArgumentException("task not found: " + id);
         }
         t.setRetries(t.getRetries() == null ? 1 : t.getRetries() + 1);
-        t.setUpdatedAt(LocalDateTime.now());
-        mapper.updateById(t);
-    }
-
-    /**
-     * 重置 retries 到 0（cascade swap 时使用）。
-     */
-    public void resetRetries(Long id) {
-        DispatchedTask t = mapper.selectById(id);
-        if (t == null) {
-            throw new IllegalArgumentException("task not found: " + id);
-        }
-        t.setRetries(0);
-        t.setUpdatedAt(LocalDateTime.now());
-        mapper.updateById(t);
-    }
-
-    /**
-     * 切换到新的执行器 hint，并把 retries 重置为 0（cascade 用）。
-     */
-    public void switchExecutor(Long id, String executor) {
-        DispatchedTask t = mapper.selectById(id);
-        if (t == null) {
-            throw new IllegalArgumentException("task not found: " + id);
-        }
-        t.setExecutorUsed(executor);
-        t.setRetries(0);
         t.setUpdatedAt(LocalDateTime.now());
         mapper.updateById(t);
     }

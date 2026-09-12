@@ -2,14 +2,8 @@ package com.example.demo.dispatch.application;
 
 import com.example.demo.dispatch.application.executor.Executor;
 import com.example.demo.dispatch.application.executor.ExecutorRouter;
-import com.example.demo.dispatch.application.fallback.DecisionLayerFallback;
-import com.example.demo.dispatch.application.prompt.EmailMetadata;
-import com.example.demo.dispatch.application.prompt.HintMerger;
-import com.example.demo.dispatch.application.prompt.MemoryRecallService;
-import com.example.demo.dispatch.application.prompt.PromptTemplate;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import com.example.demo.dispatch.domain.PushConfig;
-import com.example.demo.dispatch.application.DispatchProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,20 +11,16 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
 
 /**
- * 任务派发器核心：状态机 RETRY → SWAP → SELF → FAILED。
+ * 已决策任务的执行调度器。
  *
- * <p>每次执行的工作流：
+ * <p>Python Agent 必须在创建任务前确定完整执行指令、执行器和重试次数。Java 仅负责：
  * <ol>
- *   <li>WorkspaceManager.create(task)</li>
- *   <li>MemoryRecallService.recall(subject, 5) → memories</li>
- *   <li>HintMerger.merge + PromptTemplate.render → prompt</li>
- *   <li>ExecutorRouter.pick(executor_hint).execute(task, prompt, workspace, timeout)</li>
- *   <li>成功 → WorkspaceManager.archive + 写 md → DONE</li>
- *   <li>失败 → 累计 retries，超过 retry_max → swap → self → FAILED</li>
+ *   <li>创建工作区；</li>
+ *   <li>按任务指定的 executor 执行原样 instruction；</li>
+ *   <li>执行基础设施级重试与超时控制；</li>
+ *   <li>保存结果、失败原因并归档工作区。</li>
  * </ol>
  */
 @Slf4j
@@ -41,17 +31,11 @@ public class Dispatcher {
     private final DispatchProperties properties;
     private final DispatchedTaskService taskService;
     private final WorkspaceManager workspaceManager;
-    private final MemoryRecallService recallService;
-    private final PromptTemplate promptTemplate;
     private final ExecutorRouter executorRouter;
-    private final DecisionLayerFallback fallback;
+    private final ExecutionResultPublisher resultPublisher;
 
     /**
-     * 跑单个任务。抢占由 caller（{@code TaskPoller}）完成。
-     */
-    /**
-     * 跑单个任务的全流程：建工作区 → 召回记忆 → 拼 prompt → 多级 cascade 执行 → 归档落结果。
-     * 抢占由 caller（{@link TaskPoller}）完成。任何抛出都会被捕获并写入 FAILED 状态。
+     * 执行单个已决策任务。抢占由 {@link TaskPoller} 完成，任何异常都会记录为 FAILED。
      */
     public void run(DispatchedTask task) {
         log.info("dispatcher.run start task={}", task.getId());
@@ -61,27 +45,16 @@ public class Dispatcher {
             Path workspace = workspaceManager.create(task);
             task.setWorkspacePath(workspace.toString());
 
-            // 2. recall
-            long userId = task.getUserId() == null ? 0L : task.getUserId();
-            List<Map<String, Object>> memories = userId == 0L
-                    ? recallService.recallForTask(task.getSubject(), 5)
-                    : recallService.recallForTask(userId, task.getSubject(), 5);
+            // Python 已完成上下文构造、执行器路由和失败策略决策，Java 原样执行 instruction。
+            String result = execute(task, workspace, cfg);
 
-            // 3. prompt
-            String finalHint = HintMerger.merge(null, task.getFinalHint());
-            String prompt = promptTemplate.render(
-                    new EmailMetadata(task.getSubject(), null, task.getBodyExcerpt()),
-                    memories, finalHint);
-
-            // 4. execute (with cascade)
-            String result = executeWithCascade(task, prompt, workspace, cfg);
-
-            // 5. archive workspace + write md
+            // archive workspace + write md
             Path archive = workspaceManager.archive(task);
             Path mdPath = writeResultMd(task, result);
             taskService.markDone(task.getId(), task.getExecutorUsed(), result, mdPath.toString());
+            resultPublisher.publishDone(task, result);
 
-            // 6. evict LRU for this email
+            // evict LRU for this email
             workspaceManager.evict(task.getEmailId(), cfg);
 
             log.info("dispatcher.run done task={} archived={} md={}",
@@ -91,70 +64,54 @@ public class Dispatcher {
             try {
                 workspaceManager.archive(task);
                 taskService.markFailed(task.getId(), task.getExecutorUsed(), e.getMessage());
+                resultPublisher.publishFailed(task, e.getMessage());
             } catch (Exception ee) {
                 log.error("dispatcher.run archive/fail bookkeeping failed task={}", task.getId(), ee);
             }
         }
     }
 
-    private String executeWithCascade(DispatchedTask task, String prompt, Path workspace, PushConfig cfg) {
-        int retryMax = cfg.getRetryMax() == null ? 2 : cfg.getRetryMax();
+    private String execute(DispatchedTask task, Path workspace, PushConfig cfg) {
+        String executorName = requireText(task.getExecutor(), "executor");
+        String instruction = requireText(task.getExecutionInstruction(), "execution_instruction");
+        int retryMax = task.getRetryMax() == null ? 0 : task.getRetryMax();
+        if (retryMax < 0) {
+            throw new IllegalArgumentException("retry_max must be greater than or equal to 0");
+        }
         int timeout = cfg.getExecutorTimeoutSeconds() == null
                 ? properties.getExecutorTimeoutSeconds() : cfg.getExecutorTimeoutSeconds();
 
-        // ---- Stage 1: primary executor with retries ----
-        String currentHint = task.getExecutorHint();
-        task.setExecutorUsed(currentHint);
-        try {
-            return runWithRetries(task, prompt, workspace, currentHint, retryMax, timeout);
-        } catch (Exception primaryErr) {
-            log.warn("primary executor {} failed for task {}: {}", currentHint, task.getId(), primaryErr.getMessage());
-        }
-
-        // ---- Stage 2: swap to fallback executor ----
-        String fallbackHint = task.getFallbackExecutor();
-        if (fallbackHint != null && !fallbackHint.equals(currentHint)) {
-            taskService.switchExecutor(task.getId(), fallbackHint);
-            task.setExecutorUsed(fallbackHint);
-            try {
-                return runWithRetries(task, prompt, workspace, fallbackHint, retryMax, timeout);
-            } catch (Exception fbErr) {
-                log.warn("fallback executor {} failed for task {}: {}", fallbackHint, task.getId(), fbErr.getMessage());
-            }
-        }
-
-        // ---- Stage 3: decision-layer self-execution ----
-        taskService.switchExecutor(task.getId(), DispatchedTask.EXECUTOR_DECISION_LAYER_SELF);
-        task.setExecutorUsed(DispatchedTask.EXECUTOR_DECISION_LAYER_SELF);
-        try {
-            long userId = task.getUserId() == null ? 0L : task.getUserId();
-            String selfResult = userId == 0L ? fallback.answer(prompt) : fallback.answer(userId, prompt);
-            return selfResult;
-        } catch (Exception selfErr) {
-            // ---- Stage 4: FAILED (outer Dispatcher.run catch will mark failed) ----
-            throw new CascadeFailedException("cascade failed for task " + task.getId(), selfErr);
-        }
+        task.setExecutorUsed(executorName);
+        return runWithRetries(task, instruction, workspace, executorName, retryMax, timeout);
     }
 
-    private String runWithRetries(DispatchedTask task, String prompt, Path workspace,
+    private String runWithRetries(DispatchedTask task, String instruction, Path workspace,
                                    String hint, int retryMax, int timeout) {
         Executor exec = executorRouter.pick(hint);
         Exception last = null;
         for (int attempt = 0; attempt <= retryMax; attempt++) {
             try {
-                return exec.execute(task, prompt, workspace, timeout);
-            } catch (Executor.ExecutorUnavailableException | Executor.ExecutorTimeoutException e) {
+                return exec.execute(task, instruction, workspace, timeout);
+            } catch (Executor.ExecutorUnavailableException e) {
                 throw e;
             } catch (Exception e) {
                 last = e;
                 if (attempt < retryMax) {
                     taskService.appendRetry(task.getId());
+                    task.setRetries(task.getRetries() == null ? 1 : task.getRetries() + 1);
                     log.warn("executor {} attempt {}/{} failed for task {}: {}",
                             hint, attempt + 1, retryMax + 1, task.getId(), e.getMessage());
                 }
             }
         }
         throw new RuntimeException("executor " + hint + " exhausted " + (retryMax + 1) + " attempts", last);
+    }
+
+    private static String requireText(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
+        return value;
     }
 
     private Path writeResultMd(DispatchedTask task, String result) {
@@ -194,11 +151,5 @@ public class Dispatcher {
 
     private static String nullSafe(String s) {
         return s == null ? "" : s;
-    }
-
-    public static class CascadeFailedException extends RuntimeException {
-        public CascadeFailedException(String message, Throwable cause) {
-            super(message, cause);
-        }
     }
 }

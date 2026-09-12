@@ -15,7 +15,6 @@ import reactor.netty.http.client.HttpClient;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -88,28 +87,6 @@ public class GraphGatewayClient {
             throw new IllegalStateException("Graph 未返回有效聊天内容");
         }
         return response.content();
-    }
-
-    /**
-     * Ask the Python Graph service for relevant memory. Java deliberately does
-     * not know the backing vector store or its schema.
-     */
-    public List<Map<String, Object>> recallMemory(long userId, String query, int topK) {
-        Map<String, Object> payload = Map.of("query", query, "top_k", topK);
-        List<Map<String, Object>> result = webClient.post()
-                .uri("/internal/memory/recall")
-                .headers(headers -> applyInternalHeaders(headers, userId))
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(payload)
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
-                .block(Duration.ofSeconds(properties.getResponseTimeoutSeconds()));
-        return result == null ? List.of() : result;
-    }
-
-    /** Delegate the final decision-layer answer to Python Graph. */
-    public String completeDispatch(long userId, String prompt) {
-        return chat(userId, null, prompt);
     }
 
     /**

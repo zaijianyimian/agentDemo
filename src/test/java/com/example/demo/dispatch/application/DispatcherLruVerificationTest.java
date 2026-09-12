@@ -2,9 +2,6 @@ package com.example.demo.dispatch.application;
 
 import com.example.demo.dispatch.application.executor.Executor;
 import com.example.demo.dispatch.application.executor.ExecutorRouter;
-import com.example.demo.dispatch.application.fallback.DecisionLayerFallback;
-import com.example.demo.dispatch.application.prompt.MemoryRecallService;
-import com.example.demo.dispatch.application.prompt.PromptTemplate;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import com.example.demo.dispatch.domain.PushConfig;
 import com.example.demo.dispatch.persistence.PushConfigMapper;
@@ -49,11 +46,9 @@ public class DispatcherLruVerificationTest {
         properties.setDispatchedRoot(tempDir.resolve("dispatched").toString());
         PushConfigMapper mapper = mock(PushConfigMapper.class);
         when(mapper.selectById(PushConfig.SINGLETON_ID)).thenReturn(PushConfig.builder()
-                .workspaceMaxCount(50).workspaceMaxAgeDays(30).retryMax(0).executorTimeoutSeconds(30).build());
+                .workspaceMaxCount(50).workspaceMaxAgeDays(30).executorTimeoutSeconds(30).build());
         WorkspaceManager manager = new WorkspaceManager(properties, mapper);
         DispatchedTaskService tasks = mock(DispatchedTaskService.class);
-        MemoryRecallService recall = mock(MemoryRecallService.class);
-        when(recall.recallForTask(anyString(), eq(5))).thenReturn(List.of());
         Executor executor = mock(Executor.class);
         when(executor.execute(any(), anyString(), any(), anyInt())).thenAnswer(invocation -> {
             DispatchedTask task = invocation.getArgument(0);
@@ -65,15 +60,16 @@ public class DispatcherLruVerificationTest {
         });
         ExecutorRouter router = mock(ExecutorRouter.class);
         when(router.pick("claude-code")).thenReturn(executor);
-        DecisionLayerFallback fallback = mock(DecisionLayerFallback.class);
-        Dispatcher dispatcher = new Dispatcher(properties, tasks, manager, recall, new PromptTemplate(), router, fallback);
+        ExecutionResultPublisher resultPublisher = mock(ExecutionResultPublisher.class);
+        Dispatcher dispatcher = new Dispatcher(properties, tasks, manager, router, resultPublisher);
         Path archiveRoot = tempDir.resolve("workspaces/7/archive");
         Instant baseTime = Instant.now().minusSeconds(120);
 
         for (long id = 1; id <= 51; id++) {
             DispatchedTask task = DispatchedTask.builder().id(id).emailId(7L)
-                    .subject("LRU verification " + id).bodyExcerpt("Write a task marker")
-                    .executorHint("claude-code").sandboxLevel("workspace-write").build();
+                    .subject("LRU verification " + id).bodyExcerpt("metadata")
+                    .executor("claude-code").executionInstruction("Write a task marker")
+                    .retryMax(0).sandboxLevel("workspace-write").build();
             dispatcher.run(task);
             Path result = tempDir.resolve("dispatched/" + id + ".md");
             verify(tasks).markDone(id, "claude-code", "Completed task " + id, result.toString());
@@ -96,7 +92,6 @@ public class DispatcherLruVerificationTest {
         assertEquals(1, git(repo, "worktree", "list", "--porcelain").lines()
                 .filter(line -> line.startsWith("worktree ")).count());
         verify(tasks, never()).markFailed(anyLong(), any(), any());
-        verifyNoInteractions(fallback);
     }
 
     private static String git(Path directory, String... arguments) throws Exception {

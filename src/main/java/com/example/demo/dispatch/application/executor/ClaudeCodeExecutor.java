@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * Claude Code CLI 执行器。
  *
- * <p>拼装 {@code claude -p <prompt> --output-format json --allowedTools <list> --add-dir <workspace>}，
+ * <p>拼装 {@code claude -p <instruction> --output-format json --allowedTools <list> --add-dir <workspace>}，
  * 用 {@code ProcessBuilder} 启动，按 timeout 等待。</p>
  */
 @Slf4j
@@ -43,14 +43,14 @@ public class ClaudeCodeExecutor implements Executor {
     }
 
     @Override
-    public String execute(DispatchedTask task, String prompt, Path workspace, int timeoutSeconds) {
+    public String execute(DispatchedTask task, String instruction, Path workspace, int timeoutSeconds) {
         if (!isAvailable()) {
             throw new ExecutorUnavailableException("claude CLI not found on PATH");
         }
         List<String> cmd = new ArrayList<>();
         cmd.add(CLI);
         cmd.add("-p");
-        cmd.add(prompt);
+        cmd.add(instruction);
         cmd.add("--output-format");
         cmd.add("json");
         List<String> tools = SandboxTranslator.claudeTools(task.getSandboxLevel());

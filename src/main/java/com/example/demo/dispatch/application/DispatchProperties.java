@@ -3,8 +3,6 @@ package com.example.demo.dispatch.application;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.List;
-
 /**
  * Dispatch 模块配置（对应 application.yaml 中的 {@code app.dispatch.*}）。
  */
@@ -37,20 +35,11 @@ public class DispatchProperties {
     /** 单个执行器子进程超时（秒） */
     private int executorTimeoutSeconds = 600;
 
-    /** Python Graph 上下文召回超时（秒） */
-    private int recallTimeoutSeconds = 10;
+    /** Python Agent 发布已决策执行请求的 RabbitMQ 队列。 */
+    private String executionQueue = "agent.execution.requests";
 
-    /** 默认 executor_hint */
-    private String defaultExecutorHint = "claude-code";
-
-    /** 默认 sandbox_level */
-    private String defaultSandboxLevel = "workspace-write";
-
-    /** 默认工具白名单（逗号分隔） */
-    private String defaultToolAllowlist = "Read,Edit,Write,Glob,Grep,Bash";
-
-    /** 决策层自答超时（秒） */
-    private int decisionLayerFallbackTimeoutSeconds = 120;
+    /** Java 发布执行成功或失败事实的 RabbitMQ 队列。 */
+    private String resultQueue = "agent.execution.results";
 
     /** 推送连续失败次数上限，超过则标记 PUSH_FAILED */
     private int pushRetryMax = 3;
@@ -72,17 +61,4 @@ public class DispatchProperties {
         private int healthTimeoutSeconds = 3;
     }
 
-    /**
-     * 将 {@link #defaultToolAllowlist} 字符串按逗号拆分成工具列表。
-     */
-    public List<String> defaultToolAllowlistAsList() {
-        if (defaultToolAllowlist == null || defaultToolAllowlist.isBlank()) {
-            return List.of();
-        }
-        String[] parts = defaultToolAllowlist.split(",");
-        return java.util.Arrays.stream(parts)
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-    }
 }

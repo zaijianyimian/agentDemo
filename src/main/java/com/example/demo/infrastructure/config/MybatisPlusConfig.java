@@ -32,7 +32,6 @@ public class MybatisPlusConfig implements MetaObjectHandler {
      */
     private static final Set<String> USER_SCOPED_TABLES = Set.of(
             "email_config",
-            "email_attachment_analysis",
             "chat_session",
             "schedule_event",
             "scheduled_task",
@@ -46,8 +45,7 @@ public class MybatisPlusConfig implements MetaObjectHandler {
             "knowledge_document",
             "search_history",
             "user_interest",
-            "dispatched_task",
-            "ai_model_config"
+            "dispatched_task"
     );
 
     private final CurrentUserProvider currentUserProvider;
