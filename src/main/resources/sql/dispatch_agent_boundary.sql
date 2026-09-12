@@ -53,6 +53,19 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+SET @has_task_timeout := (
+    SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = @db_name AND table_name = 'dispatched_task' AND column_name = 'executor_timeout_seconds'
+);
+SET @sql := IF(
+    @has_task_timeout = 0,
+    'ALTER TABLE `dispatched_task` ADD COLUMN `executor_timeout_seconds` INT NOT NULL DEFAULT 600 COMMENT ''Python 已指定的单次执行超时（秒）'' AFTER `retry_max`',
+    'SELECT ''dispatched_task.executor_timeout_seconds exists, skip'' AS msg'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- 旧任务没有 Python 生成的完整指令，不允许继续按旧 Java Agent 链路运行。
 UPDATE `dispatched_task`
 SET `status` = 'FAILED',

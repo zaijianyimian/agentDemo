@@ -23,16 +23,16 @@ public class ExecutorRouter {
     /**
      * @return 与名称精确匹配的执行器；不存在则抛异常。
      */
-    public Executor pick(String hint) {
-        if (hint == null) {
+    public Executor pick(String executorName) {
+        if (executorName == null) {
             throw new Executor.ExecutorUnavailableException("executor is null");
         }
         for (Executor e : executors) {
-            if (hint.equals(e.hint())) {
+            if (executorName.equals(e.hint())) {
                 return e;
             }
         }
-        throw new Executor.ExecutorUnavailableException("no executor registered with name: " + hint);
+        throw new Executor.ExecutorUnavailableException("no executor registered with name: " + executorName);
     }
 
     /**

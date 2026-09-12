@@ -56,6 +56,7 @@ class DispatchAgentBoundaryArchitectureTest {
         assertNotNull(findMethod(DispatchedTask.class, "getExecutor"));
         assertNotNull(findMethod(DispatchedTask.class, "getExecutionInstruction"));
         assertNotNull(findMethod(DispatchedTask.class, "getRetryMax"));
+        assertNotNull(findMethod(DispatchedTask.class, "getExecutorTimeoutSeconds"));
 
         Set<String> methods = methodNames(DispatchedTask.class);
         assertFalse(methods.contains("getExecutorHint"));

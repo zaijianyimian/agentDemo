@@ -21,7 +21,7 @@ class ExecutionRequestListenerTest {
     void persistsPythonDecisionWithoutChangingIt() {
         listener.onExecutionRequest(new ExecutionRequestListener.ExecutionRequest(
                 9L, 12L, "message-1", "subject", "metadata", "high",
-                "codex", "complete instruction", 2, "workspace-write", List.of("Read", "Edit")));
+                "codex", "complete instruction", 2, 45, "workspace-write", List.of("Read", "Edit")));
 
         ArgumentCaptor<DispatchedTask> captor = ArgumentCaptor.forClass(DispatchedTask.class);
         verify(taskService).create(captor.capture());
@@ -30,6 +30,7 @@ class ExecutionRequestListenerTest {
         assertEquals("codex", task.getExecutor());
         assertEquals("complete instruction", task.getExecutionInstruction());
         assertEquals(2, task.getRetryMax());
+        assertEquals(45, task.getExecutorTimeoutSeconds());
         assertEquals("[\"Read\",\"Edit\"]", task.getToolAllowlist());
         assertEquals(DispatchedTask.STATUS_PENDING, task.getStatus());
     }
@@ -38,10 +39,21 @@ class ExecutionRequestListenerTest {
     void rejectsIncompleteAgentDecision() {
         ExecutionRequestListener.ExecutionRequest request = new ExecutionRequestListener.ExecutionRequest(
                 9L, 12L, null, null, null, null,
-                null, "instruction", 0, "workspace-write", List.of());
+                null, "instruction", 0, 45, "workspace-write", List.of());
 
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class, () -> listener.onExecutionRequest(request));
         assertEquals("executor must not be blank", error.getMessage());
+    }
+
+    @Test
+    void rejectsRequestWithoutTaskTimeout() {
+        ExecutionRequestListener.ExecutionRequest request = new ExecutionRequestListener.ExecutionRequest(
+                9L, 12L, null, null, null, null,
+                "codex", "instruction", 0, null, "workspace-write", List.of());
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class, () -> listener.onExecutionRequest(request));
+        assertEquals("executor_timeout_seconds must be greater than 0", error.getMessage());
     }
 }

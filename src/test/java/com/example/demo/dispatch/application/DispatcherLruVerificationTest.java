@@ -69,7 +69,7 @@ public class DispatcherLruVerificationTest {
             DispatchedTask task = DispatchedTask.builder().id(id).emailId(7L)
                     .subject("LRU verification " + id).bodyExcerpt("metadata")
                     .executor("claude-code").executionInstruction("Write a task marker")
-                    .retryMax(0).sandboxLevel("workspace-write").build();
+                    .retryMax(0).executorTimeoutSeconds(30).sandboxLevel("workspace-write").build();
             dispatcher.run(task);
             Path result = tempDir.resolve("dispatched/" + id + ".md");
             verify(tasks).markDone(id, "claude-code", "Completed task " + id, result.toString());

@@ -27,7 +27,7 @@ public class ExecutionRequestListener {
     /**
      * 消费 Python 发布的完整执行请求。
      *
-     * @param request 已包含 executor、instruction、retry_max 等最终执行参数的请求。
+     * @param request 已包含 executor、instruction、retry_max、timeout 等最终执行参数的请求。
      */
     @RabbitListener(
             queues = "${app.dispatch.execution-queue:agent.execution.requests}",
@@ -44,6 +44,7 @@ public class ExecutionRequestListener {
                 .executor(request.executor())
                 .executionInstruction(request.executionInstruction())
                 .retryMax(request.retryMax())
+                .executorTimeoutSeconds(request.executorTimeoutSeconds())
                 .sandboxLevel(request.sandboxLevel())
                 .toolAllowlist(toJson(request.toolAllowlist()))
                 .status(DispatchedTask.STATUS_PENDING)
@@ -69,6 +70,9 @@ public class ExecutionRequestListener {
         requireText(request.executionInstruction(), "execution_instruction");
         if (request.retryMax() == null || request.retryMax() < 0) {
             throw new IllegalArgumentException("retry_max must be greater than or equal to 0");
+        }
+        if (request.executorTimeoutSeconds() == null || request.executorTimeoutSeconds() <= 0) {
+            throw new IllegalArgumentException("executor_timeout_seconds must be greater than 0");
         }
         String sandbox = requireText(request.sandboxLevel(), "sandbox_level");
         if (!DispatchedTask.SANDBOX_READ_ONLY.equals(sandbox)
@@ -104,6 +108,7 @@ public class ExecutionRequestListener {
             String executor,
             @JsonProperty("execution_instruction") String executionInstruction,
             @JsonProperty("retry_max") Integer retryMax,
+            @JsonProperty("executor_timeout_seconds") Integer executorTimeoutSeconds,
             @JsonProperty("sandbox_level") String sandboxLevel,
             @JsonProperty("tool_allowlist") List<String> toolAllowlist) {
     }
