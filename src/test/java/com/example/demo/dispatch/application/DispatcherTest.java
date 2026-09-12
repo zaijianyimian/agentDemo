@@ -31,7 +31,6 @@ class DispatcherTest {
         executorRouter = mock(ExecutorRouter.class);
         resultPublisher = mock(ExecutionResultPublisher.class);
         when(workspaceManager.loadPushConfig()).thenReturn(PushConfig.builder()
-                .executorTimeoutSeconds(60)
                 .workspaceMaxCount(50)
                 .workspaceMaxAgeDays(30)
                 .build());
@@ -125,6 +124,17 @@ class DispatcherTest {
         verify(taskService).markFailed(1L, null, "execution_instruction must not be blank");
     }
 
+    @Test
+    void missingTaskTimeoutFailsBeforeExecutorLookup() {
+        DispatchedTask task = baseTask();
+        task.setExecutorTimeoutSeconds(null);
+
+        dispatcher().run(task);
+
+        verifyNoInteractions(executorRouter);
+        verify(taskService).markFailed(1L, null, "executor_timeout_seconds must be greater than 0");
+    }
+
     private Dispatcher dispatcher() {
         return new Dispatcher(properties, taskService, workspaceManager, executorRouter, resultPublisher);
     }
@@ -140,6 +150,7 @@ class DispatcherTest {
                 .executor("codex")
                 .executionInstruction("python decided instruction")
                 .retryMax(0)
+                .executorTimeoutSeconds(60)
                 .sandboxLevel(DispatchedTask.SANDBOX_WORKSPACE_WRITE)
                 .build();
     }

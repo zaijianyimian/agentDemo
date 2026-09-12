@@ -46,7 +46,7 @@ public class Dispatcher {
             task.setWorkspacePath(workspace.toString());
 
             // Python 已完成上下文构造、执行器路由和失败策略决策，Java 原样执行 instruction。
-            String result = execute(task, workspace, cfg);
+            String result = execute(task, workspace);
 
             // archive workspace + write md
             Path archive = workspaceManager.archive(task);
@@ -71,23 +71,25 @@ public class Dispatcher {
         }
     }
 
-    private String execute(DispatchedTask task, Path workspace, PushConfig cfg) {
+    private String execute(DispatchedTask task, Path workspace) {
         String executorName = requireText(task.getExecutor(), "executor");
         String instruction = requireText(task.getExecutionInstruction(), "execution_instruction");
         int retryMax = task.getRetryMax() == null ? 0 : task.getRetryMax();
         if (retryMax < 0) {
             throw new IllegalArgumentException("retry_max must be greater than or equal to 0");
         }
-        int timeout = cfg.getExecutorTimeoutSeconds() == null
-                ? properties.getExecutorTimeoutSeconds() : cfg.getExecutorTimeoutSeconds();
+        Integer timeout = task.getExecutorTimeoutSeconds();
+        if (timeout == null || timeout <= 0) {
+            throw new IllegalArgumentException("executor_timeout_seconds must be greater than 0");
+        }
 
         task.setExecutorUsed(executorName);
         return runWithRetries(task, instruction, workspace, executorName, retryMax, timeout);
     }
 
     private String runWithRetries(DispatchedTask task, String instruction, Path workspace,
-                                   String hint, int retryMax, int timeout) {
-        Executor exec = executorRouter.pick(hint);
+                                   String executorName, int retryMax, int timeout) {
+        Executor exec = executorRouter.pick(executorName);
         Exception last = null;
         for (int attempt = 0; attempt <= retryMax; attempt++) {
             try {
@@ -100,11 +102,12 @@ public class Dispatcher {
                     taskService.appendRetry(task.getId());
                     task.setRetries(task.getRetries() == null ? 1 : task.getRetries() + 1);
                     log.warn("executor {} attempt {}/{} failed for task {}: {}",
-                            hint, attempt + 1, retryMax + 1, task.getId(), e.getMessage());
+                            executorName, attempt + 1, retryMax + 1, task.getId(), e.getMessage());
                 }
             }
         }
-        throw new RuntimeException("executor " + hint + " exhausted " + (retryMax + 1) + " attempts", last);
+        throw new RuntimeException(
+                "executor " + executorName + " exhausted " + (retryMax + 1) + " attempts", last);
     }
 
     private static String requireText(String value, String field) {

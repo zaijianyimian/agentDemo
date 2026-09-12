@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * 派发任务实体。
  *
  * <p>由 Python Agent 生成完整执行请求后，经 RabbitMQ 进入 MySQL；Java dispatcher
- * 只按已指定的执行器和指令执行，并流转至终态。</p>
+ * 只按已指定的执行器、指令、重试次数和超时执行，并流转至终态。</p>
  */
 @Data
 @Builder
@@ -86,6 +86,8 @@ public class DispatchedTask {
     private String executionInstruction;
     /** 同一执行器的基础设施级最大重试次数。 */
     private Integer retryMax;
+    /** Python Agent 已明确指定的单次执行超时（秒）。 */
+    private Integer executorTimeoutSeconds;
     private String status;
     private Integer retries;
     private String executorUsed;

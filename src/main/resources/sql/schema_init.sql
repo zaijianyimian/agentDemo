@@ -508,6 +508,7 @@ CREATE TABLE IF NOT EXISTS `dispatched_task` (
   `workspace_path`     VARCHAR(1024)                        COMMENT '当前工作区绝对路径',
   `execution_instruction` MEDIUMTEXT NOT NULL               COMMENT 'Python 已生成的完整执行指令',
   `retry_max`          INT          NOT NULL DEFAULT 0      COMMENT '同一执行器的基础设施级最大重试次数',
+  `executor_timeout_seconds` INT    NOT NULL                COMMENT 'Python 已指定的单次执行超时（秒）',
   `status`             VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT '状态: PENDING / RUNNING / DONE / FAILED / CANCELLED',
   `retries`            INT          NOT NULL DEFAULT 0     COMMENT '当前执行器已重试次数',
   `executor_used`      VARCHAR(32)                          COMMENT '实际执行的指定执行器',

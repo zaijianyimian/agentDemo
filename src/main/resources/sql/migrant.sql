@@ -231,6 +231,8 @@ CALL mig_add_column('knowledge_document', 'user_id', 'BIGINT NULL COMMENT ''所�
 CALL mig_add_column('search_history', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('user_interest', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('dispatched_task', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
+CALL mig_add_column('dispatched_task', 'executor_timeout_seconds',
+    'INT NOT NULL DEFAULT 600 COMMENT ''Python 已指定的单次执行超时（秒）'' AFTER `retry_max`');
 
 -- 混合范围表：NULL 表示系统内置记录，因此保持可空。
 CALL mig_add_column('mcp_tool', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID，NULL=系统工具'' AFTER `id`');
