@@ -29,9 +29,6 @@
         <n-form-item label="workspace 保留天数" path="workspaceMaxAgeDays">
           <n-input-number v-model:value="form.workspaceMaxAgeDays" :min="1" :max="365" />
         </n-form-item>
-        <n-form-item label="执行器最大重试" path="retryMax">
-          <n-input-number v-model:value="form.retryMax" :min="0" :max="10" />
-        </n-form-item>
         <n-form-item label="执行器超时（秒）" path="executorTimeoutSeconds">
           <n-input-number v-model:value="form.executorTimeoutSeconds" :min="10" :max="3600" />
         </n-form-item>
@@ -65,7 +62,6 @@ const form = reactive<PushConfigPayload>({
   immediateEnabled: true,
   workspaceMaxCount: 50,
   workspaceMaxAgeDays: 30,
-  retryMax: 2,
   executorTimeoutSeconds: 600
 })
 

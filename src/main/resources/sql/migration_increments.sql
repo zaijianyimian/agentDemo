@@ -460,20 +460,6 @@ INSERT IGNORE INTO `system_settings` (`category`, `config_key`, `config_value`, 
 ('system', 'site_name', 'AI Agent', '系统名称'),
 ('system', 'site_logo', '', '系统Logo URL'),
 ('system', 'default_theme', 'light', '默认主题'),
-('model', 'temperature', '0.7', '模型温度'),
-('model', 'maxTokens', '4096', '最大Token数'),
-('model', 'topP', '0.9', 'Top P 核采样'),
-('model', 'memorySize', '20', '上下文记忆数量'),
-('model', 'systemPrompt', '你是一个有帮助的AI助手，请用简洁、准确的语言回答问题。', '系统提示词'),
-('qdrant', 'host', 'localhost', 'Qdrant 服务地址'),
-('qdrant', 'port', '6334', 'Qdrant 服务端口'),
-('qdrant', 'rest_port', '6333', 'Qdrant REST 服务端口'),
-('qdrant', 'api_key', '', 'Qdrant API Key'),
-('qdrant', 'use_tls', 'false', '是否使用 TLS 连接 Qdrant'),
-('qdrant', 'collection_name', 'agent_memory', '向量集合名称'),
-('qdrant', 'vector_size', '768', '向量维度'),
-('qdrant', 'top_k', '5', '返回结果数量'),
-('qdrant', 'min_score', '0.6', '最小相似度分数'),
 ('search', 'enabled', 'true', '是否启用搜索'),
 ('search', 'engine', 'serper', '搜索引擎'),
 ('search', 'max_results', '3', '最大搜索结果数'),
@@ -484,26 +470,8 @@ INSERT IGNORE INTO `system_settings` (`category`, `config_key`, `config_value`, 
 ('file', 'max_file_size', '10MB', '最大文件大小');
 
 -- ============================================
--- 8. 派发执行：email_config.agent_default_hint + dispatched_task + push_config
+-- 8. 派发执行：dispatched_task + push_config
 -- ============================================
-
--- email_config 新增 agent_default_hint 列（幂等）
-SET @has_agent_default_hint = (
-    SELECT COUNT(*)
-    FROM information_schema.columns
-    WHERE table_schema = @db_name
-      AND table_name = 'email_config'
-      AND column_name = 'agent_default_hint'
-);
-
-SET @sql_agent_default_hint = IF(
-    @has_agent_default_hint = 0,
-    'ALTER TABLE `email_config` ADD COLUMN `agent_default_hint` TEXT DEFAULT NULL COMMENT ''派发执行时该邮箱的默认 agent hint'' AFTER `remark`',
-    'SELECT ''email_config.agent_default_hint exists, skip'' AS msg'
-);
-PREPARE stmt FROM @sql_agent_default_hint;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `dispatched_task` (
   `id`                 BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -512,16 +480,15 @@ CREATE TABLE IF NOT EXISTS `dispatched_task` (
   `subject`            VARCHAR(512)                         COMMENT '邮件主题',
   `body_excerpt`       TEXT                                 COMMENT '邮件正文摘要',
   `importance`         VARCHAR(16)                          COMMENT '重要性: high / medium / low',
-  `executor_hint`      VARCHAR(32)                          COMMENT '主执行器: claude-code / codex',
-  `fallback_executor`  VARCHAR(32)                          COMMENT '备用执行器: claude-code / codex',
+  `executor`           VARCHAR(32)  NOT NULL                COMMENT 'Python 已指定的执行器',
   `sandbox_level`      VARCHAR(32)                          COMMENT '沙箱: read-only / workspace-write / danger-full-access',
   `tool_allowlist`     JSON                                 COMMENT '工具白名单 (JSON 数组)',
   `workspace_path`     VARCHAR(1024)                        COMMENT '当前工作区绝对路径',
-  `user_hint`          TEXT                                 COMMENT '邮件中识别的 hint',
-  `final_hint`         TEXT                                 COMMENT '合并后的 hint',
+  `execution_instruction` MEDIUMTEXT NOT NULL               COMMENT 'Python 已生成的完整执行指令',
+  `retry_max`          INT          NOT NULL DEFAULT 0      COMMENT '同一执行器的基础设施级最大重试次数',
   `status`             VARCHAR(16)  NOT NULL DEFAULT 'PENDING' COMMENT '状态: PENDING / RUNNING / DONE / FAILED / CANCELLED',
   `retries`            INT          NOT NULL DEFAULT 0     COMMENT '当前执行器已重试次数',
-  `executor_used`      VARCHAR(32)                          COMMENT '实际执行过的执行器 (claude-code / codex / decision-layer-self)',
+  `executor_used`      VARCHAR(32)                          COMMENT '实际执行的指定执行器',
   `result`             MEDIUMTEXT                           COMMENT '执行结果 (md 内容)',
   `result_path`        VARCHAR(1024)                        COMMENT '结果 md 文件绝对路径',
   `push_status`        VARCHAR(16)  NOT NULL DEFAULT 'pending' COMMENT '推送状态: pending / sent / PUSH_FAILED',
@@ -544,7 +511,6 @@ CREATE TABLE IF NOT EXISTS `push_config` (
   `immediate_enabled`           TINYINT(1)   NOT NULL DEFAULT 1  COMMENT '是否启用实时推送',
   `workspace_max_count`         INT          NOT NULL DEFAULT 50 COMMENT '每邮箱归档工作区最大数量',
   `workspace_max_age_days`      INT          NOT NULL DEFAULT 30 COMMENT '归档保留天数',
-  `retry_max`                   INT          NOT NULL DEFAULT 2  COMMENT '每个执行器最大重试次数',
   `executor_timeout_seconds`    INT          NOT NULL DEFAULT 600 COMMENT '执行器超时时间（秒）',
   `updated_at`                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
@@ -607,47 +573,6 @@ SET @sql_email_max_size = IF(
 PREPARE stmt FROM @sql_email_max_size;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
-
--- ai_model_config 增加 purpose 字段（chat / attachment）
-SET @has_model_purpose = (
-    SELECT COUNT(*)
-    FROM information_schema.columns
-    WHERE table_schema = DATABASE()
-      AND table_name = 'ai_model_config'
-      AND column_name = 'purpose'
-);
-
-SET @sql_model_purpose = IF(
-    @has_model_purpose = 0,
-    'ALTER TABLE `ai_model_config` ADD COLUMN `purpose` VARCHAR(32) NOT NULL DEFAULT ''chat'' COMMENT ''模型用途: chat / attachment'' AFTER `enabled`',
-    'SELECT ''ai_model_config.purpose exists, skip'' AS msg'
-);
-PREPARE stmt FROM @sql_model_purpose;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- 附件解析结果表
-CREATE TABLE IF NOT EXISTS `email_attachment_analysis` (
-  `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `message_id`      VARCHAR(512) NOT NULL                COMMENT '邮件 Message-ID',
-  `account_email`   VARCHAR(255)                         COMMENT '所属邮箱账号',
-  `file_name`       VARCHAR(500)                         COMMENT '原始文件名',
-  `content_type`    VARCHAR(255)                         COMMENT 'MIME 类型',
-  `size_bytes`      BIGINT                               COMMENT '字节数',
-  `file_path`       VARCHAR(1024)                        COMMENT '落盘路径',
-  `status`          VARCHAR(32)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/RUNNING/SUCCESS/FAILED/SKIPPED_SIZE/SKIPPED_TYPE',
-  `skip_reason`     VARCHAR(500)                         COMMENT '跳过原因或失败原因',
-  `summary`         MEDIUMTEXT                           COMMENT 'AI 摘要',
-  `raw_text`        MEDIUMTEXT                           COMMENT '文档类附件抽取出的原始文本',
-  `model_name`      VARCHAR(128)                         COMMENT '实际调用的模型名',
-  `error_detail`    TEXT                                 COMMENT '失败时异常信息',
-  `analyzed_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '解析时间',
-  `update_time`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_eaa_message`   (`message_id`),
-  KEY `idx_eaa_status`    (`status`),
-  KEY `idx_eaa_analyzed`  (`analyzed_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮件附件 AI 解析结果';
 
 -- 给 scheduled_task 加 requires_ai 字段：true 时定时任务触发走 Claude Code CLI
 SET @col := (SELECT COUNT(*) FROM information_schema.columns

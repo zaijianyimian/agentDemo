@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * Codex CLI 执行器。
  *
- * <p>拼装 {@code codex exec --json --sandbox <level> <prompt>}，
+ * <p>拼装 {@code codex exec --json --sandbox <level> <instruction>}，
  * 把 stdout 按 NDJSON 解析，最后一条事件的文本作为结果返回。</p>
  */
 @Slf4j
@@ -42,7 +42,7 @@ public class CodexExecutor implements Executor {
     }
 
     @Override
-    public String execute(DispatchedTask task, String prompt, Path workspace, int timeoutSeconds) {
+    public String execute(DispatchedTask task, String instruction, Path workspace, int timeoutSeconds) {
         if (!isAvailable()) {
             throw new ExecutorUnavailableException("codex CLI not found on PATH");
         }
@@ -52,7 +52,7 @@ public class CodexExecutor implements Executor {
         cmd.add("--json");
         cmd.add("--sandbox");
         cmd.add(SandboxTranslator.codexFlag(task.getSandboxLevel()));
-        cmd.add(prompt);
+        cmd.add(instruction);
 
         log.info("Starting codex task {} in {}", task.getId(), workspace);
         return runProcess(cmd, workspace, timeoutSeconds);

@@ -9,9 +9,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 派发模块专用线程池，统一注册到 Spring 容器，由 Spring 关闭时调用 {@code shutdown()}
- * 避免 {@code workerPool} / {@code recallExecutor} / {@code fallbackExecutor} 三个
- * 之前各自 {@code newFixedThreadPool} 永不销毁的问题。
+ * 派发模块 worker 线程池，由 Spring 在关闭时调用 {@code shutdown()}。
  *
  * <p>全部 daemon 线程，JVM 退出也不会阻塞。</p>
  */
@@ -21,17 +19,6 @@ public class DispatchExecutors {
     @Bean(name = "dispatchWorkerPool", destroyMethod = "shutdown")
     public ExecutorService dispatchWorkerPool() {
         return Executors.newFixedThreadPool(2, namedDaemonFactory("dispatch-worker"));
-    }
-
-    @Bean(name = "dispatchRecallExecutor", destroyMethod = "shutdown")
-    public ExecutorService dispatchRecallExecutor() {
-        int n = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
-        return Executors.newFixedThreadPool(n, namedDaemonFactory("dispatch-recall"));
-    }
-
-    @Bean(name = "dispatchFallbackExecutor", destroyMethod = "shutdown")
-    public ExecutorService dispatchFallbackExecutor() {
-        return Executors.newSingleThreadExecutor(namedDaemonFactory("dispatch-fallback"));
     }
 
     private static ThreadFactory namedDaemonFactory(String prefix) {

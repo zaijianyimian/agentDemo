@@ -1,7 +1,6 @@
 package com.example.demo.dispatch.domain;
 
 import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
@@ -14,8 +13,8 @@ import java.time.LocalDateTime;
 /**
  * 派发任务实体。
  *
- * <p>由决策层（{@code DecisionRouter}）在邮件事件落库时同步创建，
- * 异步 dispatcher 拉取后流转至终态（{@code DONE} / {@code FAILED} / {@code CANCELLED}）。</p>
+ * <p>由 Python Agent 生成完整执行请求后，经 RabbitMQ 进入 MySQL；Java dispatcher
+ * 只按已指定的执行器和指令执行，并流转至终态。</p>
  */
 @Data
 @Builder
@@ -41,9 +40,6 @@ public class DispatchedTask {
     public static final String EXECUTOR_CODEX = "codex";
     /** 执行器：OpenClaw */
     public static final String EXECUTOR_OPENCLAW = "openclaw";
-    /** 执行器：决策层自答 */
-    public static final String EXECUTOR_DECISION_LAYER_SELF = "decision-layer-self";
-
     /** 沙箱：只读 */
     public static final String SANDBOX_READ_ONLY = "read-only";
     /** 沙箱：工作区可写 */
@@ -76,8 +72,8 @@ public class DispatchedTask {
     private String subject;
     private String bodyExcerpt;
     private String importance;
-    private String executorHint;
-    private String fallbackExecutor;
+    /** Python Agent 已明确指定的执行器。 */
+    private String executor;
     private String sandboxLevel;
 
     /**
@@ -86,8 +82,10 @@ public class DispatchedTask {
     private String toolAllowlist;
 
     private String workspacePath;
-    private String userHint;
-    private String finalHint;
+    /** Python Agent 已生成的完整执行指令，Java 不再加工。 */
+    private String executionInstruction;
+    /** 同一执行器的基础设施级最大重试次数。 */
+    private Integer retryMax;
     private String status;
     private Integer retries;
     private String executorUsed;

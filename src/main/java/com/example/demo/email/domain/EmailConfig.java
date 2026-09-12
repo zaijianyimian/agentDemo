@@ -152,9 +152,6 @@ public class EmailConfig {
     /** 备注；OAuth2 模式下可承载 OAuth 元数据 JSON。 */
     private String remark;
 
-    /** 派发执行时该邮箱的默认 agent hint。 */
-    private String agentDefaultHint;
-
     /** 创建时间。 */
     private LocalDateTime createTime;
 
@@ -229,10 +226,6 @@ public class EmailConfig {
 
     public void setRemark(String remark) {
         this.remark = trim(remark);
-    }
-
-    public void setAgentDefaultHint(String agentDefaultHint) {
-        this.agentDefaultHint = trim(agentDefaultHint);
     }
 
     private String trim(String value) {

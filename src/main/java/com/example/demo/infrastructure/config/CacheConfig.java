@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * Caffeine 缓存配置。
  *
- * <p>默认 KeyGenerator 会把当前 userId 放进缓存键，避免模型、Skill、知识库、Note 等用户数据
+ * <p>默认 KeyGenerator 会把当前 userId 放进缓存键，避免业务配置、知识库、Note 等用户数据
  * 因相同方法参数命中另一个用户的缓存。系统后台无用户上下文时使用 {@code system} scope。</p>
  */
 @Configuration
@@ -28,9 +28,6 @@ public class CacheConfig implements CachingConfigurer {
     public static final String USER_ACCOUNT_BY_USERNAME = "userAccountByUsername";
     public static final String USER_ACCOUNT_BY_EMAIL = "userAccountByEmail";
     public static final String USER_ACCOUNT_BY_LOGIN = "userAccountByLogin";
-    public static final String MODEL_LIST = "modelList";
-    public static final String MODEL_DETAIL = "modelDetail";
-    public static final String MODEL_PROVIDERS = "modelProviders";
     public static final String SKILL_LIST_ALL = "skillListAll";
     public static final String SKILL_LIST_ENABLED = "skillListEnabled";
     public static final String SKILL_LIST_BUILTIN = "skillListBuiltin";
@@ -67,9 +64,6 @@ public class CacheConfig implements CachingConfigurer {
                 USER_ACCOUNT_BY_USERNAME,
                 USER_ACCOUNT_BY_EMAIL,
                 USER_ACCOUNT_BY_LOGIN,
-                MODEL_LIST,
-                MODEL_DETAIL,
-                MODEL_PROVIDERS,
                 SKILL_LIST_ALL,
                 SKILL_LIST_ENABLED,
                 SKILL_LIST_BUILTIN,

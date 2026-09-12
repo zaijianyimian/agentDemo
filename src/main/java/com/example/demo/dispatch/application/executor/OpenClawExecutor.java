@@ -71,7 +71,7 @@ public class OpenClawExecutor implements Executor {
     }
 
     @Override
-    public String execute(DispatchedTask task, String prompt, Path workspace, int timeoutSeconds) {
+    public String execute(DispatchedTask task, String instruction, Path workspace, int timeoutSeconds) {
         if (!executorToggleService.isExecutorEnabled(HINT)) {
             throw new ExecutorUnavailableException("openclaw gateway executor is disabled");
         }
@@ -81,7 +81,7 @@ public class OpenClawExecutor implements Executor {
         try {
             String requestBody = objectMapper.writeValueAsString(Map.of(
                     "model", properties.getModel(),
-                    "messages", List.of(Map.of("role", "user", "content", prompt)),
+                    "messages", List.of(Map.of("role", "user", "content", instruction)),
                     "stream", false));
             HttpRequest request = requestBuilder("/v1/chat/completions")
                     .timeout(Duration.ofSeconds(timeoutSeconds))

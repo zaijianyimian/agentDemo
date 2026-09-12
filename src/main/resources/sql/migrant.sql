@@ -217,9 +217,6 @@ CALL mig_add_column('job_log', 'create_time',
 
 -- 强隔离表：最终会收紧为 NOT NULL。
 CALL mig_add_column('email_config', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
-CALL mig_add_column('email_attachment_analysis', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
-CALL mig_add_column('email_attachment_analysis', 'email_config_id',
-    'BIGINT NULL COMMENT ''所属邮箱配置ID'' AFTER `user_id`');
 CALL mig_add_column('chat_session', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('schedule_event', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('scheduled_task', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
@@ -234,7 +231,6 @@ CALL mig_add_column('knowledge_document', 'user_id', 'BIGINT NULL COMMENT ''所�
 CALL mig_add_column('search_history', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('user_interest', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('dispatched_task', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
-CALL mig_add_column('ai_model_config', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 
 -- 混合范围表：NULL 表示系统内置记录，因此保持可空。
 CALL mig_add_column('mcp_tool', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID，NULL=系统工具'' AFTER `id`');
@@ -285,28 +281,6 @@ SET `user_id` = @default_user_id
 WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
 
 UPDATE `user_interest`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
-
-UPDATE `ai_model_config`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
-
--- 子业务表优先从父记录继承 owner，再回退到默认用户。
-UPDATE `email_attachment_analysis` analysis
-JOIN `email_config` config ON config.id = analysis.email_config_id
-SET analysis.user_id = config.user_id
-WHERE analysis.user_id IS NULL
-  AND config.user_id IS NOT NULL;
-
-UPDATE `email_attachment_analysis` analysis
-JOIN `email_config` config ON config.email = analysis.account_email
-SET analysis.email_config_id = config.id,
-    analysis.user_id = COALESCE(analysis.user_id, config.user_id)
-WHERE analysis.email_config_id IS NULL
-  AND analysis.account_email IS NOT NULL;
-
-UPDATE `email_attachment_analysis`
 SET `user_id` = @default_user_id
 WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
 
@@ -376,7 +350,6 @@ WHERE tool.user_id IS NULL
 -- =========================================================
 
 CALL mig_require_user_not_null('email_config');
-CALL mig_require_user_not_null('email_attachment_analysis');
 CALL mig_require_user_not_null('chat_session');
 CALL mig_require_user_not_null('schedule_event');
 CALL mig_require_user_not_null('scheduled_task');
@@ -391,7 +364,6 @@ CALL mig_require_user_not_null('knowledge_document');
 CALL mig_require_user_not_null('search_history');
 CALL mig_require_user_not_null('user_interest');
 CALL mig_require_user_not_null('dispatched_task');
-CALL mig_require_user_not_null('ai_model_config');
 
 -- =========================================================
 -- 5. 单用户唯一约束 -> owner 维度唯一约束
@@ -420,8 +392,6 @@ CALL mig_add_index('skill', 'uk_skill_user_code',
 
 CALL mig_add_index('email_config', 'idx_email_config_user_enabled',
     'INDEX `idx_email_config_user_enabled` (`user_id`, `enabled`)');
-CALL mig_add_index('email_attachment_analysis', 'idx_eaa_user_message_file',
-    'INDEX `idx_eaa_user_message_file` (`user_id`, `email_config_id`, `message_id`(128), `file_name`(128))');
 CALL mig_add_index('chat_session', 'idx_chat_session_user_last_message',
     'INDEX `idx_chat_session_user_last_message` (`user_id`, `last_message_time`, `create_time`)');
 CALL mig_add_index('schedule_event', 'idx_schedule_user_date_status',
@@ -448,8 +418,6 @@ CALL mig_add_index('search_history', 'idx_search_history_user_create',
     'INDEX `idx_search_history_user_create` (`user_id`, `create_time`)');
 CALL mig_add_index('dispatched_task', 'idx_dispatch_user_status_created',
     'INDEX `idx_dispatch_user_status_created` (`user_id`, `status`, `created_at`)');
-CALL mig_add_index('ai_model_config', 'idx_model_user_enabled_default',
-    'INDEX `idx_model_user_enabled_default` (`user_id`, `enabled`, `is_default`)');
 CALL mig_add_index('mcp_tool', 'idx_mcp_tool_user_enabled',
     'INDEX `idx_mcp_tool_user_enabled` (`user_id`, `enabled`)');
 CALL mig_add_index('skill', 'idx_skill_user_enabled_category',
@@ -461,10 +429,6 @@ CALL mig_add_index('skill', 'idx_skill_user_enabled_category',
 
 CALL mig_add_fk('email_config', 'fk_email_config_user',
     'CONSTRAINT `fk_email_config_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
-CALL mig_add_fk('email_attachment_analysis', 'fk_eaa_user',
-    'CONSTRAINT `fk_eaa_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
-CALL mig_add_fk('email_attachment_analysis', 'fk_eaa_email_config',
-    'CONSTRAINT `fk_eaa_email_config` FOREIGN KEY (`email_config_id`) REFERENCES `email_config`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('chat_session', 'fk_chat_session_user',
     'CONSTRAINT `fk_chat_session_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('schedule_event', 'fk_schedule_event_user',
@@ -495,8 +459,6 @@ CALL mig_add_fk('user_interest', 'fk_user_interest_user',
     'CONSTRAINT `fk_user_interest_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('dispatched_task', 'fk_dispatched_task_user',
     'CONSTRAINT `fk_dispatched_task_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
-CALL mig_add_fk('ai_model_config', 'fk_ai_model_config_user',
-    'CONSTRAINT `fk_ai_model_config_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('mcp_tool', 'fk_mcp_tool_user',
     'CONSTRAINT `fk_mcp_tool_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('skill', 'fk_skill_user',
@@ -515,7 +477,6 @@ CALL mig_add_fk('email_listener_state', 'fk_email_listener_state_config',
 -- =========================================================
 
 SELECT 'email_config' AS table_name, COUNT(*) AS rows_without_user FROM `email_config` WHERE user_id IS NULL
-UNION ALL SELECT 'email_attachment_analysis', COUNT(*) FROM `email_attachment_analysis` WHERE user_id IS NULL
 UNION ALL SELECT 'chat_session', COUNT(*) FROM `chat_session` WHERE user_id IS NULL
 UNION ALL SELECT 'schedule_event', COUNT(*) FROM `schedule_event` WHERE user_id IS NULL
 UNION ALL SELECT 'scheduled_task', COUNT(*) FROM `scheduled_task` WHERE user_id IS NULL
@@ -529,8 +490,7 @@ UNION ALL SELECT 'knowledge_base', COUNT(*) FROM `knowledge_base` WHERE user_id 
 UNION ALL SELECT 'knowledge_document', COUNT(*) FROM `knowledge_document` WHERE user_id IS NULL
 UNION ALL SELECT 'search_history', COUNT(*) FROM `search_history` WHERE user_id IS NULL
 UNION ALL SELECT 'user_interest', COUNT(*) FROM `user_interest` WHERE user_id IS NULL
-UNION ALL SELECT 'dispatched_task', COUNT(*) FROM `dispatched_task` WHERE user_id IS NULL
-UNION ALL SELECT 'ai_model_config', COUNT(*) FROM `ai_model_config` WHERE user_id IS NULL;
+UNION ALL SELECT 'dispatched_task', COUNT(*) FROM `dispatched_task` WHERE user_id IS NULL;
 
 SELECT user_id, COUNT(*) AS email_config_count
 FROM `email_config`

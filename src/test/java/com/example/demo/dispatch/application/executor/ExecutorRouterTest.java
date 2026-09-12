@@ -20,7 +20,7 @@ class ExecutorRouterTest {
         assertSame(openClaw, router.pick("openclaw"));
         assertEquals(false, router.availabilitySnapshot().get("openclaw"));
         org.junit.jupiter.api.Assertions.assertThrows(Executor.ExecutorUnavailableException.class,
-                () -> router.pickFallback("claude-code"));
+                () -> router.pick("codex"));
         assertFalse(router.anyAvailable() && router.availabilitySnapshot().get("openclaw"));
     }
 
@@ -38,7 +38,7 @@ class ExecutorRouterTest {
 
             @Override
             public String execute(com.example.demo.dispatch.domain.DispatchedTask task,
-                                  String prompt, Path workspace, int timeoutSeconds) {
+                                  String instruction, Path workspace, int timeoutSeconds) {
                 return "ok";
             }
         };

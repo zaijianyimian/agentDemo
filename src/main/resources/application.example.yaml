@@ -51,6 +51,16 @@ app:
     listener:
       enabled: ${EMAIL_LISTENER_ENABLED:true}
 
+  dispatch:
+    enabled: ${DISPATCH_ENABLED:false}
+    execution-queue: ${DISPATCH_EXECUTION_QUEUE:agent.execution.requests}
+    result-queue: ${DISPATCH_RESULT_QUEUE:agent.execution.results}
+    workspace-root: ${DISPATCH_WORKSPACE_ROOT:./data/workspaces}
+    project-root: ${DISPATCH_PROJECT_ROOT:}
+    dispatched-root: ${DISPATCH_RESULT_ROOT:./data/dispatched}
+    poll-interval-ms: ${DISPATCH_POLL_INTERVAL_MS:5000}
+    executor-timeout-seconds: ${DISPATCH_EXECUTOR_TIMEOUT_SECONDS:600}
+
   mail:
     smtp-host: ${SMTP_HOST:smtp.example.com}
     smtp-port: ${SMTP_PORT:465}

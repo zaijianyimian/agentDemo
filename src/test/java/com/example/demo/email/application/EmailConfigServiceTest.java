@@ -19,7 +19,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>重点验证 {@link EmailConfigService#findByEmail(String)} 的脱敏契约：
  * 返回的 {@link EmailConfig} 必须清空 password / oauth secrets 等敏感字段，
- * 这样下游（如 DecisionRouter）拿到的就是可直接落库的版本。</p>
+ * 避免邮件业务接口泄露凭据。</p>
  */
 class EmailConfigServiceTest {
 
@@ -41,7 +41,6 @@ class EmailConfigServiceTest {
         EmailConfig raw = EmailConfig.builder()
                 .id(1L)
                 .email("acct@example.com")
-                .agentDefaultHint("hint")
                 .password("plain-password")
                 .oauthClientSecret("oauth-secret")
                 .oauthRefreshToken("refresh")
@@ -55,7 +54,6 @@ class EmailConfigServiceTest {
         // 业务字段保留
         assertThat(result.getId()).isEqualTo(1L);
         assertThat(result.getEmail()).isEqualTo("acct@example.com");
-        assertThat(result.getAgentDefaultHint()).isEqualTo("hint");
         // 敏感字段被清空（authService.sanitizeForResponse 负责）
         verify(authService).sanitizeForResponse(raw);
     }

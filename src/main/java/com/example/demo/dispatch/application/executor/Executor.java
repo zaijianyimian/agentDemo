@@ -10,7 +10,7 @@ import java.nio.file.Path;
 public interface Executor {
 
     /**
-     * @return 该执行器对应的 hint 名（与 {@code DispatchedTask.executor_hint} 匹配）
+     * @return 执行器协议名称（与 {@code DispatchedTask.executor} 精确匹配）。
      */
     String hint();
 
@@ -20,14 +20,14 @@ public interface Executor {
     boolean isAvailable();
 
     /**
-     * 在 {@code workspace} 目录里跑 {@code prompt}。
+     * 在 {@code workspace} 目录里执行 Python 已生成的 {@code instruction}。
      *
      * @return 提取自 stdout 的纯文本结果
      * @throws ExecutorUnavailableException CLI 不在 PATH
      * @throws ExecutorTimeoutException    超过超时
      * @throws ExecutorFailedException     执行器以非 0 退出码退出
      */
-    String execute(DispatchedTask task, String prompt, Path workspace, int timeoutSeconds);
+    String execute(DispatchedTask task, String instruction, Path workspace, int timeoutSeconds);
 
     /** 执行器找不到 */
     class ExecutorUnavailableException extends RuntimeException {

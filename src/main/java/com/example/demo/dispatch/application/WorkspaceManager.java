@@ -262,7 +262,6 @@ public class WorkspaceManager {
                 .immediateEnabled(true)
                 .workspaceMaxCount(50)
                 .workspaceMaxAgeDays(30)
-                .retryMax(2)
                 .executorTimeoutSeconds(properties.getExecutorTimeoutSeconds())
                 .updatedAt(LocalDateTime.now())
                 .build();

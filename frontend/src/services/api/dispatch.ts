@@ -6,8 +6,7 @@ export interface DispatchedTaskSummary {
   emailId: number
   subject?: string
   importance?: string
-  executorHint?: string
-  fallbackExecutor?: string
+  executor?: string
   sandboxLevel?: string
   status?: string
   retries?: number
@@ -27,7 +26,6 @@ export interface PushConfigPayload {
   immediateEnabled?: boolean
   workspaceMaxCount?: number
   workspaceMaxAgeDays?: number
-  retryMax?: number
   executorTimeoutSeconds?: number
 }
 
