@@ -31,13 +31,13 @@ public class GraphGatewayProperties {
     private int responseTimeoutSeconds = 120;
 
     /** Java 发布新邮件事件的 RabbitMQ DirectExchange。 */
-    private String emailExchange = "agent.email.events";
+    private String emailExchange = "agent_email";
 
     /** Python Graph 消费新邮件事件的持久化队列。 */
-    private String emailQueue = "agent.email.received";
+    private String emailQueue = "agent_email_queue";
 
     /** Java 发布新邮件事件使用的 routing key。 */
-    private String emailRoutingKey = "email.received";
+    private String emailRoutingKey = "agent_email";
 
     /**
      * 启动时验证 Graph 配置，避免打开功能后才在运行期发现边界配置错误。
