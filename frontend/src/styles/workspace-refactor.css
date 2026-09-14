@@ -418,6 +418,26 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+ * Chat: keep the parent grid track aligned with the collapsible session list
+ * -------------------------------------------------------------------------- */
+
+.agent-chat-page {
+  transition: grid-template-columns 160ms ease;
+}
+
+@media (min-width: 1281px) {
+  .agent-chat-page:has(.session-sidebar.collapsed) {
+    grid-template-columns: 58px minmax(0, 1fr) 280px !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1280px) {
+  .agent-chat-page:has(.session-sidebar.collapsed) {
+    grid-template-columns: 58px minmax(0, 1fr) !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
  * Responsive
  * -------------------------------------------------------------------------- */
 
