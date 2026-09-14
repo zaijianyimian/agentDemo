@@ -47,9 +47,9 @@ app:
     base-url: ${GRAPH_BASE_URL:http://127.0.0.1:8001}
     connect-timeout-seconds: ${GRAPH_CONNECT_TIMEOUT_SECONDS:5}
     response-timeout-seconds: ${GRAPH_RESPONSE_TIMEOUT_SECONDS:120}
-    email-exchange: ${RABBITMQ_EXCHANGE:agent.email.events}
-    email-queue: ${RABBITMQ_QUEUE_NAME:agent.email.received}
-    email-routing-key: ${RABBITMQ_ROUTING_KEY:email.received}
+    email-exchange: ${RABBITMQ_EXCHANGE:agent_email}
+    email-queue: ${RABBITMQ_QUEUE_NAME:agent_email_queue}
+    email-routing-key: ${RABBITMQ_ROUTING_KEY:agent_email}
 
   email:
     listener:
