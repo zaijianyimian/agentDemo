@@ -8,9 +8,10 @@ import org.springframework.stereotype.Component;
 import java.net.URI;
 
 /**
- * Python Graph 服务网关配置。
+ * Python Graph 服务边界配置。
  *
- * <p>Java 不连接 Graph 使用的 PostgreSQL，只通过内部 HTTP/SSE API 与 Python 通信。</p>
+ * <p>聊天等同步请求通过 HTTP/SSE 访问 Python Graph；新邮件通过 RabbitMQ 事件进入 Graph。
+ * Java 不连接 Graph 使用的 PostgreSQL，也不感知其表结构。</p>
  */
 @Data
 @Component
@@ -29,8 +30,14 @@ public class GraphGatewayProperties {
     /** 普通 HTTP 请求响应超时时间，单位秒。 */
     private int responseTimeoutSeconds = 120;
 
+    /** Java 发布新邮件事件的 RabbitMQ DirectExchange。 */
+    private String emailExchange = "agent.email.events";
+
+    /** Java 发布新邮件事件使用的 routing key。 */
+    private String emailRoutingKey = "email.received";
+
     /**
-     * 启动时验证 Graph 配置，避免打开功能后才在运行期发现地址或超时配置错误。
+     * 启动时验证 Graph 配置，避免打开功能后才在运行期发现边界配置错误。
      */
     @PostConstruct
     public void validate() {
@@ -42,6 +49,12 @@ public class GraphGatewayProperties {
         }
         if (baseUrl == null || baseUrl.isBlank()) {
             throw new IllegalStateException("启用 Graph 时必须配置 app.graph.base-url / GRAPH_BASE_URL");
+        }
+        if (emailExchange == null || emailExchange.isBlank()) {
+            throw new IllegalStateException("启用 Graph 时必须配置邮件 RabbitMQ exchange");
+        }
+        if (emailRoutingKey == null || emailRoutingKey.isBlank()) {
+            throw new IllegalStateException("启用 Graph 时必须配置邮件 RabbitMQ routing key");
         }
         URI uri;
         try {
