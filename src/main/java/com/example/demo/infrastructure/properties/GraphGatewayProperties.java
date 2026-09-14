@@ -33,6 +33,9 @@ public class GraphGatewayProperties {
     /** Java 发布新邮件事件的 RabbitMQ DirectExchange。 */
     private String emailExchange = "agent.email.events";
 
+    /** Python Graph 消费新邮件事件的持久化队列。 */
+    private String emailQueue = "agent.email.received";
+
     /** Java 发布新邮件事件使用的 routing key。 */
     private String emailRoutingKey = "email.received";
 
@@ -52,6 +55,9 @@ public class GraphGatewayProperties {
         }
         if (emailExchange == null || emailExchange.isBlank()) {
             throw new IllegalStateException("启用 Graph 时必须配置邮件 RabbitMQ exchange");
+        }
+        if (emailQueue == null || emailQueue.isBlank()) {
+            throw new IllegalStateException("启用 Graph 时必须配置邮件 RabbitMQ queue");
         }
         if (emailRoutingKey == null || emailRoutingKey.isBlank()) {
             throw new IllegalStateException("启用 Graph 时必须配置邮件 RabbitMQ routing key");
