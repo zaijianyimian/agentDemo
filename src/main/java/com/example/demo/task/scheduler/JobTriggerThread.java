@@ -1,6 +1,5 @@
 package com.example.demo.task.scheduler;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.demo.task.domain.ScheduledTask;
 import com.example.demo.task.persistence.ScheduledTaskMapper;
 import jakarta.annotation.PostConstruct;
@@ -83,12 +82,7 @@ public class JobTriggerThread {
         LocalDateTime now = LocalDateTime.now();
         List<ScheduledTask> due;
         try {
-            due = taskMapper.selectList(new QueryWrapper<ScheduledTask>()
-                    .eq("enabled", true)
-                    .isNotNull("next_execute_time")
-                    .le("next_execute_time", now)
-                    .orderByAsc("next_execute_time")
-                    .last("LIMIT " + batchSize));
+            due = taskMapper.selectDueForInternalScan(now, batchSize);
         } catch (Exception e) {
             log.warn("扫描待触发任务失败: {}", e.getMessage());
             return;

@@ -25,17 +25,6 @@ public class ChatActionController {
     }
 
     /**
-     * 从聊天内容生成笔记。
-     *
-     * @param request 聊天动作请求。
-     * @return 创建结果。
-     */
-    @PostMapping("/note")
-    public ApiResponse<ChatActionResult> createNote(@RequestBody ChatActionRequest request) {
-        return ApiResponse.success(chatActionService.createNote(request));
-    }
-
-    /**
      * 从聊天内容生成定时提醒任务。
      *
      * @param request 聊天动作请求。

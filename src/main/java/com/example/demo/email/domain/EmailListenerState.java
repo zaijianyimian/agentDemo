@@ -27,6 +27,7 @@ public class EmailListenerState {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long userId;
     private Long configId;
     private String provider;
     private String listenMode;

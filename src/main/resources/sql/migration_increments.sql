@@ -505,20 +505,18 @@ CREATE TABLE IF NOT EXISTS `dispatched_task` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='派发任务主表';
 
 CREATE TABLE IF NOT EXISTS `push_config` (
-  `id`                          INT          NOT NULL DEFAULT 1 COMMENT '单行配置主键，固定为 1',
+  `id`                          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`                     BIGINT       NOT NULL COMMENT '所属用户ID',
   `push_email`                  VARCHAR(256)                  COMMENT '推送目标邮箱',
   `push_threshold`              VARCHAR(16)  NOT NULL DEFAULT 'medium' COMMENT '重要性阈值: high/medium/low',
   `batch_cron`                  VARCHAR(64)  NOT NULL DEFAULT '0 0 9 * * ?' COMMENT '批量推送 cron 表达式',
   `immediate_enabled`           TINYINT(1)   NOT NULL DEFAULT 1  COMMENT '是否启用实时推送',
-  `workspace_max_count`         INT          NOT NULL DEFAULT 50 COMMENT '每邮箱归档工作区最大数量',
-  `workspace_max_age_days`      INT          NOT NULL DEFAULT 30 COMMENT '归档保留天数',
-  `executor_timeout_seconds`    INT          NOT NULL DEFAULT 600 COMMENT '执行器超时时间（秒）',
+  `result_retention_days`       INT          NOT NULL DEFAULT 30 COMMENT '执行结果保留天数',
   `updated_at`                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推送与执行器全局配置（单行）';
-
--- 默认推送配置（如果不存在）
-INSERT IGNORE INTO `push_config` (`id`) VALUES (1);
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_push_config_user` (`user_id`),
+  CONSTRAINT `fk_push_config_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户派发结果推送配置';
 
 -- ============================================
 -- 定时任务执行日志（参考 xxl-job 的 xxl_job_log 设计）
@@ -574,14 +572,6 @@ SET @sql_email_max_size = IF(
 PREPARE stmt FROM @sql_email_max_size;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
-
--- 给 scheduled_task 加 requires_ai 字段：true 时定时任务触发走 Claude Code CLI
-SET @col := (SELECT COUNT(*) FROM information_schema.columns
-             WHERE table_schema=DATABASE() AND table_name='scheduled_task' AND column_name='requires_ai');
-SET @sql := IF(@col=0,
-  'ALTER TABLE `scheduled_task` ADD COLUMN `requires_ai` TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''是否走 AI 处理：1=触发时调用 Claude Code CLI'' AFTER `trigger_status`',
-  'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ============================================
 -- 高频查询复合索引（性能优化）

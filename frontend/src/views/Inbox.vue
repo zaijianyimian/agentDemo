@@ -3,7 +3,7 @@
     <UiPageHeader
       eyebrow="Unified Inbox"
       title="统一收件箱"
-      subtitle="把邮件、任务、日程、笔记和 Agent 发现统一收拢，优先处理需要行动的事项。"
+      subtitle="把邮件、任务、日程和 Agent 发现统一收拢，优先处理需要行动的事项。"
     >
       <template #actions>
         <n-tag size="small" :bordered="false">{{ lastUpdated }}</n-tag>
@@ -54,7 +54,6 @@
           <div class="batch-actions">
             <n-button size="small" tertiary @click="batchCompleteSchedules">完成日程</n-button>
             <n-button size="small" tertiary @click="batchExecuteTasks">执行任务</n-button>
-            <n-button size="small" tertiary @click="batchToggleNotes">切换置顶</n-button>
             <n-button size="small" tertiary @click="batchRescanAutonomy">重新扫描</n-button>
             <n-button size="small" quaternary @click="selectedKeys = []">清空</n-button>
           </div>
@@ -171,15 +170,14 @@
  * 聚合各业务域产生的事项，并提供过滤、单项动作和批量动作。页面不自行构造业务数据，所有
  * 操作继续复用原有 service 接口。
  */
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { NButton, NCheckbox, NIcon, NTag, useMessage } from 'naive-ui'
 import {
   AlertCircleOutline as AlertIcon,
   CalendarOutline as CalendarIcon,
   ChatbubblesOutline as ChatIcon,
   CheckmarkCircleOutline as CheckIcon,
-  DocumentTextOutline as NoteIcon,
   FileTrayFullOutline as InboxIcon,
   MailOutline as MailIcon,
   SparklesOutline as AutonomyIcon,
@@ -188,7 +186,6 @@ import {
 import type { InboxItem, InboxSummary } from '@/types'
 import { autonomyService } from '@/services/api/autonomy'
 import { inboxService } from '@/services/api/inbox'
-import { noteService } from '@/services/api/note'
 import { scheduleService } from '@/services/api/schedule'
 import { taskService } from '@/services/api/task'
 import { formatShortDateTime as formatTime } from '@/utils/date-format'
@@ -197,7 +194,7 @@ import EmptyStateWithGlow from '@/components/EmptyStateWithGlow.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { UiPage, UiPageHeader } from '@/components/ui'
 
-type InboxFilter = 'all' | 'pending' | 'mail' | 'schedule' | 'task' | 'note' | 'autonomy'
+type InboxFilter = 'all' | 'pending' | 'mail' | 'schedule' | 'task' | 'autonomy'
 
 interface ItemAction {
   label: string
@@ -206,6 +203,7 @@ interface ItemAction {
 }
 
 const router = useRouter()
+const route = useRoute()
 const message = useMessage()
 const loading = ref(false)
 const selectedKeys = ref<string[]>([])
@@ -221,7 +219,6 @@ const inbox = ref<InboxSummary>({
 const categoryMap: Record<string, { label: string; icon: any }> = {
   schedule: { label: '日程', icon: CalendarIcon },
   task: { label: '任务', icon: TaskIcon },
-  note: { label: '笔记', icon: NoteIcon },
   mail: { label: '邮件', icon: MailIcon },
   autonomy: { label: 'Agent', icon: AutonomyIcon }
 }
@@ -232,9 +229,26 @@ const filters: Array<{ key: InboxFilter; label: string; icon: any }> = [
   { key: 'mail', label: '邮件', icon: MailIcon },
   { key: 'schedule', label: '日程', icon: CalendarIcon },
   { key: 'task', label: '任务', icon: TaskIcon },
-  { key: 'note', label: '笔记', icon: NoteIcon },
   { key: 'autonomy', label: 'Agent', icon: AutonomyIcon }
 ]
+
+const inboxFilterKeys: InboxFilter[] = ['all', 'pending', 'mail', 'schedule', 'task', 'autonomy']
+
+watch(
+  () => route.query.filter,
+  value => {
+    const key = Array.isArray(value) ? value[0] : value
+    if (key && inboxFilterKeys.includes(key as InboxFilter)) {
+      activeFilter.value = key as InboxFilter
+    }
+  },
+  { immediate: true }
+)
+
+watch(activeFilter, value => {
+  if (route.query.filter === value) return
+  void router.replace({ query: { ...route.query, filter: value } })
+})
 
 const isCompleted = (status?: string) => {
   const normalized = (status || '').toLowerCase()
@@ -316,9 +330,6 @@ const itemActions = (item: InboxItem): ItemAction[] => {
   if (item.category === 'schedule' && id && !isCompleted(item.status)) {
     return [{ label: '标记完成', primary: true, run: () => completeSchedule(Number(id)) }, { label: '打开', run: () => goTo(item.route) }]
   }
-  if (item.category === 'note' && id) {
-    return [{ label: '切换置顶', run: () => toggleNotePin(Number(id)) }, { label: '打开', run: () => goTo(item.route) }]
-  }
   if (item.category === 'autonomy') {
     return [{ label: '重新扫描', primary: true, run: runAutonomyScan }, { label: '查看', run: () => goTo(item.route) }]
   }
@@ -335,13 +346,6 @@ const executeTask = async (id: number) => {
 const completeSchedule = async (id: number) => {
   await scheduleService.complete(id)
   message.success('日程已标记完成')
-  await loadInbox()
-}
-
-const toggleNotePin = async (id: number) => {
-  const response = await noteService.togglePin(id)
-  if (response.success) message.success('笔记状态已更新')
-  else message.error(response.message || '操作失败')
   await loadInbox()
 }
 
@@ -368,16 +372,6 @@ const batchExecuteTasks = async () => {
   }
   selectedKeys.value = []
   message.success('已批量执行所选任务')
-  await loadInbox()
-}
-
-/** 批量切换选中笔记置顶状态。 */
-const batchToggleNotes = async () => {
-  for (const item of selectedItems.value.filter(item => item.category === 'note' && item.meta?.id)) {
-    await noteService.togglePin(Number(item.meta?.id))
-  }
-  selectedKeys.value = []
-  message.success('已批量切换所选笔记')
   await loadInbox()
 }
 

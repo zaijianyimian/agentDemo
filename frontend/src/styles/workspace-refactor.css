@@ -342,41 +342,9 @@ body {
 
 .settings-page .settings-container {
   display: grid !important;
-  grid-template-columns: 220px minmax(0, 1fr) !important;
-  gap: 16px !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0 !important;
   align-items: start !important;
-}
-
-.settings-page .settings-nav {
-  position: sticky !important;
-  top: 0 !important;
-  display: grid !important;
-  gap: 4px !important;
-  padding: 10px !important;
-  border: 1px solid var(--workspace-border) !important;
-  border-radius: var(--workspace-panel-radius) !important;
-  background: var(--bg-card) !important;
-  box-shadow: none !important;
-}
-
-.settings-page .nav-item {
-  min-height: 40px !important;
-  margin: 0 !important;
-  padding: 8px 10px !important;
-  border-radius: 9px !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.settings-page .nav-item:hover,
-.settings-page .nav-item.active {
-  transform: none !important;
-  background: var(--workspace-soft) !important;
-}
-
-.settings-page .nav-item.active {
-  color: var(--primary-color) !important;
-  box-shadow: inset 3px 0 0 var(--primary-color) !important;
 }
 
 .settings-page .settings-content,
@@ -458,11 +426,6 @@ body {
   .settings-page .settings-container {
     grid-template-columns: 1fr !important;
   }
-
-  .settings-page .settings-nav {
-    position: static !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
 }
 
 @media (max-width: 767px) {
@@ -488,8 +451,7 @@ body {
     padding: 14px !important;
   }
 
-  .automation-hub .stats-row,
-  .settings-page .settings-nav {
+  .automation-hub .stats-row {
     grid-template-columns: 1fr !important;
   }
 

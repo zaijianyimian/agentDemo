@@ -1,11 +1,8 @@
 package com.example.demo.personal.web;
 
 import com.example.demo.shared.dto.ApiResponse;
-import com.example.demo.infrastructure.config.CacheConfig;
 import com.example.demo.task.domain.ScheduledTask;
 import com.example.demo.personal.application.PersonalProductivityService;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -31,7 +28,6 @@ public class PersonalProductivityController {
      * 获取个人生产力洞察统计。首页面板频繁读取，缓存 30 秒。
      */
     @GetMapping("/insights")
-    @Cacheable(cacheNames = CacheConfig.PERSONAL_INSIGHTS, sync = true)
     public ApiResponse<Map<String, Object>> insights() {
         return ApiResponse.success(personalProductivityService.insights());
     }
@@ -49,28 +45,8 @@ public class PersonalProductivityController {
      * 命中 taskList 缓存会自动 evict（由 taskId 路径触发）。
      */
     @PostMapping("/task-templates/{templateId}/create")
-    @CacheEvict(cacheNames = CacheConfig.TASK_LIST, allEntries = true)
     public ApiResponse<ScheduledTask> createFromTemplate(@PathVariable String templateId) {
         return ApiResponse.success(personalProductivityService.createTaskFromTemplate(templateId));
     }
 
-    /**
-     * 导出个人数据备份（设置、任务、笔记等）
-     */
-    @GetMapping("/backup/export")
-    public ApiResponse<Map<String, Object>> exportBackup() {
-        return ApiResponse.success(personalProductivityService.exportBackup());
-    }
-
-    /**
-     * 导入个人数据备份
-     *
-     * @param payload         备份内容
-     * @param replaceExisting 是否替换现有数据
-     */
-    @PostMapping("/backup/import")
-    public ApiResponse<Map<String, Object>> importBackup(@RequestBody Map<String, Object> payload,
-                                                         @RequestParam(defaultValue = "false") boolean replaceExisting) {
-        return ApiResponse.success(personalProductivityService.importBackup(payload, replaceExisting));
-    }
 }

@@ -3,8 +3,7 @@
     <n-page-header title="派发任务" subtitle="邮件产生的可执行单元的执行与历史">
       <template #extra>
         <n-space>
-          <n-tag :type="availabilityTagType">Claude Code: {{ availability['claude-code'] ? '可用' : '缺失' }}</n-tag>
-          <n-tag :type="availabilityTagType">Codex: {{ availability['codex'] ? '可用' : '缺失' }}</n-tag>
+          <n-tag type="warning">WORKER_UNAVAILABLE</n-tag>
           <n-button @click="refresh" :loading="loading">刷新</n-button>
         </n-space>
       </template>
@@ -25,28 +24,21 @@
 
 <script setup lang="ts">
 /**
- * 派发任务页面：邮件触发的执行单元（Claude Code / Codex）历史、取消与重跑。
+ * 派发任务页面：展示任务账本、取消与重跑；当前没有隔离 Worker。
  */
-import { computed, h, onMounted, reactive, ref } from 'vue'
+import { h, onMounted, reactive, ref } from 'vue'
 import { NButton, NSpace, NTag, useMessage } from 'naive-ui'
 import { dispatchedService, type DispatchedTaskSummary } from '@/services/api/dispatch'
 
 const message = useMessage()
 const rows = ref<DispatchedTaskSummary[]>([])
 const loading = ref(false)
-const availability = ref<Record<string, boolean>>({})
 
 const pagination = reactive({
   page: 1,
   pageSize: 20,
   itemCount: 0,
   showSizePicker: false
-})
-
-const availabilityTagType = computed(() => {
-  const all = Object.values(availability.value)
-  if (all.length === 0) return 'default'
-  return all.every(v => v) ? 'success' : 'warning'
 })
 
 const columns = [
@@ -114,19 +106,8 @@ async function load() {
   }
 }
 
-async function loadAvailability() {
-  try {
-    const resp = await dispatchedService.executorAvailability()
-    if (resp.success) {
-      availability.value = (resp.data as Record<string, boolean>) || {}
-    }
-  } catch (e) {
-    availability.value = {}
-  }
-}
-
 async function refresh() {
-  await Promise.all([load(), loadAvailability()])
+  await load()
 }
 
 async function cancel(id: number) {

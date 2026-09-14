@@ -43,7 +43,6 @@
                 <span class="task-title-row">
                   <strong>{{ task.name }}</strong>
                   <n-tag size="small" :bordered="false">{{ taskTypeLabel(task.taskType) }}</n-tag>
-                  <n-tag v-if="task.requiresAi" size="small" type="warning" :bordered="false">AI</n-tag>
                 </span>
                 <span class="task-description">{{ task.description || '暂无任务描述' }}</span>
                 <span class="task-meta">
@@ -215,7 +214,6 @@ import {
   CalendarOutline as CalendarIcon,
   CloudOutline as CloudIcon,
   CreateOutline as EditIcon,
-  DocumentTextOutline as DocumentIcon,
   HelpOutline as HelpIcon,
   PlayOutline as PlayIcon,
   RefreshOutline as RefreshIcon,
@@ -267,13 +265,12 @@ const taskTypeOptions = [
 ]
 
 const enabledCount = computed(() => tasks.value.filter(item => item.enabled).length)
-const aiTaskCount = computed(() => tasks.value.filter(item => item.requiresAi || item.taskType === 'CHAT').length)
+const aiTaskCount = computed(() => tasks.value.filter(item => item.taskType === 'CHAT').length)
 const failedExecutionCount = computed(() => tasks.value.reduce((total, item) => total + Number(item.failCount || 0), 0))
 
 const templateCards = computed(() => [
   { id: 'daily-report', name: '日报生成', description: '每天固定时间生成工作摘要', icon: CalendarIcon },
   { id: 'knowledge-check', name: '知识库巡检', description: '定时检查知识库状态', icon: SearchIcon },
-  { id: 'note-summary', name: '笔记总结', description: '让 AI 定时总结笔记', icon: DocumentIcon },
   { id: 'model-health', name: '模型健康检查', description: '检查模型连接与可用状态', icon: CloudIcon },
   ...templates.value.map((template, index) => ({
     id: template.id,
@@ -442,12 +439,12 @@ const undoDelete = async () => {
 
 /** 通过模板预填任务；自定义模板继续使用后端模板接口。 */
 const createByTemplate = async (templateId: string, templateName: string) => {
-  if (templateId === 'daily-report' || templateId === 'knowledge-check' || templateId === 'note-summary' || templateId === 'model-health') {
+  if (templateId === 'daily-report' || templateId === 'knowledge-check' || templateId === 'model-health') {
     openCreateModal()
     form.value = {
       name: templateName,
       description: '',
-      taskType: templateId === 'note-summary' ? 'CHAT' : 'SKILL',
+      taskType: 'SKILL',
       cronExpression: '0 0 8 * * ?',
       params: '',
       skillCode: templateId === 'daily-report'

@@ -1,7 +1,7 @@
 @ApplicationModule(
         id = "file",
         displayName = "File",
-        allowedDependencies = {"shared::*", "system::*"}
+        allowedDependencies = {"infrastructure", "shared::*", "system::*"}
 )
 package com.example.demo.file;
 

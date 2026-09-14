@@ -1,6 +1,7 @@
 package com.example.demo.email.application.listener;
 
 import com.example.demo.email.application.EmailListenerStateService;
+import com.example.demo.email.application.EmailListenerExecutionGuard;
 import com.example.demo.email.application.listener.strategy.ListenStrategy;
 import com.example.demo.email.application.listener.strategy.MailSourceAdapter;
 import com.example.demo.email.domain.EmailConfig;
@@ -29,6 +30,7 @@ public class ImapIdleStrategy implements ListenStrategy {
     private final JavaMailSupport javaMailSupport;
     private final EmailListenerStateService stateService;
     private final PollingStrategy pollingStrategy;
+    private final EmailListenerExecutionGuard executionGuard;
     private final ExecutorService executorService;
     private final Map<Long, Future<?>> tasks = new ConcurrentHashMap<>();
 
@@ -36,10 +38,12 @@ public class ImapIdleStrategy implements ListenStrategy {
             JavaMailSupport javaMailSupport,
             EmailListenerStateService stateService,
             PollingStrategy pollingStrategy,
+            EmailListenerExecutionGuard executionGuard,
             @Qualifier("emailProcessingExecutor") ExecutorService executorService) {
         this.javaMailSupport = javaMailSupport;
         this.stateService = stateService;
         this.pollingStrategy = pollingStrategy;
+        this.executionGuard = executionGuard;
         this.executorService = executorService;
     }
 
@@ -67,6 +71,9 @@ public class ImapIdleStrategy implements ListenStrategy {
         Store store = null;
         Folder folder = null;
         try {
+            if (!executionGuard.mayAccessProvider(config)) {
+                return;
+            }
             store = javaMailSupport.connectStore(config);
             folder = javaMailSupport.openFolder(store, config, Folder.READ_WRITE);
             if (!(folder instanceof IMAPFolder imapFolder)) {
@@ -75,6 +82,9 @@ public class ImapIdleStrategy implements ListenStrategy {
             }
             stateService.markStatus(config, ListenerStatus.RUNNING, null);
             while (!Thread.currentThread().isInterrupted()) {
+                if (!executionGuard.mayAccessProvider(config)) {
+                    break;
+                }
                 pollingStrategy.pollOnce(config, adapter, "imap-idle-before-wait");
                 imapFolder.idle();
                 pollingStrategy.pollOnce(config, adapter, "imap-idle");

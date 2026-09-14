@@ -1,13 +1,14 @@
 /**
  * 派发执行模块。
  *
- * <p>从邮件链路产生的可执行单元落库后，本模块负责异步调度、外部执行器（Claude Code / Codex）
- * 调用、工作区管理、基础设施重试，以及按重要性阈值推送执行结果。</p>
+ * <p>本模块保存外部 Agent 产生的执行请求与终态结果。没有合格隔离 Worker 时，任务以
+ * {@code WORKER_UNAVAILABLE} 安全失败；Java 不启动本机进程或创建工作区。</p>
  */
 @ApplicationModule(
         id = "dispatch",
         displayName = "Dispatch",
         allowedDependencies = {
+                "auth::application",
                 "email::*",
                 "infrastructure",
                 "shared::*",

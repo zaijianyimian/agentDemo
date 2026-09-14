@@ -2,7 +2,7 @@
 export interface Document {
   id: number
   fileName: string
-  filePath: string
+  storageKey: string
   fileType: string
   fileSize: number
   content: string
@@ -28,7 +28,7 @@ export interface ScheduleEvent {
   summaryStatus: string
   reminderEnabled: boolean
   status: string
-  filePath?: string
+  storageKey?: string
   createTime: string
   updateTime: string
 }
@@ -148,11 +148,6 @@ export interface ScheduledTask {
   skillCode?: string
   enabled: boolean
   triggerStatus?: 0 | 1
-  /**
-   * 是否走 AI 处理：true 时定时任务触发会调 Claude Code CLI。
-   * 把 description + params 作为 prompt 喂进去，结果写 job_log.result。
-   */
-  requiresAi?: boolean
   lastExecuteTime?: string | number[] | null
   lastExecuteResult?: string
   nextExecuteTime?: string | number[] | null
@@ -270,16 +265,6 @@ export interface InboxSummary {
   warnings: string[]
 }
 
-export interface NoteSemanticHit {
-  noteId: number
-  title: string
-  contentSnippet: string
-  tags?: string
-  aiSummary?: string
-  score: number
-  updateTime?: string
-}
-
 export interface GeneratedReport {
   period: string
   generatedAt: string
@@ -360,7 +345,6 @@ export interface PersonalInsight {
   enabledTasks: number
   todaySchedules: number
   pendingSchedules: number
-  pinnedNotes: number
   snippetCount: number
   messageCount: number
   totalTokenUsage: number
@@ -460,18 +444,6 @@ export interface ChatMessageEntity {
   model?: string
   tokenCount?: number
   createTime: string
-}
-
-// 笔记类型
-export interface Note {
-  id: number
-  title: string
-  content: string
-  tags?: string
-  aiSummary?: string
-  isPinned: boolean
-  createTime: string
-  updateTime: string
 }
 
 // 代码片段类型

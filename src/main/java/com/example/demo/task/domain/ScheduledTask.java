@@ -42,9 +42,6 @@ public class ScheduledTask {
     private Integer failCount;
     private Boolean enabled;
 
-    /** 是否走 AI 执行路径。 */
-    private Boolean requiresAi;
-
     /** 0=静止，1=运行中。 */
     private Integer triggerStatus;
 

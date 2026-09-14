@@ -23,14 +23,8 @@
         <n-form-item label="启用实时推送" path="immediateEnabled">
           <n-switch v-model:value="form.immediateEnabled" />
         </n-form-item>
-        <n-form-item label="workspace 上限" path="workspaceMaxCount">
-          <n-input-number v-model:value="form.workspaceMaxCount" :min="1" :max="500" />
-        </n-form-item>
-        <n-form-item label="workspace 保留天数" path="workspaceMaxAgeDays">
-          <n-input-number v-model:value="form.workspaceMaxAgeDays" :min="1" :max="365" />
-        </n-form-item>
-        <n-form-item label="执行器超时（秒）" path="executorTimeoutSeconds">
-          <n-input-number v-model:value="form.executorTimeoutSeconds" :min="10" :max="3600" />
+        <n-form-item label="结果保留天数" path="resultRetentionDays">
+          <n-input-number v-model:value="form.resultRetentionDays" :min="1" :max="365" />
         </n-form-item>
         <n-form-item>
           <n-space>
@@ -45,7 +39,7 @@
 
 <script setup lang="ts">
 /**
- * 推送配置页面：维护派发任务邮件推送的阈值、批量 cron 与工作区上限。
+ * 推送配置页面：维护当前用户的派发结果推送与保留策略。
  */
 import { onMounted, reactive, ref } from 'vue'
 import { useMessage } from 'naive-ui'
@@ -60,9 +54,7 @@ const form = reactive<PushConfigPayload>({
   pushThreshold: 'medium',
   batchCron: '0 0 9 * * ?',
   immediateEnabled: true,
-  workspaceMaxCount: 50,
-  workspaceMaxAgeDays: 30,
-  executorTimeoutSeconds: 600
+  resultRetentionDays: 30
 })
 
 const thresholdOptions = [

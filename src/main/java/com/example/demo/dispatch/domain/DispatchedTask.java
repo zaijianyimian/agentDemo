@@ -34,19 +34,6 @@ public class DispatchedTask {
     /** 状态：用户取消 */
     public static final String STATUS_CANCELLED = "CANCELLED";
 
-    /** 执行器：Claude Code */
-    public static final String EXECUTOR_CLAUDE_CODE = "claude-code";
-    /** 执行器：Codex */
-    public static final String EXECUTOR_CODEX = "codex";
-    /** 执行器：OpenClaw */
-    public static final String EXECUTOR_OPENCLAW = "openclaw";
-    /** 沙箱：只读 */
-    public static final String SANDBOX_READ_ONLY = "read-only";
-    /** 沙箱：工作区可写 */
-    public static final String SANDBOX_WORKSPACE_WRITE = "workspace-write";
-    /** 沙箱：完全访问 */
-    public static final String SANDBOX_DANGER_FULL = "danger-full-access";
-
     /** 重要性：高 */
     public static final String IMPORTANCE_HIGH = "high";
     /** 重要性：中 */
@@ -66,6 +53,8 @@ public class DispatchedTask {
 
     /** 所属系统用户 ID，用于调用 Python Graph 时保持租户隔离。 */
     private Long userId;
+
+    private String requestId;
 
     private Long emailId;
     private String emailUid;
@@ -89,6 +78,8 @@ public class DispatchedTask {
     /** Python Agent 已明确指定的单次执行超时（秒）。 */
     private Integer executorTimeoutSeconds;
     private String status;
+    private Long version;
+    private Integer attempt;
     private Integer retries;
     private String executorUsed;
     private String result;
@@ -96,6 +87,7 @@ public class DispatchedTask {
     private String pushStatus;
     private LocalDateTime pushedAt;
     private String errorMessage;
+    private String errorCode;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime finishedAt;

@@ -1,7 +1,7 @@
 @ApplicationModule(
         id = "infrastructure",
         displayName = "Infrastructure",
-        allowedDependencies = {"shared::dto", "system::*"},
+        allowedDependencies = {"shared::context", "shared::dto", "system::*"},
         type = ApplicationModule.Type.OPEN
 )
 package com.example.demo.infrastructure;

@@ -4,7 +4,7 @@
       <div>
         <div class="page-eyebrow">Solo Mode</div>
         <h2>单用户增强中心</h2>
-        <p>一站完成专注、自动化模板、备份恢复、离线缓存与知识库策略配置。</p>
+        <p>集中管理当前账号的专注偏好、自动化模板与安全设置。</p>
       </div>
       <div class="hero-side">
         <div class="hero-stat"><span>启用任务</span><strong>{{ insights?.enabledTasks ?? 0 }}</strong></div>
@@ -42,15 +42,6 @@
           <span>离线缓存（仪表盘/收件箱可回退）</span>
           <n-switch v-model:value="offlineCacheEnabled" @update:value="onOfflineCacheToggle" />
         </div>
-        <div class="setting-row">
-          <span>知识库去重上传</span>
-          <n-switch v-model:value="knowledgeDedupeEnabled" />
-        </div>
-        <div class="setting-row">
-          <span>知识库增量上传</span>
-          <n-switch v-model:value="knowledgeIncrementalEnabled" />
-        </div>
-        <n-button size="small" tertiary @click="saveKnowledgeSettings">保存知识库策略</n-button>
       </div>
 
       <div class="surface-panel span-6 motion-card">
@@ -97,33 +88,6 @@
         </div>
       </div>
 
-      <div class="surface-panel span-6 motion-card">
-        <div class="section-head">
-          <div><div class="page-eyebrow">Backup</div><h3>数据备份与恢复</h3></div>
-        </div>
-        <div class="backup-actions">
-          <n-button type="primary" @click="exportBackup">导出备份 JSON</n-button>
-          <n-upload :show-file-list="false" accept=".json,application/json" :custom-request="handleImportUpload">
-            <n-button>导入备份 JSON</n-button>
-          </n-upload>
-          <div class="setting-row">
-            <span>导入前覆盖现有数据</span>
-            <n-switch v-model:value="replaceExisting" />
-          </div>
-        </div>
-      </div>
-
-      <div class="surface-panel span-6 motion-card">
-        <div class="section-head">
-          <div><div class="page-eyebrow">Reminder</div><h3>提醒快速预设</h3></div>
-        </div>
-        <div class="preset-list">
-          <n-button size="small" @click="applyReminderPreset('morning')">晨间 08:00</n-button>
-          <n-button size="small" @click="applyReminderPreset('noon')">午间 12:00</n-button>
-          <n-button size="small" @click="applyReminderPreset('evening')">晚间 20:00</n-button>
-        </div>
-      </div>
-
       <div class="surface-panel span-12 motion-card">
         <div class="section-head">
           <div><div class="page-eyebrow">History</div><h3>最近操作记录</h3></div>
@@ -147,11 +111,10 @@
  * 个人中心页面：自动化模板、专注/缓存设置、知识库策略、人脸二次验证与备份恢复。
  */
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { NButton, NEmpty, NIcon, NSwitch, NUpload, useMessage } from 'naive-ui'
+import { NButton, NEmpty, NIcon, NSwitch, useMessage } from 'naive-ui'
 import { CameraOutline as CameraIcon } from '@vicons/ionicons5'
 import { authService } from '@/services/api/auth'
 import { personalService } from '@/services/api/personal'
-import { settingsService } from '@/services/api/settings'
 import type { FaceStatusResponse, PersonalInsight, TaskTemplate } from '@/types'
 import {
   clearRecentActions,
@@ -170,9 +133,6 @@ const insights = ref<PersonalInsight | null>(null)
 const templates = ref<TaskTemplate[]>([])
 const focusMode = ref(isFocusMode())
 const offlineCacheEnabled = ref(isOfflineCacheEnabled())
-const knowledgeDedupeEnabled = ref(true)
-const knowledgeIncrementalEnabled = ref(true)
-const replaceExisting = ref(false)
 const recentActions = ref<RecentActionItem[]>(readRecentActions())
 const faceStatus = ref<FaceStatusResponse | null>(null)
 const faceRequired = ref(false)
@@ -187,10 +147,9 @@ const capturing = ref(false)
 let mediaStream: MediaStream | null = null
 
 const loadData = async () => {
-  const [insightRes, templateRes, settingsRes, faceStatusRes] = await Promise.all([
+  const [insightRes, templateRes, faceStatusRes] = await Promise.all([
     personalService.insights(),
     personalService.listTaskTemplates(),
-    settingsService.getSystem(),
     authService.faceStatus()
   ])
 
@@ -199,10 +158,6 @@ const loadData = async () => {
   }
   if (templateRes.success && templateRes.data) {
     templates.value = templateRes.data
-  }
-  if (settingsRes.success && settingsRes.data) {
-    knowledgeDedupeEnabled.value = settingsRes.data.knowledge_dedupe_enabled !== 'false'
-    knowledgeIncrementalEnabled.value = settingsRes.data.knowledge_incremental_enabled !== 'false'
   }
   if (faceStatusRes.success && faceStatusRes.data) {
     faceStatus.value = faceStatusRes.data
@@ -234,43 +189,6 @@ const applyTemplate = async (templateId: string) => {
   }
 }
 
-/** 导出个人数据备份到本地 ZIP 文件。 */
-const exportBackup = async () => {
-  const res = await personalService.exportBackup()
-  if (!res.success || !res.data) {
-    message.error(res.message || '导出失败')
-    return
-  }
-  const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `agent-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  message.success('备份已导出')
-  appendAction('导出备份', 'JSON 文件已下载')
-}
-
-/** 自定义上传处理器：导入备份 ZIP 并可选择覆盖或合并。 */
-const handleImportUpload = async ({ file }: { file: { file: File | null } }) => {
-  if (!file.file) return
-  try {
-    const raw = await file.file.text()
-    const payload = JSON.parse(raw)
-    const res = await personalService.importBackup(payload, replaceExisting.value)
-    if (res.success) {
-      message.success('备份导入成功')
-      appendAction('导入备份', `replace=${replaceExisting.value}`)
-      await loadData()
-    } else {
-      message.error(res.message || '导入失败')
-    }
-  } catch {
-    message.error('备份文件解析失败')
-  }
-}
-
 const onFocusModeToggle = (value: boolean) => {
   setFocusMode(value)
   window.dispatchEvent(new CustomEvent('focus-mode-changed', { detail: { enabled: value } }))
@@ -280,37 +198,6 @@ const onFocusModeToggle = (value: boolean) => {
 const onOfflineCacheToggle = (value: boolean) => {
   setOfflineCacheEnabled(value)
   appendAction('切换离线缓存', value ? '开启' : '关闭')
-}
-
-const saveKnowledgeSettings = async () => {
-  const res = await settingsService.updateSystem({
-    knowledge_dedupe_enabled: knowledgeDedupeEnabled.value ? 'true' : 'false',
-    knowledge_incremental_enabled: knowledgeIncrementalEnabled.value ? 'true' : 'false'
-  })
-  if (res.success) {
-    message.success('知识库策略已保存')
-    appendAction('保存知识库策略')
-  } else {
-    message.error(res.message || '保存失败')
-  }
-}
-
-const applyReminderPreset = async (type: 'morning' | 'noon' | 'evening') => {
-  const mapping = {
-    morning: '0 0 8 * * ?',
-    noon: '0 0 12 * * ?',
-    evening: '0 0 20 * * ?'
-  }
-  const cron = mapping[type]
-  const res = await settingsService.updateSchedule({
-    morning_reminder_cron: cron
-  })
-  if (res.success) {
-    message.success('提醒预设已应用')
-    appendAction('应用提醒预设', `${type} -> ${cron}`)
-  } else {
-    message.error(res.message || '应用失败')
-  }
 }
 
 const clearHistory = () => {

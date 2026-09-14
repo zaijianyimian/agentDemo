@@ -5,9 +5,9 @@ import com.example.demo.chat.domain.ChatMessageEntity;
 import com.example.demo.chat.domain.ChatSession;
 import com.example.demo.chat.persistence.ChatMessageMapper;
 import com.example.demo.chat.persistence.ChatSessionMapper;
-import com.example.demo.infrastructure.security.CurrentUserProvider;
+import com.example.demo.shared.context.CurrentUserContext;
+import com.example.demo.shared.web.UserResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,11 +27,11 @@ public class ChatHistoryService {
 
     private final ChatSessionMapper chatSessionMapper;
     private final ChatMessageMapper chatMessageMapper;
-    private final CurrentUserProvider currentUserProvider;
+    private final CurrentUserContext currentUserProvider;
 
     public ChatHistoryService(ChatSessionMapper chatSessionMapper,
                               ChatMessageMapper chatMessageMapper,
-                              CurrentUserProvider currentUserProvider) {
+                              CurrentUserContext currentUserProvider) {
         this.chatSessionMapper = chatSessionMapper;
         this.chatMessageMapper = chatMessageMapper;
         this.currentUserProvider = currentUserProvider;
@@ -65,7 +65,9 @@ public class ChatHistoryService {
      */
     public List<ChatSession> getAllSessions() {
         currentUserProvider.requireUserId();
-        return chatSessionMapper.findAllOrderByLastMessageTime();
+        return chatSessionMapper.selectList(new LambdaQueryWrapper<ChatSession>()
+                .orderByDesc(ChatSession::getLastMessageTime)
+                .orderByDesc(ChatSession::getCreateTime));
     }
 
     /**
@@ -88,11 +90,16 @@ public class ChatHistoryService {
      * 获取当前用户会话详情。
      *
      * @param sessionId 会话 ID。
-     * @return 会话，不存在或不属于当前用户时返回 null。
+     * @return 当前用户拥有的会话。
+     * @throws UserResourceNotFoundException 会话不存在或不属于当前用户。
      */
     public ChatSession getSession(Long sessionId) {
         currentUserProvider.requireUserId();
-        return chatSessionMapper.selectById(sessionId);
+        ChatSession session = chatSessionMapper.selectById(sessionId);
+        if (session == null) {
+            throw new UserResourceNotFoundException("会话不存在");
+        }
+        return session;
     }
 
     /**
@@ -100,16 +107,14 @@ public class ChatHistoryService {
      *
      * @param sessionId 会话 ID。
      * @param title 新标题。
-     * @return 更新后的会话；无权访问时返回 null。
+     * @return 更新后的会话。
      */
     @Transactional
     public ChatSession updateSessionTitle(Long sessionId, String title) {
         ChatSession session = getSession(sessionId);
-        if (session != null) {
-            session.setTitle(title);
-            session.setUpdateTime(LocalDateTime.now());
-            chatSessionMapper.updateById(session);
-        }
+        session.setTitle(title);
+        session.setUpdateTime(LocalDateTime.now());
+        chatSessionMapper.updateById(session);
         return session;
     }
 
@@ -122,9 +127,6 @@ public class ChatHistoryService {
     @Transactional
     public boolean deleteSession(Long sessionId) {
         ChatSession session = getSession(sessionId);
-        if (session == null) {
-            return false;
-        }
         chatMessageMapper.delete(new LambdaQueryWrapper<ChatMessageEntity>()
                 .eq(ChatMessageEntity::getSessionId, sessionId));
         int result = chatSessionMapper.deleteById(sessionId);
@@ -140,13 +142,14 @@ public class ChatHistoryService {
      * @param content 消息内容。
      * @param model 模型标识。
      * @return 新消息。
-     * @throws AccessDeniedException 会话不存在或不属于当前用户时抛出。
+     * @throws UserResourceNotFoundException 会话不存在或不属于当前用户时抛出。
      */
     @Transactional
     public ChatMessageEntity addMessage(Long sessionId, String role, String content, String model) {
         ChatSession session = requireOwnedSession(sessionId);
         int estimatedTokenCount = estimateTokenCount(content);
         ChatMessageEntity message = ChatMessageEntity.builder()
+                .userId(session.getUserId())
                 .sessionId(sessionId)
                 .role(role)
                 .content(content)
@@ -178,7 +181,9 @@ public class ChatHistoryService {
      */
     public List<ChatMessageEntity> getSessionMessages(Long sessionId) {
         requireOwnedSession(sessionId);
-        return chatMessageMapper.findBySessionIdOrderByCreateTime(sessionId);
+        return chatMessageMapper.selectList(new LambdaQueryWrapper<ChatMessageEntity>()
+                .eq(ChatMessageEntity::getSessionId, sessionId)
+                .orderByAsc(ChatMessageEntity::getCreateTime));
     }
 
     /**
@@ -199,11 +204,7 @@ public class ChatHistoryService {
     }
 
     private ChatSession requireOwnedSession(Long sessionId) {
-        ChatSession session = getSession(sessionId);
-        if (session == null) {
-            throw new AccessDeniedException("会话不存在或无权访问");
-        }
-        return session;
+        return getSession(sessionId);
     }
 
     private String generateAutoTitle(String content) {

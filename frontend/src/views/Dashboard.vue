@@ -23,7 +23,7 @@
       </div>
     </section>
 
-    <section class="overview-grid" aria-label="今日概览">
+    <section id="dashboard-overview" class="overview-grid anchor-section" aria-label="今日概览">
       <button
         v-for="card in overviewCards"
         :key="card.key"
@@ -43,7 +43,7 @@
     </section>
 
     <div class="dashboard-grid">
-      <section class="dashboard-panel attention-panel">
+      <section id="dashboard-attention" class="dashboard-panel attention-panel anchor-section">
         <div class="panel-head">
           <div>
             <span class="page-eyebrow">Needs Attention</span>
@@ -82,7 +82,7 @@
       </section>
 
       <aside class="dashboard-side">
-        <section class="dashboard-panel">
+        <section id="dashboard-activity" class="dashboard-panel anchor-section">
           <div class="panel-head compact">
             <div>
               <span class="page-eyebrow">Recent Activity</span>
@@ -131,17 +131,23 @@
       </aside>
     </div>
 
-    <section v-if="inbox.warnings?.length" class="dashboard-panel warning-panel">
+    <section id="dashboard-health" class="dashboard-panel warning-panel anchor-section">
       <div class="panel-head compact">
         <div>
           <span class="page-eyebrow">System Hints</span>
           <h3>需要关注的系统提示</h3>
         </div>
       </div>
-      <div class="warning-list">
+      <div v-if="inbox.warnings?.length" class="warning-list">
         <div v-for="warning in inbox.warnings" :key="warning" class="warning-item">
           <n-icon><AlertIcon /></n-icon>
           <span>{{ warning }}</span>
+        </div>
+      </div>
+      <div v-else class="warning-list">
+        <div class="warning-item healthy-item">
+          <n-icon><CheckIcon /></n-icon>
+          <span>当前工作区服务运行正常，没有额外系统提示。</span>
         </div>
       </div>
     </section>
@@ -271,7 +277,6 @@ const activityItems = computed(() => inbox.value.items.slice(0, 6))
 const categoryLabels: Record<string, string> = {
   schedule: '日程',
   task: '任务',
-  note: '笔记',
   search: '搜索',
   mail: '邮件',
   autonomy: 'Agent'
@@ -344,6 +349,10 @@ onUnmounted(() => {
   width: min(100%, 1480px);
   margin: 0 auto;
   color: var(--text-primary);
+}
+
+.anchor-section {
+  scroll-margin-top: 18px;
 }
 
 .dashboard-hero,
@@ -703,6 +712,10 @@ onUnmounted(() => {
 
 .warning-item :deep(svg) {
   color: var(--primary-color);
+}
+
+.healthy-item :deep(svg) {
+  color: var(--success);
 }
 
 .mini-empty {

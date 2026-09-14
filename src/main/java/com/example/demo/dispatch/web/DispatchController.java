@@ -1,16 +1,11 @@
 package com.example.demo.dispatch.web;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.example.demo.dispatch.application.Dispatcher;
 import com.example.demo.dispatch.application.DispatchedTaskService;
-import com.example.demo.dispatch.application.ExecutorToggleService;
-import com.example.demo.dispatch.application.executor.ExecutorRouter;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import com.example.demo.shared.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 /**
  * 派发任务 REST API。
@@ -21,9 +16,6 @@ import java.util.Map;
 public class DispatchController {
 
     private final DispatchedTaskService taskService;
-    private final Dispatcher dispatcher;
-    private final ExecutorRouter executorRouter;
-    private final ExecutorToggleService executorToggleService;
 
     @GetMapping
     /**
@@ -64,31 +56,4 @@ public class DispatchController {
         return ApiResponse.success(null);
     }
 
-    @GetMapping("/executors/availability")
-    /**
-     * 返回当前各执行器是否在本机 PATH 上可用，供前端运维面板展示。
-     */
-    public ApiResponse<Map<String, Boolean>> executorAvailability() {
-        return ApiResponse.success(executorRouter.availabilitySnapshot());
-    }
-
-    @GetMapping("/executors/settings")
-    /**
-     * 返回用户在 Settings 页面配置的 executor 启用/禁用状态（{ claude-code: true, codex: false }）。
-     */
-    public ApiResponse<Map<String, Boolean>> executorSettings() {
-        return ApiResponse.success(executorToggleService.snapshot());
-    }
-
-    @PutMapping("/executors/settings")
-    /**
-     * 一次性保存所有 executor 启用/禁用开关。
-     * 请求体：{ "claude-code": true, "codex": false }
-     * 未知 hint 会被忽略；只持久化已知的 hint。
-     */
-    public ApiResponse<Map<String, Boolean>> updateExecutorSettings(
-            @RequestBody Map<String, Boolean> states) {
-        executorToggleService.replaceAll(states);
-        return ApiResponse.success(executorToggleService.snapshot());
-    }
 }

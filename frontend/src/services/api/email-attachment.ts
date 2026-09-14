@@ -11,7 +11,7 @@ export interface EmailAttachmentAnalysis {
   fileName: string
   contentType: string
   sizeBytes: number
-  filePath: string
+  storageKey: string
   status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED_SIZE' | 'SKIPPED_TYPE'
   skipReason: string
   summary: string
@@ -26,10 +26,11 @@ export interface EmailAttachmentAnalysis {
  * 附件元数据（来自 EmailMessage.Attachment）
  */
 export interface EmailAttachment {
+  user_id: number
   fileName: string
   contentType: string
   size: number
-  filePath: string
+  storage_key: string
   contentId: string
   disposition: string
 }

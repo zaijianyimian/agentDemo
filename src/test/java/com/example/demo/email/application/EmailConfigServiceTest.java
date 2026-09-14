@@ -3,12 +3,14 @@ package com.example.demo.email.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.email.domain.EmailConfig;
 import com.example.demo.email.persistence.EmailConfigMapper;
+import com.example.demo.shared.context.CurrentUserContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,6 +28,7 @@ class EmailConfigServiceTest {
     private EmailConfigMapper mapper;
     private EmailAuthConfigService authService;
     private EmailListenerConfigSupport listenerSupport;
+    private EmailListenerService listenerService;
     private EmailConfigService service;
 
     @BeforeEach
@@ -33,7 +36,9 @@ class EmailConfigServiceTest {
         mapper = mock(EmailConfigMapper.class);
         authService = mock(EmailAuthConfigService.class);
         listenerSupport = mock(EmailListenerConfigSupport.class);
-        service = new EmailConfigService(mapper, authService, listenerSupport);
+        listenerService = mock(EmailListenerService.class);
+        service = new EmailConfigService(
+                mapper, authService, listenerSupport, listenerService, mock(CurrentUserContext.class));
     }
 
     @Test
@@ -96,5 +101,21 @@ class EmailConfigServiceTest {
         ArgumentCaptor<LambdaQueryWrapper<EmailConfig>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(mapper).selectOne(captor.capture());
         assertThat(captor.getValue()).isNotNull();
+    }
+
+    @Test
+    void foreignIdIsRejectedBeforeCredentialsOrNetworkAreTouched() {
+        when(mapper.selectById(404L)).thenReturn(null);
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.example.demo.shared.web.UserResourceNotFoundException.class,
+                () -> service.testOwnedConnection(404L));
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.example.demo.shared.web.UserResourceNotFoundException.class,
+                () -> service.checkOwnedNetwork(404L));
+
+        verify(authService, never()).decodeTransientFields(any());
+        verify(listenerService, never()).testConnection(any());
+        verify(listenerService, never()).checkNetworkConnectivity(any(), anyInt(), anyInt());
     }
 }

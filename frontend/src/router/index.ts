@@ -7,6 +7,7 @@ declare module 'vue-router' {
     title?: string
     icon?: string
     public?: boolean
+    standalone?: boolean
     description?: string
   }
 }
@@ -25,6 +26,18 @@ const routes = [
     meta: { title: '登录', icon: 'lock', public: true, description: '账号密码与邮箱验证码登录。' }
   },
   {
+    path: '/mvp',
+    name: 'MultiUserMvp',
+    component: () => import('@/views/MultiUserMvp.vue'),
+    meta: {
+      title: '多用户安全 MVP',
+      icon: 'shield',
+      public: true,
+      standalone: true,
+      description: '用五个场景快速讲清 Java 多用户隔离改造。'
+    }
+  },
+  {
     path: '/schedule-share/:date',
     name: 'ScheduleShare',
     component: () => import('@/views/ScheduleShare.vue'),
@@ -40,7 +53,7 @@ const routes = [
     path: '/inbox',
     name: 'Inbox',
     component: () => import('@/views/Inbox.vue'),
-    meta: { title: '统一收件箱', icon: 'inbox', description: '聚合邮件、任务、日程、笔记和 Agent 发现项。' }
+    meta: { title: '统一收件箱', icon: 'inbox', description: '聚合邮件、任务、日程和 Agent 发现项。' }
   },
   {
     path: '/autonomy',
@@ -89,12 +102,6 @@ const routes = [
     name: 'TaskAdmin',
     component: () => import('@/views/TaskAdmin.vue'),
     meta: { title: '调度管理', icon: 'calendar', description: '查看计划任务、执行日志和运行状态。' }
-  },
-  {
-    path: '/notes',
-    name: 'Notes',
-    component: () => import('@/views/Notes.vue'),
-    meta: { title: '笔记', icon: 'note', description: '记录知识、置顶重点内容并调用 AI 总结。' }
   },
   {
     path: '/snippets',

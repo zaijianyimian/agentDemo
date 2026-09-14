@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,6 +26,9 @@ public class Document {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long userId;
+
     /**
      * 文件名
      */
@@ -32,7 +37,10 @@ public class Document {
     /**
      * 文件存储路径
      */
+    @JsonIgnore
     private String filePath;
+
+    private String storageKey;
 
     /**
      * 文件类型 (txt, md, pdf, doc, docx)

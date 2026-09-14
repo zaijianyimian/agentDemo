@@ -3,11 +3,11 @@
     <n-message-provider>
       <n-dialog-provider>
         <n-notification-provider>
-          <EmailNotificationBridge />
+          <EmailNotificationBridge v-if="!isStandalonePage" />
           <div class="app-root" :data-theme="actualTheme">
-            <router-view v-if="isAuthPage" />
-            <MacAppShell v-else>
-              <router-view />
+            <router-view v-if="isStandalonePage" />
+            <MacAppShell v-else :key="authStore.sessionGeneration">
+              <router-view :key="`${route.fullPath}:${authStore.sessionGeneration}`" />
             </MacAppShell>
           </div>
         </n-notification-provider>
@@ -37,6 +37,7 @@ const themeStore = useThemeStore()
 const authStore = useAuthStore()
 
 const isAuthPage = computed(() => route.path === '/login' || route.path === '/oauth/github/callback')
+const isStandalonePage = computed(() => isAuthPage.value || Boolean(route.meta.standalone))
 
 const actualTheme = computed(() => {
   if (themeStore.mode === 'auto') {

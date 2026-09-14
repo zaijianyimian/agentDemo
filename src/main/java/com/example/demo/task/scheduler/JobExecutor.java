@@ -1,6 +1,8 @@
 package com.example.demo.task.scheduler;
 
-import com.example.demo.infrastructure.security.UserExecutionContext;
+import com.example.demo.auth.application.ExecutionContextFactory;
+import com.example.demo.shared.context.ExecutionContextScope;
+import com.example.demo.shared.context.ExecutionPolicy;
 import com.example.demo.task.application.ScheduledTaskService;
 import com.example.demo.task.domain.ScheduledTask;
 import jakarta.annotation.PreDestroy;
@@ -19,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  * 任务执行线程池。
  *
  * <p>系统扫描线程可以读取全部用户的到期任务，但真正执行前必须绑定任务 owner。这样任务内部继续调用
- * Skill、Model、Note、Schedule 等 MyBatis Mapper 时会自动追加该用户的 {@code user_id} 条件。</p>
+ * Skill、Model、Schedule 等 MyBatis Mapper 时会自动追加该用户的 {@code user_id} 条件。</p>
  */
 @Slf4j
 @Component
@@ -27,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 public class JobExecutor {
 
     private final ScheduledTaskService scheduledTaskService;
-    private final UserExecutionContext userExecutionContext;
+    private final ExecutionContextFactory executionContexts;
 
     @Value("${app.task.executor.pool-size:5}")
     private int poolSize;
@@ -87,8 +89,11 @@ public class JobExecutor {
         }
         pool().execute(() -> {
             try {
-                userExecutionContext.runAs(task.getUserId(),
-                        () -> scheduledTaskService.executeTask(task.getId(), "CRON"));
+                var context = executionContexts.forPersistedOwner(
+                        task.getUserId(), "scheduled-task", ExecutionPolicy.readOnly());
+                try (var ignored = ExecutionContextScope.open(context)) {
+                    scheduledTaskService.executeTask(task.getId(), "CRON");
+                }
             } catch (Exception error) {
                 log.error("任务执行异常 id={}: {}", task.getId(), error.getMessage(), error);
             } finally {

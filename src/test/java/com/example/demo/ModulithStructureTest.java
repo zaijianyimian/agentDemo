@@ -32,7 +32,7 @@ class ModulithStructureTest {
                 .collect(Collectors.toSet());
 
         assertThat(moduleNames)
-                .contains("auth", "chat", "email", "schedule", "task", "note", "file",
+                .contains("auth", "chat", "email", "schedule", "task", "file",
                         "inbox", "personal", "system", "shared", "infrastructure", "dispatch")
                 .doesNotContain("app", "knowledge", "mcp", "skill", "memory", "autonomy");
 

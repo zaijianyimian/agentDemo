@@ -24,6 +24,8 @@ public class ChatHistory {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long userId;
+
     /**
      * 会话ID（同一对话的记录分组）
      */

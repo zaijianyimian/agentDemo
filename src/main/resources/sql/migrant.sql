@@ -1,29 +1,122 @@
 -- =========================================================
 -- agentDemo 多用户完整迁移脚本
--- 版本: 2026-09-10
+-- 版本: 2026-09-13
 --
--- 适用场景：已有单用户 MySQL 数据库升级到 feat/graph-gateway-multi-user。
+-- 运行前必须由运维在同一连接显式设置：
+--   SET @LEGACY_OWNER_USER_ID := <已存在且 enabled=1 的 user_account.id>;
+-- 适用场景：已确认全部历史业务数据属于一个用户的旧 MySQL 数据库。
 -- 设计原则：
 -- 1. Java 仍然只连接 MySQL；Python Graph 独占 PostgreSQL。
 -- 2. 用户私有业务表统一增加 user_id，并由 MyBatis TenantLine 强制隔离。
--- 3. chat_message / email_listener_state / skill_tool_mapping 等子表通过父表继承归属，不重复增加 user_id。
+-- 3. 可独立寻址的子表直接保存 user_id，并通过组合外键保持同 owner。
 -- 4. skill / mcp_tool 支持系统记录(user_id IS NULL) + 用户私有记录(user_id = 当前用户)。
--- 5. 历史单用户数据默认归属 user_account 中最早创建的用户。
--- 6. 本脚本可重复执行；执行前仍建议备份数据库。
+-- 5. 绝不自动选择第一位、最近登录或其他默认用户。
+-- 6. migration_journal 记录步骤、owner、checksum 与重跑次数；DDL/DML 均可重入。
 -- =========================================================
 
 SET NAMES utf8mb4;
 SET @db_name := DATABASE();
-SET FOREIGN_KEY_CHECKS = 0;
 
-SET @default_user_id := (
-    SELECT id
-    FROM user_account
-    ORDER BY id ASC
-    LIMIT 1
-);
+CREATE TABLE IF NOT EXISTS `migration_journal` (
+    `step_name` VARCHAR(100) NOT NULL,
+    `owner_user_id` BIGINT NULL,
+    `checksum` VARCHAR(64) NOT NULL,
+    `status` VARCHAR(20) NOT NULL,
+    `attempt_count` INT NOT NULL DEFAULT 1,
+    `started_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `completed_at` DATETIME NULL,
+    `details` VARCHAR(1000) NULL,
+    PRIMARY KEY (`step_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='可重入数据库迁移步骤日志';
+
+CREATE TABLE IF NOT EXISTS `file_migration_journal` (
+    `owner_user_id` BIGINT NOT NULL,
+    `resource_type` VARCHAR(64) NOT NULL,
+    `resource_id` BIGINT NOT NULL,
+    `source_path` VARCHAR(1024) NOT NULL,
+    `category` VARCHAR(64) NOT NULL,
+    `storage_key` VARCHAR(512) NOT NULL,
+    `checksum` VARCHAR(64) NOT NULL,
+    `status` VARCHAR(20) NOT NULL,
+    `attempt_count` INT NOT NULL DEFAULT 1,
+    `started_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `completed_at` DATETIME NULL,
+    `details` VARCHAR(1000) NULL,
+    PRIMARY KEY (`owner_user_id`, `resource_type`, `resource_id`),
+    UNIQUE KEY `uk_file_migration_owner_storage` (`owner_user_id`, `category`, `storage_key`),
+    KEY `idx_file_migration_status` (`status`, `started_at`),
+    CONSTRAINT `fk_file_migration_owner` FOREIGN KEY (`owner_user_id`)
+        REFERENCES `user_account`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='历史共享文件迁移 journal';
 
 DELIMITER $$
+
+DROP PROCEDURE IF EXISTS `mig_assert_owner`$$
+CREATE PROCEDURE `mig_assert_owner`()
+BEGIN
+    IF @LEGACY_OWNER_USER_ID IS NULL
+       OR CAST(@LEGACY_OWNER_USER_ID AS SIGNED) <= 0
+       OR NOT EXISTS (
+           SELECT 1 FROM `user_account`
+           WHERE `id` = CAST(@LEGACY_OWNER_USER_ID AS SIGNED) AND `enabled` = 1
+       ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'migration aborted: set LEGACY_OWNER_USER_ID to an existing enabled user';
+    END IF;
+    SET @legacy_owner_user_id := CAST(@LEGACY_OWNER_USER_ID AS SIGNED);
+END$$
+
+DROP PROCEDURE IF EXISTS `mig_require_table`$$
+CREATE PROCEDURE `mig_require_table`(IN p_table VARCHAR(64))
+BEGIN
+    DECLARE v_message VARCHAR(255);
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = DATABASE() AND table_name = p_table
+    ) THEN
+        SET v_message = CONCAT('migration aborted: required table missing: ', p_table);
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_message;
+    END IF;
+END$$
+
+DROP PROCEDURE IF EXISTS `mig_journal_start`$$
+CREATE PROCEDURE `mig_journal_start`(IN p_step VARCHAR(100), IN p_checksum VARCHAR(64))
+BEGIN
+    INSERT INTO `migration_journal`
+        (`step_name`, `owner_user_id`, `checksum`, `status`, `attempt_count`, `started_at`, `completed_at`)
+    VALUES
+        (p_step, @legacy_owner_user_id, p_checksum, 'RUNNING', 1, NOW(), NULL)
+    ON DUPLICATE KEY UPDATE
+        `owner_user_id` = VALUES(`owner_user_id`),
+        `checksum` = VALUES(`checksum`),
+        `status` = 'RUNNING',
+        `attempt_count` = `attempt_count` + 1,
+        `started_at` = NOW(),
+        `completed_at` = NULL;
+END$$
+
+DROP PROCEDURE IF EXISTS `mig_journal_complete`$$
+CREATE PROCEDURE `mig_journal_complete`(IN p_step VARCHAR(100))
+BEGIN
+    UPDATE `migration_journal`
+    SET `status` = 'COMPLETED', `completed_at` = NOW()
+    WHERE BINARY `step_name` = BINARY p_step AND `owner_user_id` = @legacy_owner_user_id;
+END$$
+
+DROP PROCEDURE IF EXISTS `mig_assert_zero`$$
+CREATE PROCEDURE `mig_assert_zero`(IN p_check VARCHAR(100), IN p_query TEXT)
+BEGIN
+    DECLARE v_message VARCHAR(255);
+    SET @mig_issue_count = 0;
+    SET @mig_sql = CONCAT('SELECT COUNT(*) INTO @mig_issue_count FROM ', p_query);
+    PREPARE mig_stmt FROM @mig_sql;
+    EXECUTE mig_stmt;
+    DEALLOCATE PREPARE mig_stmt;
+    IF COALESCE(@mig_issue_count, 0) > 0 THEN
+        SET v_message = CONCAT('migration contract check failed: ', p_check, '=', @mig_issue_count);
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_message;
+    END IF;
+END$$
 
 DROP PROCEDURE IF EXISTS `mig_add_column`$$
 CREATE PROCEDURE `mig_add_column`(
@@ -124,6 +217,43 @@ BEGIN
     END IF;
 END$$
 
+DROP PROCEDURE IF EXISTS `mig_drop_column`$$
+CREATE PROCEDURE `mig_drop_column`(IN p_table VARCHAR(64), IN p_column VARCHAR(64))
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = p_table AND column_name = p_column
+    ) THEN
+        SET @mig_sql = CONCAT(
+            'ALTER TABLE `', REPLACE(p_table, '`', '``'),
+            '` DROP COLUMN `', REPLACE(p_column, '`', '``'), '`'
+        );
+        PREPARE mig_stmt FROM @mig_sql;
+        EXECUTE mig_stmt;
+        DEALLOCATE PREPARE mig_stmt;
+    END IF;
+END$$
+
+DROP PROCEDURE IF EXISTS `mig_require_column_not_null`$$
+CREATE PROCEDURE `mig_require_column_not_null`(
+    IN p_table VARCHAR(64), IN p_column VARCHAR(64), IN p_definition TEXT
+)
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = p_table
+          AND column_name = p_column AND is_nullable = 'YES'
+    ) THEN
+        SET @mig_sql = CONCAT(
+            'ALTER TABLE `', REPLACE(p_table, '`', '``'),
+            '` MODIFY COLUMN `', REPLACE(p_column, '`', '``'), '` ', p_definition
+        );
+        PREPARE mig_stmt FROM @mig_sql;
+        EXECUTE mig_stmt;
+        DEALLOCATE PREPARE mig_stmt;
+    END IF;
+END$$
+
 DROP PROCEDURE IF EXISTS `mig_require_user_not_null`$$
 CREATE PROCEDURE `mig_require_user_not_null`(IN p_table VARCHAR(64))
 BEGIN
@@ -177,6 +307,20 @@ END$$
 
 DELIMITER ;
 
+-- Preflight happens before any ownership column is backfilled.
+CALL mig_require_table('user_account');
+CALL mig_assert_owner();
+CALL mig_require_table('email_config');
+CALL mig_require_table('chat_session');
+CALL mig_require_table('chat_message');
+CALL mig_require_table('email_listener_state');
+CALL mig_require_table('schedule_event');
+CALL mig_require_table('scheduled_task');
+CALL mig_require_table('document');
+CALL mig_require_table('dispatched_task');
+CALL mig_require_table('push_config');
+CALL mig_journal_start('01_expand', '2026-09-13-expand-v1');
+
 -- =========================================================
 -- 1. 补齐当前 Java 实体需要的表 / 字段
 -- =========================================================
@@ -206,8 +350,6 @@ CREATE TABLE IF NOT EXISTS `job_log` (
 
 CALL mig_add_column('scheduled_task', 'trigger_status',
     'TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''触发状态: 0=静止, 1=运行中'' AFTER `enabled`');
-CALL mig_add_column('scheduled_task', 'requires_ai',
-    'TINYINT(1) NOT NULL DEFAULT 0 COMMENT ''是否走 AI 执行路径'' AFTER `trigger_status`');
 CALL mig_add_column('job_log', 'create_time',
     'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT ''创建时间''');
 
@@ -217,11 +359,12 @@ CALL mig_add_column('job_log', 'create_time',
 
 -- 强隔离表：最终会收紧为 NOT NULL。
 CALL mig_add_column('email_config', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
+CALL mig_add_column('email_listener_state', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('chat_session', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
+CALL mig_add_column('chat_message', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('schedule_event', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('scheduled_task', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('job_log', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
-CALL mig_add_column('note', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('code_snippet', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('document', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('chat_history', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
@@ -231,8 +374,26 @@ CALL mig_add_column('knowledge_document', 'user_id', 'BIGINT NULL COMMENT ''所�
 CALL mig_add_column('search_history', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('user_interest', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
 CALL mig_add_column('dispatched_task', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
+CALL mig_add_column('dispatched_task', 'request_id',
+    'VARCHAR(128) NULL COMMENT ''来源请求幂等键'' AFTER `user_id`');
+CALL mig_add_column('dispatched_task', 'version',
+    'BIGINT NOT NULL DEFAULT 0 COMMENT ''乐观锁版本'' AFTER `status`');
+CALL mig_add_column('dispatched_task', 'attempt',
+    'INT NOT NULL DEFAULT 0 COMMENT ''当前执行 attempt'' AFTER `version`');
+CALL mig_add_column('dispatched_task', 'error_code',
+    'VARCHAR(64) NULL COMMENT ''稳定失败码'' AFTER `error_message`');
 CALL mig_add_column('dispatched_task', 'executor_timeout_seconds',
     'INT NOT NULL DEFAULT 600 COMMENT ''Python 已指定的单次执行超时（秒）'' AFTER `retry_max`');
+CALL mig_add_column('push_config', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID'' AFTER `id`');
+CALL mig_add_column('push_config', 'result_retention_days',
+    'INT NOT NULL DEFAULT 30 COMMENT ''执行结果保留天数'' AFTER `immediate_enabled`');
+CALL mig_add_column('schedule_event', 'storage_key',
+    'VARCHAR(512) NULL COMMENT ''用户根目录下相对存储键'' AFTER `file_path`');
+CALL mig_add_column('document', 'storage_key',
+    'VARCHAR(512) NULL COMMENT ''用户根目录下相对存储键'' AFTER `file_path`');
+
+CALL mig_journal_complete('01_expand');
+CALL mig_journal_start('02_backfill_ownership', '2026-09-13-backfill-v1');
 
 -- 混合范围表：NULL 表示系统内置记录，因此保持可空。
 CALL mig_add_column('mcp_tool', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID，NULL=系统工具'' AFTER `id`');
@@ -243,48 +404,54 @@ CALL mig_add_column('skill', 'user_id', 'BIGINT NULL COMMENT ''所属用户ID，
 -- =========================================================
 
 UPDATE `email_config`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
+
+UPDATE `email_listener_state` state_row
+JOIN `email_config` config ON config.id = state_row.config_id
+SET state_row.user_id = config.user_id
+WHERE state_row.user_id IS NULL;
 
 UPDATE `chat_session`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
+
+UPDATE `chat_message` message_row
+JOIN `chat_session` session_row ON session_row.id = message_row.session_id
+SET message_row.user_id = session_row.user_id
+WHERE message_row.user_id IS NULL;
 
 UPDATE `schedule_event`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `scheduled_task`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
-
-UPDATE `note`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `code_snippet`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `document`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `virtual_assistant`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `knowledge_base`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `search_history`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `user_interest`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `dispatched_task` task
 JOIN `email_config` config ON config.id = task.email_id
@@ -293,8 +460,12 @@ WHERE task.user_id IS NULL
   AND config.user_id IS NOT NULL;
 
 UPDATE `dispatched_task`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
+
+UPDATE `dispatched_task`
+SET `request_id` = CONCAT('legacy-dispatch-', `id`)
+WHERE `request_id` IS NULL OR `request_id` = '';
 
 UPDATE `job_log` log_row
 JOIN `scheduled_task` task ON task.id = log_row.job_id
@@ -303,8 +474,8 @@ WHERE log_row.user_id IS NULL
   AND task.user_id IS NOT NULL;
 
 UPDATE `job_log`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `knowledge_document` doc
 JOIN `knowledge_base` base ON base.id = doc.base_id
@@ -313,8 +484,8 @@ WHERE doc.user_id IS NULL
   AND base.user_id IS NOT NULL;
 
 UPDATE `knowledge_document`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 UPDATE `chat_history` history_row
 JOIN `virtual_assistant` assistant ON assistant.id = history_row.assistant_id
@@ -323,15 +494,18 @@ WHERE history_row.user_id IS NULL
   AND assistant.user_id IS NOT NULL;
 
 UPDATE `chat_history`
-SET `user_id` = @default_user_id
-WHERE `user_id` IS NULL AND @default_user_id IS NOT NULL;
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
+
+UPDATE `push_config`
+SET `user_id` = @legacy_owner_user_id
+WHERE `user_id` IS NULL;
 
 -- Skill：内置技能继续保持 user_id=NULL；历史自定义技能归属默认用户。
 UPDATE `skill`
-SET `user_id` = @default_user_id
+SET `user_id` = @legacy_owner_user_id
 WHERE `user_id` IS NULL
-  AND COALESCE(`is_builtin`, 0) = 0
-  AND @default_user_id IS NOT NULL;
+  AND COALESCE(`is_builtin`, 0) = 0;
 
 -- MCP Tool：被系统内置 Skill 引用的工具保持全局，其余历史工具归属默认用户。
 UPDATE `mcp_tool` tool
@@ -342,21 +516,55 @@ LEFT JOIN (
     WHERE builtin_skill.user_id IS NULL
       AND builtin_skill.is_builtin = 1
 ) builtin_tool ON builtin_tool.tool_id = tool.id
-SET tool.user_id = @default_user_id
+SET tool.user_id = @legacy_owner_user_id
 WHERE tool.user_id IS NULL
-  AND builtin_tool.tool_id IS NULL
-  AND @default_user_id IS NOT NULL;
+  AND builtin_tool.tool_id IS NULL;
+
+CALL mig_journal_complete('02_backfill_ownership');
+CALL mig_journal_start('03_contract_checks', '2026-09-13-contract-v1');
+
+CALL mig_assert_zero('email_config owner NULL', '`email_config` WHERE `user_id` IS NULL');
+CALL mig_assert_zero('email_listener_state owner NULL', '`email_listener_state` WHERE `user_id` IS NULL');
+CALL mig_assert_zero('chat_session owner NULL', '`chat_session` WHERE `user_id` IS NULL');
+CALL mig_assert_zero('chat_message owner NULL', '`chat_message` WHERE `user_id` IS NULL');
+CALL mig_assert_zero('schedule_event owner NULL', '`schedule_event` WHERE `user_id` IS NULL');
+CALL mig_assert_zero('scheduled_task owner NULL', '`scheduled_task` WHERE `user_id` IS NULL');
+CALL mig_assert_zero('job_log owner NULL', '`job_log` WHERE `user_id` IS NULL');
+CALL mig_assert_zero('document owner NULL', '`document` WHERE `user_id` IS NULL');
+CALL mig_assert_zero('dispatched_task owner/request NULL',
+    '`dispatched_task` WHERE `user_id` IS NULL OR `request_id` IS NULL OR `request_id` = ''''');
+CALL mig_assert_zero('push_config owner NULL', '`push_config` WHERE `user_id` IS NULL');
+CALL mig_assert_zero('orphan listener state',
+    '`email_listener_state` child LEFT JOIN `email_config` parent ON parent.id=child.config_id WHERE parent.id IS NULL');
+CALL mig_assert_zero('cross-owner listener state',
+    '`email_listener_state` child JOIN `email_config` parent ON parent.id=child.config_id WHERE child.user_id<>parent.user_id');
+CALL mig_assert_zero('orphan chat message',
+    '`chat_message` child LEFT JOIN `chat_session` parent ON parent.id=child.session_id WHERE parent.id IS NULL');
+CALL mig_assert_zero('cross-owner chat message',
+    '`chat_message` child JOIN `chat_session` parent ON parent.id=child.session_id WHERE child.user_id<>parent.user_id');
+CALL mig_assert_zero('cross-owner job log',
+    '`job_log` child JOIN `scheduled_task` parent ON parent.id=child.job_id WHERE child.user_id<>parent.user_id');
+CALL mig_assert_zero('duplicate email identity',
+    '(SELECT user_id,email FROM email_config GROUP BY user_id,email HAVING COUNT(*)>1) duplicate_rows');
+CALL mig_assert_zero('duplicate dispatch request',
+    '(SELECT user_id,request_id FROM dispatched_task GROUP BY user_id,request_id HAVING COUNT(*)>1) duplicate_rows');
+CALL mig_assert_zero('duplicate push config',
+    '(SELECT user_id FROM push_config GROUP BY user_id HAVING COUNT(*)>1) duplicate_rows');
+
+CALL mig_journal_complete('03_contract_checks');
+CALL mig_journal_start('04_contract_constraints', '2026-09-13-constraints-v1');
 
 -- =========================================================
 -- 4. 私有表收紧为 NOT NULL
 -- =========================================================
 
 CALL mig_require_user_not_null('email_config');
+CALL mig_require_user_not_null('email_listener_state');
 CALL mig_require_user_not_null('chat_session');
+CALL mig_require_user_not_null('chat_message');
 CALL mig_require_user_not_null('schedule_event');
 CALL mig_require_user_not_null('scheduled_task');
 CALL mig_require_user_not_null('job_log');
-CALL mig_require_user_not_null('note');
 CALL mig_require_user_not_null('code_snippet');
 CALL mig_require_user_not_null('document');
 CALL mig_require_user_not_null('chat_history');
@@ -366,6 +574,13 @@ CALL mig_require_user_not_null('knowledge_document');
 CALL mig_require_user_not_null('search_history');
 CALL mig_require_user_not_null('user_interest');
 CALL mig_require_user_not_null('dispatched_task');
+CALL mig_require_user_not_null('push_config');
+CALL mig_require_column_not_null('dispatched_task', 'request_id',
+    'VARCHAR(128) NOT NULL COMMENT ''来源请求幂等键''');
+
+CALL mig_drop_column('push_config', 'workspace_max_count');
+CALL mig_drop_column('push_config', 'workspace_max_age_days');
+CALL mig_drop_column('push_config', 'executor_timeout_seconds');
 
 -- =========================================================
 -- 5. 单用户唯一约束 -> owner 维度唯一约束
@@ -379,6 +594,20 @@ CALL mig_drop_index('skill', 'uk_code');
 
 CALL mig_add_index('email_config', 'uk_email_config_user_email',
     'UNIQUE INDEX `uk_email_config_user_email` (`user_id`, `email`)');
+CALL mig_add_index('email_config', 'uk_email_config_user_id',
+    'UNIQUE INDEX `uk_email_config_user_id` (`user_id`, `id`)');
+CALL mig_add_index('email_listener_state', 'uk_email_listener_state_user_config',
+    'UNIQUE INDEX `uk_email_listener_state_user_config` (`user_id`, `config_id`)');
+CALL mig_add_index('chat_session', 'uk_chat_session_user_id',
+    'UNIQUE INDEX `uk_chat_session_user_id` (`user_id`, `id`)');
+CALL mig_add_index('scheduled_task', 'uk_scheduled_task_user_id',
+    'UNIQUE INDEX `uk_scheduled_task_user_id` (`user_id`, `id`)');
+CALL mig_add_index('dispatched_task', 'uk_dispatch_user_request',
+    'UNIQUE INDEX `uk_dispatch_user_request` (`user_id`, `request_id`)');
+CALL mig_add_index('dispatched_task', 'uk_dispatch_user_id',
+    'UNIQUE INDEX `uk_dispatch_user_id` (`user_id`, `id`)');
+CALL mig_add_index('push_config', 'uk_push_config_user',
+    'UNIQUE INDEX `uk_push_config_user` (`user_id`)');
 CALL mig_add_index('user_interest', 'uk_user_interest_user_tag',
     'UNIQUE INDEX `uk_user_interest_user_tag` (`user_id`, `tag`)');
 CALL mig_add_index('virtual_assistant', 'uk_virtual_assistant_user_collection',
@@ -394,16 +623,18 @@ CALL mig_add_index('skill', 'uk_skill_user_code',
 
 CALL mig_add_index('email_config', 'idx_email_config_user_enabled',
     'INDEX `idx_email_config_user_enabled` (`user_id`, `enabled`)');
+CALL mig_add_index('email_listener_state', 'idx_listener_state_user_status',
+    'INDEX `idx_listener_state_user_status` (`user_id`, `status`)');
 CALL mig_add_index('chat_session', 'idx_chat_session_user_last_message',
     'INDEX `idx_chat_session_user_last_message` (`user_id`, `last_message_time`, `create_time`)');
+CALL mig_add_index('chat_message', 'idx_chat_message_user_session_time',
+    'INDEX `idx_chat_message_user_session_time` (`user_id`, `session_id`, `create_time`)');
 CALL mig_add_index('schedule_event', 'idx_schedule_user_date_status',
     'INDEX `idx_schedule_user_date_status` (`user_id`, `event_date`, `status`)');
 CALL mig_add_index('scheduled_task', 'idx_task_user_enabled_next',
     'INDEX `idx_task_user_enabled_next` (`user_id`, `enabled`, `next_execute_time`)');
 CALL mig_add_index('job_log', 'idx_job_log_user_job_create',
     'INDEX `idx_job_log_user_job_create` (`user_id`, `job_id`, `create_time`)');
-CALL mig_add_index('note', 'idx_note_user_pinned_update',
-    'INDEX `idx_note_user_pinned_update` (`user_id`, `is_pinned`, `update_time`)');
 CALL mig_add_index('code_snippet', 'idx_snippet_user_language',
     'INDEX `idx_snippet_user_language` (`user_id`, `language`)');
 CALL mig_add_index('document', 'idx_document_user_status_create',
@@ -431,8 +662,16 @@ CALL mig_add_index('skill', 'idx_skill_user_enabled_category',
 
 CALL mig_add_fk('email_config', 'fk_email_config_user',
     'CONSTRAINT `fk_email_config_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
+CALL mig_add_fk('email_listener_state', 'fk_email_listener_state_user',
+    'CONSTRAINT `fk_email_listener_state_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
+CALL mig_add_fk('email_listener_state', 'fk_email_listener_state_owner_config',
+    'CONSTRAINT `fk_email_listener_state_owner_config` FOREIGN KEY (`user_id`, `config_id`) REFERENCES `email_config`(`user_id`, `id`) ON DELETE CASCADE');
 CALL mig_add_fk('chat_session', 'fk_chat_session_user',
     'CONSTRAINT `fk_chat_session_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
+CALL mig_add_fk('chat_message', 'fk_chat_message_user',
+    'CONSTRAINT `fk_chat_message_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
+CALL mig_add_fk('chat_message', 'fk_chat_message_owner_session',
+    'CONSTRAINT `fk_chat_message_owner_session` FOREIGN KEY (`user_id`, `session_id`) REFERENCES `chat_session`(`user_id`, `id`) ON DELETE CASCADE');
 CALL mig_add_fk('schedule_event', 'fk_schedule_event_user',
     'CONSTRAINT `fk_schedule_event_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('scheduled_task', 'fk_scheduled_task_user',
@@ -441,8 +680,8 @@ CALL mig_add_fk('job_log', 'fk_job_log_user',
     'CONSTRAINT `fk_job_log_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('job_log', 'fk_job_log_task',
     'CONSTRAINT `fk_job_log_task` FOREIGN KEY (`job_id`) REFERENCES `scheduled_task`(`id`) ON DELETE CASCADE');
-CALL mig_add_fk('note', 'fk_note_user',
-    'CONSTRAINT `fk_note_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
+CALL mig_add_fk('job_log', 'fk_job_log_owner_task',
+    'CONSTRAINT `fk_job_log_owner_task` FOREIGN KEY (`user_id`, `job_id`) REFERENCES `scheduled_task`(`user_id`, `id`) ON DELETE CASCADE');
 CALL mig_add_fk('code_snippet', 'fk_code_snippet_user',
     'CONSTRAINT `fk_code_snippet_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('document', 'fk_document_user',
@@ -461,6 +700,8 @@ CALL mig_add_fk('user_interest', 'fk_user_interest_user',
     'CONSTRAINT `fk_user_interest_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('dispatched_task', 'fk_dispatched_task_user',
     'CONSTRAINT `fk_dispatched_task_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
+CALL mig_add_fk('push_config', 'fk_push_config_user',
+    'CONSTRAINT `fk_push_config_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('mcp_tool', 'fk_mcp_tool_user',
     'CONSTRAINT `fk_mcp_tool_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE');
 CALL mig_add_fk('skill', 'fk_skill_user',
@@ -474,6 +715,8 @@ WHERE config.id IS NULL;
 CALL mig_add_fk('email_listener_state', 'fk_email_listener_state_config',
     'CONSTRAINT `fk_email_listener_state_config` FOREIGN KEY (`config_id`) REFERENCES `email_config`(`id`) ON DELETE CASCADE');
 
+CALL mig_journal_complete('04_contract_constraints');
+
 -- =========================================================
 -- 8. 校验
 -- =========================================================
@@ -483,7 +726,6 @@ UNION ALL SELECT 'chat_session', COUNT(*) FROM `chat_session` WHERE user_id IS N
 UNION ALL SELECT 'schedule_event', COUNT(*) FROM `schedule_event` WHERE user_id IS NULL
 UNION ALL SELECT 'scheduled_task', COUNT(*) FROM `scheduled_task` WHERE user_id IS NULL
 UNION ALL SELECT 'job_log', COUNT(*) FROM `job_log` WHERE user_id IS NULL
-UNION ALL SELECT 'note', COUNT(*) FROM `note` WHERE user_id IS NULL
 UNION ALL SELECT 'code_snippet', COUNT(*) FROM `code_snippet` WHERE user_id IS NULL
 UNION ALL SELECT 'document', COUNT(*) FROM `document` WHERE user_id IS NULL
 UNION ALL SELECT 'chat_history', COUNT(*) FROM `chat_history` WHERE user_id IS NULL
@@ -493,6 +735,24 @@ UNION ALL SELECT 'knowledge_document', COUNT(*) FROM `knowledge_document` WHERE 
 UNION ALL SELECT 'search_history', COUNT(*) FROM `search_history` WHERE user_id IS NULL
 UNION ALL SELECT 'user_interest', COUNT(*) FROM `user_interest` WHERE user_id IS NULL
 UNION ALL SELECT 'dispatched_task', COUNT(*) FROM `dispatched_task` WHERE user_id IS NULL;
+
+CREATE TABLE IF NOT EXISTS `consumed_event` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL,
+    `consumer_name` VARCHAR(128) NOT NULL,
+    `event_id` VARCHAR(128) NOT NULL,
+    `status` VARCHAR(20) NOT NULL,
+    `attempt` INT NOT NULL DEFAULT 1,
+    `resource_type` VARCHAR(64) NOT NULL,
+    `resource_id` VARCHAR(128) NOT NULL,
+    `error_message` TEXT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_consumed_event_owner_consumer_event` (`user_id`, `consumer_name`, `event_id`),
+    KEY `idx_consumed_event_status_updated` (`status`, `updated_at`),
+    CONSTRAINT `fk_consumed_event_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户事件 consumer 幂等及失败记录';
 
 SELECT user_id, COUNT(*) AS email_config_count
 FROM `email_config`
@@ -517,9 +777,14 @@ DROP PROCEDURE IF EXISTS `mig_add_column`;
 DROP PROCEDURE IF EXISTS `mig_add_index`;
 DROP PROCEDURE IF EXISTS `mig_drop_index`;
 DROP PROCEDURE IF EXISTS `mig_add_fk`;
+DROP PROCEDURE IF EXISTS `mig_drop_column`;
+DROP PROCEDURE IF EXISTS `mig_require_column_not_null`;
 DROP PROCEDURE IF EXISTS `mig_require_user_not_null`;
-
-SET FOREIGN_KEY_CHECKS = 1;
+DROP PROCEDURE IF EXISTS `mig_assert_zero`;
+DROP PROCEDURE IF EXISTS `mig_journal_start`;
+DROP PROCEDURE IF EXISTS `mig_journal_complete`;
+DROP PROCEDURE IF EXISTS `mig_require_table`;
+DROP PROCEDURE IF EXISTS `mig_assert_owner`;
 
 -- =========================================================
 -- 迁移完成

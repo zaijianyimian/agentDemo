@@ -1,7 +1,10 @@
 package com.example.demo.dispatch.application;
 
+import com.example.demo.auth.application.ExecutionContextFactory;
 import com.example.demo.dispatch.domain.DispatchedTask;
-import com.example.demo.infrastructure.security.UserExecutionContext;
+import com.example.demo.dispatch.domain.OwnedTaskRef;
+import com.example.demo.shared.context.ExecutionContextScope;
+import com.example.demo.shared.context.ExecutionPolicy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,18 +26,18 @@ public class TaskPoller {
     private final DispatchedTaskService taskService;
     private final Dispatcher dispatcher;
     private final ExecutorService workerPool;
-    private final UserExecutionContext userExecutionContext;
+    private final ExecutionContextFactory executionContexts;
 
     public TaskPoller(DispatchProperties properties,
                       DispatchedTaskService taskService,
                       Dispatcher dispatcher,
                       @Qualifier("dispatchWorkerPool") ExecutorService workerPool,
-                      UserExecutionContext userExecutionContext) {
+                      ExecutionContextFactory executionContexts) {
         this.properties = properties;
         this.taskService = taskService;
         this.dispatcher = dispatcher;
         this.workerPool = workerPool;
-        this.userExecutionContext = userExecutionContext;
+        this.executionContexts = executionContexts;
     }
 
     @Scheduled(fixedDelayString = "${app.dispatch.poll-interval-ms:5000}")
@@ -45,18 +48,29 @@ public class TaskPoller {
         if (!properties.isEnabled()) {
             return;
         }
-        List<DispatchedTask> pending = taskService.findPending(8);
-        for (DispatchedTask t : pending) {
+        List<OwnedTaskRef> pending = taskService.findPending(8);
+        for (OwnedTaskRef ref : pending) {
             workerPool.submit(() -> {
-                userExecutionContext.runAs(t.getUserId(), () -> {
-                    boolean claimed = taskService.claimRunning(t.getId(), t.getExecutor());
-                    if (!claimed) {
-                        log.debug("task {} already claimed by another worker", t.getId());
-                        return;
+                try {
+                    var context = executionContexts.forPersistedOwner(
+                            ref.userId(), "dispatch-task", ExecutionPolicy.readOnly());
+                    try (var ignored = ExecutionContextScope.open(context)) {
+                        boolean claimed = taskService.claimRunning(ref);
+                        if (!claimed) {
+                            log.debug("task {} already claimed by another worker", ref.taskId());
+                            return;
+                        }
+                        DispatchedTask t = taskService.getById(ref.taskId());
+                        if (t == null) {
+                            log.warn("claimed task {} disappeared", ref.taskId());
+                            return;
+                        }
+                        dispatcher.run(t);
                     }
-                    t.setStatus(DispatchedTask.STATUS_RUNNING);
-                    dispatcher.run(t);
-                });
+                } catch (RuntimeException error) {
+                    log.warn("Skipping dispatch task {} because its persisted owner is not executable: {}",
+                            ref.taskId(), error.getMessage());
+                }
             });
         }
     }

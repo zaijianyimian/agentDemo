@@ -11,10 +11,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 推送与执行器全局配置（单行）。
- *
- * <p>主键固定为 {@code 1}。字段对应 {@code app.dispatch.*} 与推送相关的所有运行时配置，
- * 管理员可通过 {@code /api/dispatch/push-config} 在线修改，无需重启应用。</p>
+ * 当前用户的推送配置，每个 user_id 最多一条。
  */
 @Data
 @Builder
@@ -23,11 +20,10 @@ import java.time.LocalDateTime;
 @TableName("push_config")
 public class PushConfig {
 
-    /** 单行主键，固定 1 */
-    public static final int SINGLETON_ID = 1;
+    @TableId(type = IdType.AUTO)
+    private Long id;
 
-    @TableId(type = IdType.INPUT)
-    private Integer id;
+    private Long userId;
 
     private String pushEmail;
 
@@ -39,11 +35,8 @@ public class PushConfig {
 
     private Boolean immediateEnabled;
 
-    private Integer workspaceMaxCount;
-
-    private Integer workspaceMaxAgeDays;
-
-    private Integer executorTimeoutSeconds;
+    /** Number of days completed dispatch results are retained for this user. */
+    private Integer resultRetentionDays;
 
     private LocalDateTime updatedAt;
 }

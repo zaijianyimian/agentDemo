@@ -2,7 +2,7 @@ package com.example.demo.chat.web;
 
 import com.example.demo.chat.dto.ChatResponse;
 import com.example.demo.infrastructure.graph.GraphGatewayClient;
-import com.example.demo.infrastructure.security.CurrentUserProvider;
+import com.example.demo.shared.context.CurrentUserContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ChatController {
 
     private final GraphGatewayClient graphGatewayClient;
-    private final CurrentUserProvider currentUserProvider;
+    private final CurrentUserContext currentUserProvider;
     private final ObjectMapper objectMapper;
 
     /**

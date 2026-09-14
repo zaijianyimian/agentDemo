@@ -4,6 +4,10 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.example.demo.shared.context.ExecutionContext;
+import com.example.demo.shared.context.ExecutionContextScope;
+import com.example.demo.shared.context.ExecutionPolicy;
+import com.example.demo.shared.context.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -35,6 +39,14 @@ public class TokenVersionValidationFilter extends OncePerRequestFilter {
             Jwt jwt = jwtAuthenticationToken.getToken();
             try {
                 authService.validateTokenVersion(jwt);
+                long userId = authService.extractUserIdFromJwt(jwt);
+                var execution = ExecutionContext.start(new UserContext(userId),
+                        "http:" + request.getMethod() + ":" + request.getRequestURI(),
+                        ExecutionContext.Actor.USER, ExecutionPolicy.readOnly());
+                try (var ignored = ExecutionContextScope.open(execution)) {
+                    filterChain.doFilter(request, response);
+                }
+                return;
             } catch (IllegalArgumentException ex) {
                 SecurityContextHolder.clearContext();
                 response.setStatus(401);

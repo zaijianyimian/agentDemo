@@ -1,5 +1,6 @@
 package com.example.demo.infrastructure.config;
 
+import com.example.demo.shared.context.ContextPropagatingExecutorService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -41,16 +42,19 @@ public class VirtualThreadConfig {
      */
     @Bean
     public ExecutorService taskExecutor() {
+        ExecutorService executor;
         if (VIRTUAL_THREAD_SUPPORTED) {
             try {
-                return (ExecutorService) Executors.class
+                executor = (ExecutorService) Executors.class
                         .getMethod("newVirtualThreadPerTaskExecutor")
                         .invoke(null);
             } catch (Exception e) {
-                return createOptimizedThreadPool();
+                executor = createOptimizedThreadPool();
             }
+        } else {
+            executor = createOptimizedThreadPool();
         }
-        return createOptimizedThreadPool();
+        return new ContextPropagatingExecutorService(executor);
     }
 
     /**
@@ -74,16 +78,19 @@ public class VirtualThreadConfig {
      */
     @Bean("emailProcessingExecutor")
     public ExecutorService emailProcessingExecutor() {
+        ExecutorService executor;
         if (VIRTUAL_THREAD_SUPPORTED) {
             try {
-                return (ExecutorService) Executors.class
+                executor = (ExecutorService) Executors.class
                         .getMethod("newVirtualThreadPerTaskExecutor")
                         .invoke(null);
             } catch (Exception e) {
-                return Executors.newCachedThreadPool(new NamedThreadFactory("email"));
+                executor = Executors.newCachedThreadPool(new NamedThreadFactory("email"));
             }
+        } else {
+            executor = Executors.newCachedThreadPool(new NamedThreadFactory("email"));
         }
-        return Executors.newCachedThreadPool(new NamedThreadFactory("email"));
+        return new ContextPropagatingExecutorService(executor);
     }
 
     /**
@@ -91,16 +98,19 @@ public class VirtualThreadConfig {
      */
     @Bean("toolExecutionExecutor")
     public ExecutorService toolExecutionExecutor() {
+        ExecutorService executor;
         if (VIRTUAL_THREAD_SUPPORTED) {
             try {
-                return (ExecutorService) Executors.class
+                executor = (ExecutorService) Executors.class
                         .getMethod("newVirtualThreadPerTaskExecutor")
                         .invoke(null);
             } catch (Exception e) {
-                return Executors.newCachedThreadPool(new NamedThreadFactory("tool"));
+                executor = Executors.newCachedThreadPool(new NamedThreadFactory("tool"));
             }
+        } else {
+            executor = Executors.newCachedThreadPool(new NamedThreadFactory("tool"));
         }
-        return Executors.newCachedThreadPool(new NamedThreadFactory("tool"));
+        return new ContextPropagatingExecutorService(executor);
     }
 
     /**
@@ -108,16 +118,19 @@ public class VirtualThreadConfig {
      */
     @Bean("scheduleNotificationExecutor")
     public ExecutorService scheduleNotificationExecutor() {
+        ExecutorService executor;
         if (VIRTUAL_THREAD_SUPPORTED) {
             try {
-                return (ExecutorService) Executors.class
+                executor = (ExecutorService) Executors.class
                         .getMethod("newVirtualThreadPerTaskExecutor")
                         .invoke(null);
             } catch (Exception e) {
-                return Executors.newCachedThreadPool(new NamedThreadFactory("schedule"));
+                executor = Executors.newCachedThreadPool(new NamedThreadFactory("schedule"));
             }
+        } else {
+            executor = Executors.newCachedThreadPool(new NamedThreadFactory("schedule"));
         }
-        return Executors.newCachedThreadPool(new NamedThreadFactory("schedule"));
+        return new ContextPropagatingExecutorService(executor);
     }
 
     /**

@@ -2,8 +2,6 @@ package com.example.demo.chat.application;
 
 import com.example.demo.chat.dto.ChatActionRequest;
 import com.example.demo.chat.dto.ChatActionResult;
-import com.example.demo.note.application.NoteService;
-import com.example.demo.note.domain.Note;
 import com.example.demo.schedule.application.ScheduleCommandService;
 import com.example.demo.schedule.domain.ScheduleEvent;
 import com.example.demo.task.application.ScheduledTaskService;
@@ -20,59 +18,20 @@ import java.util.Map;
 /**
  * 聊天业务动作服务。
  *
- * <p>仅负责调用 Java 业务能力创建笔记、任务和日程。Agent 的长期记忆、语义提取与决策已经迁移
+ * <p>仅负责调用 Java 业务能力创建任务和日程。Agent 的长期记忆、语义提取与决策已经迁移
  * 到 Python，Java 不再保存 Agent Memory。</p>
  */
 @Service
 public class ChatActionService {
 
-    private final NoteService noteService;
     private final ScheduledTaskService scheduledTaskService;
     private final ScheduleCommandService scheduleCommandService;
 
     public ChatActionService(
-            NoteService noteService,
             ScheduledTaskService scheduledTaskService,
             ScheduleCommandService scheduleCommandService) {
-        this.noteService = noteService;
         this.scheduledTaskService = scheduledTaskService;
         this.scheduleCommandService = scheduleCommandService;
-    }
-
-    /**
-     * 创建一条从聊天内容提炼的笔记。
-     *
-     * @param request 聊天动作请求。
-     * @return 创建结果。
-     */
-    public ChatActionResult createNote(ChatActionRequest request) {
-        String title = buildTitle(request.titleHint(), request.content(), "聊天沉淀笔记");
-        String markdown = """
-                # %s
-
-                > 来源会话: %s
-                > 来源角色: %s
-
-                %s
-                """.formatted(
-                title,
-                request.sessionId() != null ? request.sessionId() : "manual",
-                request.role() != null ? request.role() : "assistant",
-                request.content() != null ? request.content().trim() : "");
-
-        Note note = new Note();
-        note.setTitle(title);
-        note.setTags("chat,quick-capture");
-        note.setContent(markdown);
-        Note created = noteService.createNote(note);
-
-        return ChatActionResult.builder()
-                .target("note")
-                .message("已从聊天内容生成笔记")
-                .entityId(created.getId())
-                .route("/notes")
-                .payload(Map.of("title", created.getTitle()))
-                .build();
     }
 
     /**

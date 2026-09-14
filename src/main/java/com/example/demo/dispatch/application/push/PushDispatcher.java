@@ -1,21 +1,21 @@
 package com.example.demo.dispatch.application.push;
 
-import com.example.demo.dispatch.application.DispatchedTaskService;
-import com.example.demo.dispatch.application.WorkspaceManager;
+import com.example.demo.dispatch.application.PushConfigService;
+import com.example.demo.auth.application.ExecutionContextFactory;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import com.example.demo.dispatch.domain.PushConfig;
 import com.example.demo.dispatch.application.DispatchProperties;
 import com.example.demo.dispatch.persistence.DispatchedTaskMapper;
+import com.example.demo.dispatch.persistence.PushConfigMapper;
 import com.example.demo.email.application.EmailSenderService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import com.example.demo.shared.context.ExecutionContextScope;
+import com.example.demo.shared.context.ExecutionPolicy;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -33,9 +33,10 @@ import java.util.Map;
 public class PushDispatcher {
 
     private final DispatchProperties properties;
-    private final DispatchedTaskService taskService;
     private final DispatchedTaskMapper taskMapper;
-    private final WorkspaceManager workspaceManager;
+    private final PushConfigService pushConfigs;
+    private final PushConfigMapper pushConfigMapper;
+    private final ExecutionContextFactory executionContexts;
     private final EmailSenderService emailSenderService;
 
     /** 失败计数 key: taskId -> count */
@@ -48,7 +49,7 @@ public class PushDispatcher {
      * 实时推送入口。由 Dispatcher 在任务完成 / 失败后调用，根据阈值与开关判断是否推送。
      */
     public void pushImmediate(DispatchedTask task) {
-        PushConfig cfg = workspaceManager.loadPushConfig();
+        PushConfig cfg = pushConfigs.getOrCreate();
         if (cfg.getImmediateEnabled() == null || !cfg.getImmediateEnabled()) {
             return;
         }
@@ -86,13 +87,21 @@ public class PushDispatcher {
         if (!properties.isEnabled()) {
             return;
         }
-        PushConfig cfg;
-        try {
-            cfg = workspaceManager.loadPushConfig();
-        } catch (Exception e) {
-            log.warn("pushBatched: failed to load push config, falling back to default cron behavior");
-            return;
+        for (PushConfig config : pushConfigMapper.selectAllForInternalScan()) {
+            try {
+                var context = executionContexts.forPersistedOwner(
+                        config.getUserId(), "dispatch-batch-push", ExecutionPolicy.readOnly());
+                try (var ignored = ExecutionContextScope.open(context)) {
+                    pushBatchedForCurrent(config);
+                }
+            } catch (RuntimeException error) {
+                log.warn("Skipping batch push for invalid owner {}: {}",
+                        config.getUserId(), error.getMessage());
+            }
         }
+    }
+
+    private void pushBatchedForCurrent(PushConfig cfg) {
         if (cfg.getPushEmail() == null || cfg.getPushEmail().isBlank()) {
             log.warn("pushBatched: push_email blank, skipping");
             return;
@@ -159,7 +168,7 @@ public class PushDispatcher {
     }
 
     private boolean trySend(String subject, String body) {
-        PushConfig cfg = workspaceManager.loadPushConfig();
+        PushConfig cfg = pushConfigs.getOrCreate();
         String to = cfg.getPushEmail();
         if (to == null || to.isBlank()) {
             log.warn("push_email missing, skipping send");
@@ -185,32 +194,12 @@ public class PushDispatcher {
         if (t.getErrorMessage() != null) {
             sb.append("- error_message: ").append(t.getErrorMessage()).append("\n");
         }
-        String excerpt = readExcerpt(t.getResultPath(), 500);
-        if (!excerpt.isBlank()) {
-            sb.append("\n--- excerpt ---\n").append(excerpt).append("\n");
-        }
         return sb.toString();
     }
 
     private String buildSubject(DispatchedTask t, boolean batched) {
         String prefix = DispatchedTask.STATUS_FAILED.equals(t.getStatus()) ? "[FAILED]" : "[DONE]";
         return prefix + " task " + t.getId() + ": " + nullSafe(t.getSubject());
-    }
-
-    private static String readExcerpt(String resultPath, int max) {
-        if (resultPath == null || resultPath.isBlank()) {
-            return "";
-        }
-        try {
-            Path p = Paths.get(resultPath);
-            if (!Files.exists(p)) {
-                return "";
-            }
-            String s = Files.readString(p);
-            return s.length() > max ? s.substring(0, max) + "...[truncated]" : s;
-        } catch (Exception e) {
-            return "";
-        }
     }
 
     private static int importanceRank(String importance) {

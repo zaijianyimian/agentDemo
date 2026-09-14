@@ -1,9 +1,8 @@
 package com.example.demo.schedule.application;
 
-import com.example.demo.infrastructure.properties.ScheduleProperties;
-import com.example.demo.infrastructure.security.CurrentUserProvider;
+import com.example.demo.infrastructure.storage.OwnedStorageResolver;
+import com.example.demo.shared.context.CurrentUserContext;
 import com.example.demo.schedule.domain.ScheduleEvent;
-import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeUtility;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +11,6 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -25,29 +23,20 @@ import java.util.stream.Stream;
  * 日程 Markdown 文件服务。
  *
  * <p>多用户模式下每个用户使用独立目录：
- * {@code ${app.schedule.storage-path}/user-{userId}/}，避免同一天的文件互相覆盖。</p>
+ * {@code data/users/{userId}/schedules/}，避免同一天的文件互相覆盖。</p>
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ScheduleFileService {
 
-    private final ScheduleProperties scheduleProperties;
-    private final CurrentUserProvider currentUserProvider;
+    private final OwnedStorageResolver storage;
+    private final CurrentUserContext currentUserProvider;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final Pattern SCHEDULE_FILE_NAME_PATTERN =
             Pattern.compile("^schedule-\\d{4}-\\d{2}-\\d{2}\\.md$");
-
-    @PostConstruct
-    public void init() {
-        try {
-            Files.createDirectories(baseStorageDir());
-        } catch (IOException error) {
-            log.error("创建日程存储目录失败: {}", scheduleProperties.getStoragePath(), error);
-        }
-    }
 
     /** 保存单个日程到当前用户文件。 */
     public String saveScheduleToFile(ScheduleEvent event) {
@@ -56,15 +45,15 @@ public class ScheduleFileService {
         }
         try {
             String dateStr = event.getEventDate().format(DATE_FORMATTER);
-            Path filePath = userStorageDir().resolve("schedule-" + dateStr + ".md");
-            Files.createDirectories(filePath.getParent());
+            String storageKey = "schedule-" + dateStr + ".md";
+            Path filePath = pathForCreate(storageKey);
             String content = buildEventContent(event);
             if (Files.exists(filePath)) {
                 Files.writeString(filePath, content, StandardOpenOption.APPEND);
             } else {
                 Files.writeString(filePath, "# 日程安排 - " + dateStr + "\n\n" + content);
             }
-            return filePath.toString();
+            return storageKey;
         } catch (IOException error) {
             log.error("写入日程文件失败: {}", event.getTitle(), error);
             return null;
@@ -78,8 +67,8 @@ public class ScheduleFileService {
         }
         try {
             String dateStr = date.format(DATE_FORMATTER);
-            Path filePath = userStorageDir().resolve("schedule-" + dateStr + ".md");
-            Files.createDirectories(filePath.getParent());
+            String storageKey = "schedule-" + dateStr + ".md";
+            Path filePath = pathForCreate(storageKey);
             StringBuilder content = new StringBuilder();
             content.append("# 日程安排 - ").append(dateStr).append("\n\n")
                     .append("**更新时间**: ")
@@ -90,7 +79,7 @@ public class ScheduleFileService {
                 appendEvent(content, sortedEvents.get(i), i + 1);
             }
             Files.writeString(filePath, content.toString());
-            return filePath.toString();
+            return storageKey;
         } catch (IOException error) {
             log.error("生成日程文件失败: {}", date, error);
             return null;
@@ -100,8 +89,8 @@ public class ScheduleFileService {
     /** 生成当前用户的日程汇总文件。 */
     public String generateSummaryFile(String dateStr, List<ScheduleEvent> events) {
         try {
-            Path filePath = userStorageDir().resolve("summary-" + dateStr + ".md");
-            Files.createDirectories(filePath.getParent());
+            String storageKey = "summary-" + dateStr + ".md";
+            Path filePath = pathForCreate(storageKey);
             StringBuilder content = new StringBuilder();
             content.append("# 日程汇总 - ").append(dateStr).append("\n\n")
                     .append("**生成时间**: ")
@@ -116,7 +105,7 @@ public class ScheduleFileService {
                 }
             }
             Files.writeString(filePath, content.toString());
-            return filePath.toString();
+            return storageKey;
         } catch (IOException error) {
             log.error("生成日程汇总文件失败: {}", dateStr, error);
             return null;
@@ -125,7 +114,7 @@ public class ScheduleFileService {
 
     /** 读取当前用户指定日期的日程文件。 */
     public String readScheduleFile(LocalDate date) {
-        return readFile(userStorageDir().resolve("schedule-" + date.format(DATE_FORMATTER) + ".md"));
+        return readFile("schedule-" + date.format(DATE_FORMATTER) + ".md");
     }
 
     /** 读取当前用户指定文件名的日程文件。 */
@@ -133,27 +122,20 @@ public class ScheduleFileService {
         if (fileName == null || !SCHEDULE_FILE_NAME_PATTERN.matcher(fileName).matches()) {
             throw new IllegalArgumentException("非法日程文件名");
         }
-        Path userDir = userStorageDir();
-        Path filePath = userDir.resolve(fileName).normalize();
-        ensureInside(filePath, userDir);
-        return readFile(filePath);
+        return readFile(fileName);
     }
 
     /**
-     * 按完整路径读取日程文件，但只允许访问当前用户目录。
+     * 兼容旧调用名称；参数必须是当前用户目录内的 storage key，绝对路径会被拒绝。
      */
     public String readScheduleFileByPath(String filePathStr) {
-        Path userDir = userStorageDir();
-        Path filePath = Paths.get(filePathStr).toAbsolutePath().normalize();
-        ensureInside(filePath, userDir);
-        return readFile(filePath);
+        return readFile(filePathStr);
     }
 
     /** 删除当前用户指定日期的文件。 */
     public void deleteScheduleFile(LocalDate date) {
-        Path filePath = userStorageDir().resolve("schedule-" + date.format(DATE_FORMATTER) + ".md");
         try {
-            Files.deleteIfExists(filePath);
+            Files.deleteIfExists(pathExisting("schedule-" + date.format(DATE_FORMATTER) + ".md"));
         } catch (IOException error) {
             log.error("删除日程文件失败: {}", date, error);
         }
@@ -161,11 +143,8 @@ public class ScheduleFileService {
 
     /** 返回当前用户所有日程文件名。 */
     public List<String> listScheduleFiles() {
-        Path dir = userStorageDir();
-        if (!Files.exists(dir)) {
-            return List.of();
-        }
-        try (Stream<Path> stream = Files.list(dir)) {
+        try (Stream<Path> stream = Files.list(storage.resolveCategory(
+                currentUserProvider.requireUserId(), OwnedStorageResolver.Category.SCHEDULES, false))) {
             return stream
                     .filter(path -> SCHEDULE_FILE_NAME_PATTERN.matcher(path.getFileName().toString()).matches())
                     .map(path -> path.getFileName().toString())
@@ -177,33 +156,21 @@ public class ScheduleFileService {
         }
     }
 
-    private Path baseStorageDir() {
-        return Paths.get(scheduleProperties.getStoragePath()).toAbsolutePath().normalize();
-    }
-
-    private Path userStorageDir() {
+    private Path pathForCreate(String storageKey) throws IOException {
         long userId = currentUserProvider.requireUserId();
-        Path userDir = baseStorageDir().resolve("user-" + userId).normalize();
-        ensureInside(userDir, baseStorageDir());
-        try {
-            Files.createDirectories(userDir);
-        } catch (IOException error) {
-            throw new IllegalStateException("创建用户日程目录失败", error);
-        }
-        return userDir;
+        return storage.resolveForCreate(userId, OwnedStorageResolver.Category.SCHEDULES, storageKey);
     }
 
-    private void ensureInside(Path path, Path root) {
-        if (!path.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())) {
-            throw new IllegalArgumentException("非法日程文件路径");
-        }
+    private Path pathExisting(String storageKey) throws IOException {
+        long userId = currentUserProvider.requireUserId();
+        return storage.resolveExisting(userId, OwnedStorageResolver.Category.SCHEDULES, storageKey);
     }
 
-    private String readFile(Path filePath) {
+    private String readFile(String storageKey) {
         try {
-            return Files.exists(filePath) ? Files.readString(filePath) : null;
+            return Files.readString(pathExisting(storageKey));
         } catch (IOException error) {
-            log.error("读取日程文件失败: {}", filePath, error);
+            log.debug("日程文件不存在或不可读: {}", storageKey);
             return null;
         }
     }

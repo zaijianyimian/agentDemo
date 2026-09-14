@@ -1,9 +1,10 @@
 package com.example.demo.dispatch.application;
 
-import com.example.demo.dispatch.domain.DispatchedTask;
+import com.example.demo.auth.application.ExecutionContextFactory;
+import com.example.demo.email.application.EmailOwnedReferenceService;
+import com.example.demo.shared.context.ExecutionContextScope;
+import com.example.demo.shared.context.ExecutionPolicy;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -21,8 +22,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ExecutionRequestListener {
 
-    private final DispatchedTaskService taskService;
-    private final ObjectMapper objectMapper;
+    private final EmailOwnedReferenceService emailReferences;
+    private final ExecutionContextFactory executionContexts;
+    private final ConsumedExecutionRequestService consumer;
 
     /**
      * 消费 Python 发布的完整执行请求。
@@ -34,26 +36,27 @@ public class ExecutionRequestListener {
             autoStartup = "${app.dispatch.enabled:false}")
     public void onExecutionRequest(ExecutionRequest request) {
         validate(request);
-        DispatchedTask task = DispatchedTask.builder()
-                .userId(request.userId())
-                .emailId(request.emailId())
-                .emailUid(request.emailUid())
-                .subject(request.subject())
-                .bodyExcerpt(request.bodyExcerpt())
-                .importance(request.importance())
-                .executor(request.executor())
-                .executionInstruction(request.executionInstruction())
-                .retryMax(request.retryMax())
-                .executorTimeoutSeconds(request.executorTimeoutSeconds())
-                .sandboxLevel(request.sandboxLevel())
-                .toolAllowlist(toJson(request.toolAllowlist()))
-                .status(DispatchedTask.STATUS_PENDING)
-                .pushStatus(DispatchedTask.PUSH_PENDING)
-                .retries(0)
-                .build();
-        taskService.create(task);
-        log.info("execution request persisted: taskId={}, userId={}, executor={}",
-                task.getId(), task.getUserId(), task.getExecutor());
+        var source = emailReferences.requireEnabledConfig(request.emailId());
+        if (source.userId() != request.userId()) {
+            throw new IllegalArgumentException("execution request owner does not match email owner");
+        }
+        var context = executionContexts.forPersistedOwner(
+                source.userId(), "rabbit-execution-request", ExecutionPolicy.readOnly());
+        try (var ignored = ExecutionContextScope.open(context)) {
+            try {
+                var persisted = consumer.consume(source, request);
+                if (persisted != null) {
+                    log.info("execution request persisted: taskId={}, userId={}, executor={}",
+                            persisted.getId(), persisted.getUserId(), persisted.getExecutor());
+                } else {
+                    log.info("duplicate execution request ignored: userId={}, requestId={}",
+                            source.userId(), request.requestId());
+                }
+            } catch (RuntimeException error) {
+                consumer.recordFailure(source, request.requestId(), error);
+                throw error;
+            }
+        }
     }
 
     private void validate(ExecutionRequest request) {
@@ -63,6 +66,7 @@ public class ExecutionRequestListener {
         if (request.userId() == null || request.userId() <= 0) {
             throw new IllegalArgumentException("user_id must be greater than 0");
         }
+        requireText(request.requestId(), "request_id");
         if (request.emailId() == null || request.emailId() <= 0) {
             throw new IllegalArgumentException("email_id must be greater than 0");
         }
@@ -74,20 +78,7 @@ public class ExecutionRequestListener {
         if (request.executorTimeoutSeconds() == null || request.executorTimeoutSeconds() <= 0) {
             throw new IllegalArgumentException("executor_timeout_seconds must be greater than 0");
         }
-        String sandbox = requireText(request.sandboxLevel(), "sandbox_level");
-        if (!DispatchedTask.SANDBOX_READ_ONLY.equals(sandbox)
-                && !DispatchedTask.SANDBOX_WORKSPACE_WRITE.equals(sandbox)
-                && !DispatchedTask.SANDBOX_DANGER_FULL.equals(sandbox)) {
-            throw new IllegalArgumentException("unsupported sandbox_level: " + sandbox);
-        }
-    }
-
-    private String toJson(List<String> values) {
-        try {
-            return objectMapper.writeValueAsString(values == null ? List.of() : values);
-        } catch (JsonProcessingException error) {
-            throw new IllegalArgumentException("tool_allowlist must be a JSON string list", error);
-        }
+        requireText(request.sandboxLevel(), "sandbox_level");
     }
 
     private static String requireText(String value, String field) {
@@ -100,6 +91,7 @@ public class ExecutionRequestListener {
     /** Python 到 Java 的纯执行数据协议。 */
     public record ExecutionRequest(
             @JsonProperty("user_id") Long userId,
+            @JsonProperty("request_id") String requestId,
             @JsonProperty("email_id") Long emailId,
             @JsonProperty("email_uid") String emailUid,
             String subject,

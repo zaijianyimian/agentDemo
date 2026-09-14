@@ -35,8 +35,6 @@ declare module 'vue' {
     NSelect: typeof import('naive-ui')['NSelect']
     NSpace: typeof import('naive-ui')['NSpace']
     NSwitch: typeof import('naive-ui')['NSwitch']
-    NTag: typeof import('naive-ui')['NTag']
-    NText: typeof import('naive-ui')['NText']
     PasswordResetModal: typeof import('./components/PasswordResetModal.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
@@ -47,5 +45,6 @@ declare module 'vue' {
     UiStat: typeof import('./components/ui/UiStat.vue')['default']
     UiStatusBadge: typeof import('./components/ui/UiStatusBadge.vue')['default']
     UiToolbar: typeof import('./components/ui/UiToolbar.vue')['default']
+    WorkspaceContextSidebar: typeof import('./components/WorkspaceContextSidebar.vue')['default']
   }
 }

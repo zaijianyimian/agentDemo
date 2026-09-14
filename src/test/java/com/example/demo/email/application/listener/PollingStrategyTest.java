@@ -1,6 +1,7 @@
 package com.example.demo.email.application.listener;
 
 import com.example.demo.email.application.EmailListenerStateService;
+import com.example.demo.email.application.EmailListenerExecutionGuard;
 import com.example.demo.email.application.listener.strategy.MailSourceAdapter;
 import com.example.demo.email.domain.EmailConfig;
 import com.example.demo.email.domain.EmailMessage;
@@ -26,9 +27,11 @@ class PollingStrategyTest {
     void publishesMessageAndAdvancesCursorAfterSuccessfulProcessing() {
         EmailListenerStateService stateService = mock(EmailListenerStateService.class);
         EmailMessagePublisher publisher = mock(EmailMessagePublisher.class);
+        EmailListenerExecutionGuard executionGuard = mock(EmailListenerExecutionGuard.class);
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        PollingStrategy strategy = new PollingStrategy(stateService, publisher, executor);
+        PollingStrategy strategy = new PollingStrategy(stateService, publisher, executionGuard, executor);
         EmailConfig config = EmailConfig.builder().id(1L).email("a@example.com").build();
+        when(executionGuard.mayAccessProvider(config)).thenReturn(true);
         MailCursor before = MailCursor.of("UID", 1);
         MailCursor after = MailCursor.of("UID", 2);
         when(stateService.cursorFor(config)).thenReturn(before);
@@ -47,9 +50,11 @@ class PollingStrategyTest {
     void doesNotAdvanceCursorWhenPublishingFails() {
         EmailListenerStateService stateService = mock(EmailListenerStateService.class);
         EmailMessagePublisher publisher = mock(EmailMessagePublisher.class);
+        EmailListenerExecutionGuard executionGuard = mock(EmailListenerExecutionGuard.class);
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        PollingStrategy strategy = new PollingStrategy(stateService, publisher, executor);
+        PollingStrategy strategy = new PollingStrategy(stateService, publisher, executionGuard, executor);
         EmailConfig config = EmailConfig.builder().id(1L).email("a@example.com").build();
+        when(executionGuard.mayAccessProvider(config)).thenReturn(true);
         MailCursor before = MailCursor.of("UID", 1);
         MailCursor after = MailCursor.of("UID", 2);
         when(stateService.cursorFor(config)).thenReturn(before);

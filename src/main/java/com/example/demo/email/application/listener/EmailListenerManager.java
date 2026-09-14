@@ -7,10 +7,12 @@ import com.example.demo.email.application.listener.strategy.ListenStrategy;
 import com.example.demo.email.application.listener.strategy.MailSourceAdapter;
 import com.example.demo.email.domain.EmailConfig;
 import com.example.demo.email.domain.EmailListenerState;
+import com.example.demo.email.domain.OwnedEmailConfigRef;
 import com.example.demo.email.domain.listener.ListenMode;
 import com.example.demo.email.domain.listener.ListenerStatus;
 import com.example.demo.email.domain.listener.MailProvider;
 import com.example.demo.email.persistence.EmailConfigMapper;
+import com.example.demo.shared.context.CurrentUserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -34,9 +36,10 @@ public class EmailListenerManager {
     private final MailSourceAdapterRegistry adapterRegistry;
     private final ListenStrategyRegistry strategyRegistry;
     private final EmailConfigMapper emailConfigMapper;
+    private final CurrentUserContext currentUser;
 
-    private final Map<Long, ListenStrategy> runningStrategies = new ConcurrentHashMap<>();
-    private final Map<Long, EmailConfig> runningConfigs = new ConcurrentHashMap<>();
+    private final Map<OwnedEmailConfigRef, ListenStrategy> runningStrategies = new ConcurrentHashMap<>();
+    private final Map<OwnedEmailConfigRef, EmailConfig> runningConfigs = new ConcurrentHashMap<>();
 
     /**
      * 启动指定邮箱的监听：选择 provider 适配器 + 监听策略并替换已有的同邮箱会话。
@@ -44,9 +47,10 @@ public class EmailListenerManager {
      * @param config 邮箱配置。
      */
     public void start(EmailConfig config) {
+        OwnedEmailConfigRef reference = requireCurrentOwner(config);
         authConfigService.decodeTransientFields(config);
         configSupport.applyDefaults(config);
-        stop(config.getId());
+        stop(reference);
 
         MailProvider provider = MailProvider.fromConfig(config);
         ListenMode mode = ListenMode.fromConfig(config);
@@ -60,8 +64,8 @@ public class EmailListenerManager {
         ListenStrategy strategy = strategyRegistry.get(mode);
         stateService.markStatus(config, ListenerStatus.STARTING, null);
         strategy.start(config, adapter);
-        runningStrategies.put(config.getId(), strategy);
-        runningConfigs.put(config.getId(), config);
+        runningStrategies.put(reference, strategy);
+        runningConfigs.put(reference, config);
     }
 
     /**
@@ -69,22 +73,30 @@ public class EmailListenerManager {
      *
      * @param configId 邮箱配置 ID。
      */
-    public void stop(Long configId) {
-        ListenStrategy strategy = runningStrategies.remove(configId);
+    public void stop(EmailConfig config) {
+        stop(requireCurrentOwner(config));
+    }
+
+    private void stop(OwnedEmailConfigRef reference) {
+        ListenStrategy strategy = runningStrategies.remove(reference);
         if (strategy != null) {
-            strategy.stop(configId);
+            strategy.stop(reference.configId());
         }
-        EmailConfig config = runningConfigs.remove(configId);
+        EmailConfig config = runningConfigs.remove(reference);
         if (config != null) {
             stateService.markStatus(config, ListenerStatus.STOPPED, null);
         }
     }
 
-    /** 停止所有邮箱监听。 */
-    public void stopAll() {
-        for (Long configId : List.copyOf(runningStrategies.keySet())) {
-            stop(configId);
+    /** Lifecycle-only global stop; never expose this method through a user controller. */
+    public void stopAllForLifecycleInternal() {
+        for (OwnedEmailConfigRef reference : List.copyOf(runningStrategies.keySet())) {
+            stop(reference);
         }
+    }
+
+    public void stopForLifecycleInternal(OwnedEmailConfigRef reference) {
+        stop(reference);
     }
 
     /**
@@ -97,15 +109,18 @@ public class EmailListenerManager {
      * @return 当前调用方可见的邮箱状态。
      */
     public Map<Long, Map<String, Object>> status() {
+        long ownerId = currentUser.requireUserId();
         Map<Long, Map<String, Object>> result = new HashMap<>();
         for (EmailListenerState state : stateService.listAll()) {
             EmailConfig config = emailConfigMapper.selectById(state.getConfigId());
-            if (config == null) {
+            if (config == null || !Long.valueOf(ownerId).equals(config.getUserId())) {
                 continue;
             }
 
+            OwnedEmailConfigRef reference = new OwnedEmailConfigRef(ownerId, state.getConfigId());
+
             Map<String, Object> item = new HashMap<>();
-            item.put("connected", runningStrategies.containsKey(state.getConfigId()));
+            item.put("connected", runningStrategies.containsKey(reference));
             item.put("status", state.getStatus());
             item.put("provider", state.getProvider());
             item.put("listenMode", state.getListenMode());
@@ -126,13 +141,25 @@ public class EmailListenerManager {
      * @param configId 邮箱配置 ID。
      * @param payload Webhook 请求体。
      */
-    public void handleWebhook(Long configId, Map<String, Object> payload) {
-        EmailConfig config = runningConfigs.get(configId);
+    public void handleWebhook(EmailConfig requestedConfig, Map<String, Object> payload) {
+        OwnedEmailConfigRef reference = requireCurrentOwner(requestedConfig);
+        EmailConfig config = runningConfigs.get(reference);
         if (config == null) {
-            throw new IllegalArgumentException("邮箱监听未运行: " + configId);
+            throw new IllegalArgumentException("邮箱监听未运行: " + reference.configId());
         }
         MailSourceAdapter adapter = adapterRegistry.get(MailProvider.fromConfig(config));
         ListenStrategy strategy = strategyRegistry.get(ListenMode.WEBHOOK);
         strategy.handleWebhook(config, adapter, payload);
+    }
+
+    private OwnedEmailConfigRef requireCurrentOwner(EmailConfig config) {
+        if (config == null || config.getId() == null || config.getUserId() == null) {
+            throw new IllegalArgumentException("邮箱配置缺少可信 owner");
+        }
+        long ownerId = currentUser.requireUserId();
+        if (ownerId != config.getUserId()) {
+            throw new IllegalArgumentException("邮箱配置 owner 与执行上下文不匹配");
+        }
+        return new OwnedEmailConfigRef(ownerId, config.getId());
     }
 }

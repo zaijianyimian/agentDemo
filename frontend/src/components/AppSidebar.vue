@@ -6,8 +6,8 @@
           <img src="/resource/logo.png" alt="Agent" @error="hideBrokenImage" />
         </span>
         <span v-if="!collapsed" class="brand-copy">
-          <strong>Agent Workspace</strong>
-          <small>Personal AI Console</small>
+          <strong>Agent Console</strong>
+          <small>Personal workspace</small>
         </span>
       </button>
       <button class="collapse-button" type="button" @click="$emit('toggle')" :title="collapsed ? '展开导航' : '收起导航'">
@@ -19,14 +19,13 @@
     </div>
 
     <nav class="sidebar-nav" aria-label="主导航">
-      <section v-for="category in navStore.categories" :key="category.id" class="nav-group">
-        <div v-if="!collapsed" class="nav-group-title">{{ category.label }}</div>
+      <section class="nav-group">
         <button
-          v-for="item in category.routes"
-          :key="item.name"
+          v-for="item in primaryRoutes"
+          :key="item.path"
           type="button"
           :class="['nav-entry', { active: isActive(item.path) }]"
-          :title="collapsed ? item.label : item.description"
+          :title="collapsed ? item.label : undefined"
           @click="navigate(item.path)"
         >
           <span class="nav-entry-icon">
@@ -34,7 +33,25 @@
           </span>
           <span v-if="!collapsed" class="nav-entry-copy">
             <strong>{{ item.label }}</strong>
-            <small>{{ item.description }}</small>
+          </span>
+        </button>
+      </section>
+
+      <section class="nav-group module-group">
+        <div v-if="!collapsed" class="nav-group-title">功能空间</div>
+        <button
+          v-for="item in moduleRoutes"
+          :key="item.category"
+          type="button"
+          :class="['nav-entry', { active: isCategoryActive(item.category) }]"
+          :title="collapsed ? item.label : undefined"
+          @click="navigate(item.path)"
+        >
+          <span class="nav-entry-icon">
+            <n-icon size="18"><component :is="getIconComponent(item.icon)" /></n-icon>
+          </span>
+          <span v-if="!collapsed" class="nav-entry-copy">
+            <strong>{{ item.label }}</strong>
           </span>
         </button>
       </section>
@@ -67,28 +84,14 @@ import {
   ChatbubblesOutline,
   ChevronBackOutline,
   ChevronForwardOutline,
-  CloudOutline,
-  CloudUploadOutline,
-  CodeSlashOutline,
   ConstructOutline,
-  CubeOutline,
-  DocumentTextOutline,
   FileTrayFullOutline,
-  FolderOutline,
   GridOutline,
   HomeOutline,
-  MailOutline,
-  NotificationsOutline,
-  PersonOutline,
-  ReaderOutline,
-  RocketOutline,
-  SearchOutline,
-  SendOutline,
   SettingsOutline,
   SparklesOutline,
   SunnyOutline,
-  MoonOutline,
-  TimeOutline
+  MoonOutline
 } from '@vicons/ionicons5'
 import { useMacNavStore } from '@/stores/mac-nav'
 import { useThemeStore } from '@/stores/theme'
@@ -106,34 +109,31 @@ const router = useRouter()
 const navStore = useMacNavStore()
 const themeStore = useThemeStore()
 
+const primaryRoutes = [
+  { path: '/', label: '工作台', icon: 'home' },
+  { path: '/mvp', label: '讲解 MVP', icon: 'sparkles' },
+  { path: '/chat', label: '对话', icon: 'chatbubbles' },
+  { path: '/inbox', label: '统一收件箱', icon: 'inbox' },
+  { path: '/settings', label: '设置', icon: 'settings' }
+]
+
+const moduleRoutes = [
+  { category: 'productivity', path: '/schedule', label: '效率与日程', icon: 'calendar' },
+  { category: 'knowledge', path: '/knowledge', label: '知识与文件', icon: 'book' },
+  { category: 'agent', path: '/autonomy', label: 'Agent 能力', icon: 'sparkles' },
+  { category: 'system', path: '/email', label: '系统服务', icon: 'construct' }
+]
+
 const iconMap: Record<string, any> = {
   home: HomeOutline,
   grid: GridOutline,
   inbox: FileTrayFullOutline,
   chatbubbles: ChatbubblesOutline,
   calendar: CalendarOutline,
-  time: TimeOutline,
-  timer: TimeOutline,
-  note: DocumentTextOutline,
-  reader: ReaderOutline,
   book: BookOutline,
-  brain: CloudOutline,
-  search: SearchOutline,
-  folder: FolderOutline,
-  import: CloudUploadOutline,
   sparkles: SparklesOutline,
-  dispatch: SendOutline,
   construct: ConstructOutline,
-  rocket: RocketOutline,
-  document: DocumentTextOutline,
-  code: CodeSlashOutline,
-  cube: CubeOutline,
-  cpu: CubeOutline,
-  mail: MailOutline,
-  bell: NotificationsOutline,
-  push: NotificationsOutline,
-  settings: SettingsOutline,
-  person: PersonOutline
+  settings: SettingsOutline
 }
 
 const getIconComponent = (icon: string) => iconMap[icon] || GridOutline
@@ -141,6 +141,11 @@ const getIconComponent = (icon: string) => iconMap[icon] || GridOutline
 const isActive = (path: string) => {
   if (path === '/') return route.path === '/'
   return route.path === path || route.path.startsWith(`${path}/`)
+}
+
+const isCategoryActive = (categoryId: string) => {
+  if (['Dashboard', 'Chat', 'Inbox', 'Settings'].includes(String(route.name || ''))) return false
+  return navStore.getCategoryForRoute(String(route.name || ''))?.id === categoryId
 }
 
 const navigate = (path: string) => {
@@ -159,30 +164,30 @@ const hideBrokenImage = (event: Event) => {
 .app-sidebar {
   display: flex;
   flex-direction: column;
-  flex: 0 0 244px;
-  width: 244px;
-  min-width: 244px;
+  flex: 0 0 190px;
+  width: 190px;
+  min-width: 190px;
   height: 100vh;
-  padding: 16px 12px;
-  background: var(--bg-card);
+  padding: 12px 10px;
+  background: color-mix(in srgb, var(--bg-input) 74%, var(--bg-card));
   border-right: 1px solid var(--workspace-border, var(--border-light));
   transition: width 180ms ease, min-width 180ms ease, flex-basis 180ms ease;
   overflow: hidden;
 }
 
 .app-sidebar.collapsed {
-  flex-basis: 72px;
-  width: 72px;
-  min-width: 72px;
-  padding-inline: 10px;
+  flex-basis: 68px;
+  width: 68px;
+  min-width: 68px;
+  padding-inline: 8px;
 }
 
 .sidebar-brand {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 52px;
-  padding: 0 2px 12px;
+  min-height: 56px;
+  padding: 0 2px 10px;
   border-bottom: 1px solid var(--workspace-border, var(--border-light));
 }
 
@@ -266,8 +271,8 @@ const hideBrokenImage = (event: Event) => {
 
 .collapsed .collapse-button {
   position: absolute;
-  left: 52px;
-  top: 28px;
+  left: 49px;
+  top: 24px;
   width: 24px;
   height: 24px;
   border: 1px solid var(--workspace-border, var(--border-light));
@@ -278,13 +283,18 @@ const hideBrokenImage = (event: Event) => {
 .sidebar-nav {
   flex: 1;
   min-height: 0;
-  padding: 14px 0;
+  padding: 12px 0;
   overflow-y: auto;
   scrollbar-width: thin;
 }
 
 .nav-group + .nav-group {
-  margin-top: 18px;
+  margin-top: 14px;
+}
+
+.module-group {
+  padding-top: 12px;
+  border-top: 1px solid var(--workspace-border, var(--border-light));
 }
 
 .nav-group-title {
@@ -302,9 +312,9 @@ const hideBrokenImage = (event: Event) => {
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 44px;
-  padding: 7px 9px;
-  border-radius: 10px;
+  min-height: 42px;
+  padding: 7px 10px;
+  border-radius: 9px;
   background: transparent;
   text-align: left;
   transition: background 140ms ease, color 140ms ease;
@@ -354,7 +364,7 @@ const hideBrokenImage = (event: Event) => {
 
 .nav-entry-copy strong {
   color: var(--text-primary);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 650;
 }
 

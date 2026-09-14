@@ -18,11 +18,6 @@ public class ScheduleProperties {
     private Boolean enabled = true;
 
     /**
-     * 日程文件存储路径
-     */
-    private String storagePath = "./data/schedules";
-
-    /**
      * 用户接收邮件地址
      */
     private String userEmail;

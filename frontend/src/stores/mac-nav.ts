@@ -1,5 +1,12 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { getCurrentUserId } from '@/services/auth-token'
+
+const LEGACY_QUICK_ACCESS_KEY = 'macNavQuickAccess'
+const quickAccessKey = (): string | null => {
+  const userId = getCurrentUserId()
+  return userId ? `agent-demo:v1:user:${userId}:navigation.quickAccess` : null
+}
 
 /** 全局导航分组。 */
 export interface NavCategory {
@@ -58,7 +65,6 @@ export const useMacNavStore = defineStore('macNav', () => {
         { name: 'Schedule', path: '/schedule', label: '日程', description: '查看事件、提醒与邮件解析日程', icon: 'calendar' },
         { name: 'Tasks', path: '/tasks', label: '定时任务', description: '管理可由 Agent 触发的计划任务', icon: 'time' },
         { name: 'TaskAdmin', path: '/task-admin', label: '调度管理', description: '查看任务执行状态与日志', icon: 'timer' },
-        { name: 'Notes', path: '/notes', label: '笔记', description: '沉淀知识并调用 AI 总结', icon: 'note' },
         { name: 'Notifications', path: '/notifications', label: '通知', description: '系统提醒与消息中心', icon: 'bell' },
         { name: 'Reports', path: '/reports', label: '日报周报', description: '生成并查看个人报告', icon: 'reader' }
       ]
@@ -100,8 +106,8 @@ export const useMacNavStore = defineStore('macNav', () => {
       routes: [
         { name: 'Email', path: '/email', label: '邮件配置', description: '维护邮箱连接与监听状态', icon: 'mail' },
         { name: 'PushConfig', path: '/push-config', label: '推送配置', description: '维护推送邮箱与阈值', icon: 'push' },
-        { name: 'Settings', path: '/settings', label: '系统设置', description: '模型、存储、执行器与基础参数', icon: 'settings', hasInspector: true },
-        { name: 'Personal', path: '/personal', label: '个人中心', description: '个人效率、模板与备份恢复', icon: 'person' }
+        { name: 'Settings', path: '/settings', label: '设置', description: '本机外观偏好与执行边界', icon: 'settings', hasInspector: true },
+        { name: 'Personal', path: '/personal', label: '个人中心', description: '个人效率、模板与账户信息', icon: 'person' }
       ]
     }
   ])
@@ -125,7 +131,9 @@ export const useMacNavStore = defineStore('macNav', () => {
   /** 从本地存储恢复最近访问列表。 */
   const loadQuickAccess = () => {
     try {
-      const stored = localStorage.getItem('macNavQuickAccess')
+      localStorage.removeItem(LEGACY_QUICK_ACCESS_KEY)
+      const key = quickAccessKey()
+      const stored = key ? localStorage.getItem(key) : null
       quickAccessItems.value = stored ? JSON.parse(stored) : []
     } catch {
       quickAccessItems.value = []
@@ -134,7 +142,8 @@ export const useMacNavStore = defineStore('macNav', () => {
 
   /** 持久化最近访问列表。 */
   const saveQuickAccess = () => {
-    localStorage.setItem('macNavQuickAccess', JSON.stringify(quickAccessItems.value))
+    const key = quickAccessKey()
+    if (key) localStorage.setItem(key, JSON.stringify(quickAccessItems.value))
   }
 
   /** 记录一次路由访问。 */

@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { authService, authTokenStorage } from '@/services/api/auth'
 import type { AuthTokenResponse, AuthUserProfile, EmailCodeSendResponse } from '@/types'
+import { advanceSessionGeneration, currentSessionGeneration } from '@/services/session-lifecycle'
 
 /**
  * 认证状态 Store
@@ -15,6 +16,7 @@ import type { AuthTokenResponse, AuthUserProfile, EmailCodeSendResponse } from '
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUserProfile | null>(null)
   const initialized = ref(false)
+  const sessionGeneration = ref(currentSessionGeneration())
 
   const isAuthenticated = computed(() => !!authTokenStorage.getAccessToken() && !!user.value)
 
@@ -22,6 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!payload.accessToken || !payload.refreshToken || !payload.user) {
       throw new Error('登录态数据不完整')
     }
+    sessionGeneration.value = advanceSessionGeneration()
     authTokenStorage.setTokens(payload.accessToken, payload.refreshToken)
     user.value = payload.user
   }
@@ -30,6 +33,7 @@ export const useAuthStore = defineStore('auth', () => {
    * 清除本地 token 与 user，回到未登录状态（不触发后端登出请求）。
    */
   const clearSession = () => {
+    sessionGeneration.value = advanceSessionGeneration()
     authTokenStorage.clearTokens()
     user.value = null
   }
@@ -125,6 +129,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     initialized,
+    sessionGeneration,
     isAuthenticated,
     hydrate,
     setSession,

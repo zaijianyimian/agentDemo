@@ -1,12 +1,13 @@
 package com.example.demo.dispatch.application.push;
 
 import com.example.demo.dispatch.application.DispatchProperties;
-import com.example.demo.dispatch.application.DispatchedTaskService;
-import com.example.demo.dispatch.application.WorkspaceManager;
+import com.example.demo.dispatch.application.PushConfigService;
+import com.example.demo.auth.application.ExecutionContextFactory;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import com.example.demo.dispatch.domain.PushConfig;
 
 import com.example.demo.dispatch.persistence.DispatchedTaskMapper;
+import com.example.demo.dispatch.persistence.PushConfigMapper;
 import com.example.demo.email.application.EmailSenderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ class PushDispatcherTest {
 
     private DispatchProperties props;
     private DispatchedTaskMapper mapper;
-    private WorkspaceManager workspaceManager;
+    private PushConfigService pushConfigs;
     private EmailSenderService sender;
     private PushDispatcher dispatcher;
 
@@ -30,13 +31,13 @@ class PushDispatcherTest {
         props = new DispatchProperties();
         props.setPushRetryMax(2);
         mapper = mock(DispatchedTaskMapper.class);
-        workspaceManager = mock(WorkspaceManager.class);
+        pushConfigs = mock(PushConfigService.class);
         sender = mock(EmailSenderService.class);
         dispatcher = new PushDispatcher(props,
-                mock(DispatchedTaskService.class),
-                mapper, workspaceManager, sender);
+                mapper, pushConfigs, mock(PushConfigMapper.class),
+                mock(ExecutionContextFactory.class), sender);
 
-        when(workspaceManager.loadPushConfig()).thenReturn(PushConfig.builder()
+        when(pushConfigs.getOrCreate()).thenReturn(PushConfig.builder()
                 .pushEmail("me@example.com")
                 .pushThreshold("medium")
                 .immediateEnabled(true)
@@ -69,7 +70,7 @@ class PushDispatcherTest {
 
     @Test
     void missingPushEmailSkips() {
-        when(workspaceManager.loadPushConfig()).thenReturn(PushConfig.builder()
+        when(pushConfigs.getOrCreate()).thenReturn(PushConfig.builder()
                 .pushEmail(null).pushThreshold("medium").immediateEnabled(true).build());
         DispatchedTask t = task(4L, "high", DispatchedTask.STATUS_DONE);
         dispatcher.pushImmediate(t);
@@ -99,7 +100,7 @@ class PushDispatcherTest {
                 .subject("s" + id)
                 .importance(importance)
                 .status(status)
-                .executorUsed("claude-code")
+                .executorUsed(null)
                 .resultPath("/tmp/nonexistent.md")
                 .build();
     }

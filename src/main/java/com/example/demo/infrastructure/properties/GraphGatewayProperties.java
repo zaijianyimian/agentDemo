@@ -23,9 +23,6 @@ public class GraphGatewayProperties {
     /** Python Graph 服务地址。 */
     private String baseUrl = "http://127.0.0.1:8001";
 
-    /** Java 与 Python 内部调用共享密钥。 */
-    private String internalToken = "";
-
     /** 建立连接超时时间，单位秒。 */
     private int connectTimeoutSeconds = 5;
 
@@ -33,7 +30,7 @@ public class GraphGatewayProperties {
     private int responseTimeoutSeconds = 120;
 
     /**
-     * 启动时验证 Graph 配置，避免打开功能后才在运行期发现内部鉴权或超时配置错误。
+     * 启动时验证 Graph 配置，避免打开功能后才在运行期发现地址或超时配置错误。
      */
     @PostConstruct
     public void validate() {
@@ -54,9 +51,6 @@ public class GraphGatewayProperties {
         }
         if (uri.getScheme() == null || uri.getHost() == null) {
             throw new IllegalStateException("Graph base-url 必须是完整的 http/https 地址: " + baseUrl);
-        }
-        if (internalToken == null || internalToken.isBlank()) {
-            throw new IllegalStateException("启用 Graph 时必须配置 GRAPH_INTERNAL_TOKEN");
         }
     }
 }

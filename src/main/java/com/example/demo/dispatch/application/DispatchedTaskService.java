@@ -2,12 +2,20 @@ package com.example.demo.dispatch.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.demo.dispatch.domain.DispatchResultEvent;
+import com.example.demo.dispatch.domain.DispatchResultOutbox;
 import com.example.demo.dispatch.domain.DispatchedTask;
+import com.example.demo.dispatch.domain.OwnedTaskRef;
+import com.example.demo.dispatch.persistence.DispatchResultOutboxMapper;
 import com.example.demo.dispatch.persistence.DispatchedTaskMapper;
+import com.example.demo.shared.context.CurrentUserContext;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,6 +49,9 @@ public class DispatchedTaskService {
             DispatchedTask.STATUS_RUNNING + "->" + DispatchedTask.STATUS_FAILED);
 
     private final DispatchedTaskMapper mapper;
+    private final DispatchResultOutboxMapper outboxMapper;
+    private final ObjectMapper objectMapper;
+    private final CurrentUserContext currentUser;
 
     /**
      * 按 id 查询派发任务。
@@ -60,15 +71,20 @@ public class DispatchedTaskService {
     /**
      * 按创建时间正序取最近一批 PENDING 任务，供 poller 抢占。
      */
-    public List<DispatchedTask> findPending(int limit) {
-        return mapper.selectList(new LambdaQueryWrapper<DispatchedTask>()
-                .eq(DispatchedTask::getStatus, DispatchedTask.STATUS_PENDING)
-                .orderByAsc(DispatchedTask::getCreatedAt)
-                .last("LIMIT " + limit));
+    public List<OwnedTaskRef> findPending(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        return mapper.selectPendingForInternalScan(limit);
     }
 
     /** 保存 Python Agent 已确定的执行任务。 */
     public DispatchedTask create(DispatchedTask task) {
+        long userId = currentUser.requireUserId();
+        if (task.getRequestId() == null || task.getRequestId().isBlank()) {
+            throw new IllegalArgumentException("request_id required");
+        }
+        task.setUserId(userId);
         if (task.getStatus() == null) {
             task.setStatus(DispatchedTask.STATUS_PENDING);
         }
@@ -81,9 +97,26 @@ public class DispatchedTaskService {
         if (task.getCreatedAt() == null) {
             task.setCreatedAt(LocalDateTime.now());
         }
+        if (task.getVersion() == null) {
+            task.setVersion(0L);
+        }
+        if (task.getAttempt() == null) {
+            task.setAttempt(0);
+        }
         task.setUpdatedAt(LocalDateTime.now());
-        mapper.insert(task);
-        return task;
+        try {
+            mapper.insert(task);
+            return task;
+        } catch (DuplicateKeyException duplicate) {
+            DispatchedTask existing = mapper.selectOne(new LambdaQueryWrapper<DispatchedTask>()
+                    .eq(DispatchedTask::getUserId, userId)
+                    .eq(DispatchedTask::getRequestId, task.getRequestId())
+                    .last("LIMIT 1"));
+            if (existing != null) {
+                return existing;
+            }
+            throw duplicate;
+        }
     }
 
     /**
@@ -92,109 +125,78 @@ public class DispatchedTaskService {
      * @return true 表示本 worker 抢到了该任务
      */
     @Transactional
-    public boolean claimRunning(Long id, String executor) {
-        int affected = mapper.claimRunning(id, executor);
-        return affected > 0;
+    public boolean claimRunning(OwnedTaskRef task) {
+        return mapper.claimRunning(task.userId(), task.taskId(), task.version()) > 0;
     }
 
     /**
      * 通用状态转换（带校验）。
      */
     @Transactional
-    public void transitionTo(Long id, String newStatus, Runnable mutator) {
-        DispatchedTask existing = mapper.selectById(id);
-        if (existing == null) {
-            throw new IllegalArgumentException("task not found: " + id);
+    public boolean markFailed(DispatchedTask task, String errorCode, String errorMessage) {
+        int affected = mapper.failCurrentAttempt(task.getUserId(), task.getId(), task.getVersion(),
+                task.getAttempt(), errorCode, errorMessage);
+        if (affected == 0) {
+            return false;
         }
-        validateTransition(existing.getStatus(), newStatus);
-        if (mutator != null) {
-            mutator.run();
-        }
-        existing.setStatus(newStatus);
-        existing.setUpdatedAt(LocalDateTime.now());
-        if (DispatchedTask.STATUS_DONE.equals(newStatus) || DispatchedTask.STATUS_FAILED.equals(newStatus)) {
-            existing.setFinishedAt(LocalDateTime.now());
-        }
-        mapper.updateById(existing);
+        LocalDateTime finishedAt = LocalDateTime.now();
+        String eventId = "dispatch-result:" + task.getRequestId() + ":" + task.getAttempt();
+        DispatchResultEvent event = new DispatchResultEvent(
+                eventId, 1, task.getUserId(), finishedAt, "DISPATCHED_TASK", task.getId(),
+                task.getRequestId(), task.getAttempt(), DispatchedTask.STATUS_FAILED,
+                task.getExecutorUsed(), task.getRetries(), null, errorCode, errorMessage);
+        outboxMapper.insert(DispatchResultOutbox.builder()
+                .userId(task.getUserId())
+                .eventId(eventId)
+                .requestId(task.getRequestId())
+                .taskId(task.getId())
+                .attempt(task.getAttempt())
+                .status(DispatchResultOutbox.STATUS_PENDING)
+                .payload(toJson(event))
+                .publishAttempts(0)
+                .availableAt(finishedAt)
+                .createdAt(finishedAt)
+                .updatedAt(finishedAt)
+                .build());
+        task.setStatus(DispatchedTask.STATUS_FAILED);
+        task.setErrorCode(errorCode);
+        task.setErrorMessage(errorMessage);
+        task.setVersion(task.getVersion() + 1);
+        task.setFinishedAt(finishedAt);
+        return true;
     }
 
-    /**
-     * 将任务标记为 RUNNING；抢占失败时抛出 IllegalStateException。
-     */
-    public void markRunning(Long id, String executor) {
-        if (!claimRunning(id, executor)) {
-            throw new IllegalStateException("task " + id + " cannot be claimed as RUNNING");
+    private String toJson(DispatchResultEvent event) {
+        try {
+            return objectMapper.writeValueAsString(event);
+        } catch (JsonProcessingException error) {
+            throw new IllegalStateException("Failed to serialize dispatch result", error);
         }
-    }
-
-    public void markDone(Long id, String executorUsed, String resultText, String resultPath) {
-        DispatchedTask t = mapper.selectById(id);
-        if (t == null) {
-            throw new IllegalArgumentException("task not found: " + id);
-        }
-        validateTransition(t.getStatus(), DispatchedTask.STATUS_DONE);
-        t.setStatus(DispatchedTask.STATUS_DONE);
-        t.setExecutorUsed(executorUsed);
-        t.setResult(resultText);
-        t.setResultPath(resultPath);
-        t.setUpdatedAt(LocalDateTime.now());
-        t.setFinishedAt(LocalDateTime.now());
-        mapper.updateById(t);
-    }
-
-    /**
-     * 将任务标记为 FAILED 并记录错误信息，触发 finished_at 写入。
-     */
-    public void markFailed(Long id, String executorUsed, String errorMessage) {
-        DispatchedTask t = mapper.selectById(id);
-        if (t == null) {
-            throw new IllegalArgumentException("task not found: " + id);
-        }
-        validateTransition(t.getStatus(), DispatchedTask.STATUS_FAILED);
-        t.setStatus(DispatchedTask.STATUS_FAILED);
-        if (executorUsed != null) {
-            t.setExecutorUsed(executorUsed);
-        }
-        t.setErrorMessage(errorMessage);
-        t.setUpdatedAt(LocalDateTime.now());
-        t.setFinishedAt(LocalDateTime.now());
-        mapper.updateById(t);
-    }
-
-    /** 给同一执行器的基础设施重试累加计数。 */
-    public void appendRetry(Long id) {
-        DispatchedTask t = mapper.selectById(id);
-        if (t == null) {
-            throw new IllegalArgumentException("task not found: " + id);
-        }
-        t.setRetries(t.getRetries() == null ? 1 : t.getRetries() + 1);
-        t.setUpdatedAt(LocalDateTime.now());
-        mapper.updateById(t);
     }
 
     /**
      * 取消任务：仅允许 PENDING → CANCELLED 的转换。
      */
     public void cancel(Long id) {
-        transitionTo(id, DispatchedTask.STATUS_CANCELLED, () -> {});
+        DispatchedTask task = requireCurrentTask(id);
+        if (mapper.cancelPending(currentUser.requireUserId(), id, task.getVersion()) == 0) {
+            throw new InvalidStatusTransitionException("task cannot be cancelled");
+        }
     }
 
     public void rerun(Long id) {
-        DispatchedTask t = mapper.selectById(id);
-        if (t == null) {
-            throw new IllegalArgumentException("task not found: " + id);
+        DispatchedTask task = requireCurrentTask(id);
+        if (mapper.rerunTerminal(currentUser.requireUserId(), id, task.getVersion()) == 0) {
+            throw new InvalidStatusTransitionException("task cannot be rerun");
         }
-        if (!DispatchedTask.STATUS_DONE.equals(t.getStatus())
-                && !DispatchedTask.STATUS_FAILED.equals(t.getStatus())) {
-            throw new IllegalStateException("task " + id + " is not in a re-runnable state: " + t.getStatus());
+    }
+
+    private DispatchedTask requireCurrentTask(Long id) {
+        DispatchedTask task = mapper.selectById(id);
+        if (task == null) {
+            throw new com.example.demo.shared.web.UserResourceNotFoundException("task not found");
         }
-        t.setStatus(DispatchedTask.STATUS_PENDING);
-        t.setRetries(0);
-        t.setFinishedAt(null);
-        t.setPushStatus(DispatchedTask.PUSH_PENDING);
-        t.setErrorMessage(null);
-        t.setUpdatedAt(LocalDateTime.now());
-        mapper.updateById(t);
+        return task;
     }
 
     private void validateTransition(String from, String to) {

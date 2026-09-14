@@ -2,7 +2,8 @@
   <div class="workspace-shell" :data-theme="actualTheme">
     <a href="#main-content" class="skip-link">跳转到主要内容</a>
 
-    <AppSidebar :collapsed="sidebarCollapsed" @toggle="toggleSidebar" />
+    <AppSidebar :collapsed="effectiveSidebarCollapsed" @toggle="toggleSidebar" />
+    <WorkspaceContextSidebar />
 
     <main id="main-content" class="workspace-main">
       <AppTopbar
@@ -145,14 +146,12 @@ import {
 } from '@vicons/ionicons5'
 import AppSidebar from '@/components/AppSidebar.vue'
 import AppTopbar from '@/components/AppTopbar.vue'
+import WorkspaceContextSidebar from '@/components/WorkspaceContextSidebar.vue'
 import { useMacNavStore } from '@/stores/mac-nav'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { authService } from '@/services/api/auth'
 import { inboxService } from '@/services/api/inbox'
-import { modelService } from '@/services/api/model'
-import { searchService } from '@/services/api/search'
-import { settingsService } from '@/services/api/settings'
 
 interface CommandItem {
   id: string
@@ -175,6 +174,8 @@ const { message } = createDiscreteApi(['message'])
 const logoutLoading = ref(false)
 const sidebarCollapsed = ref(localStorage.getItem('workspace.sidebar.collapsed') === 'true')
 const isMobile = computed(() => windowWidth.value < 768)
+const isTablet = computed(() => windowWidth.value >= 768 && windowWidth.value < 1200)
+const effectiveSidebarCollapsed = computed(() => sidebarCollapsed.value || isTablet.value)
 
 const actualTheme = computed(() => {
   if (themeStore.mode === 'auto') {
@@ -203,35 +204,7 @@ const notificationCount = ref(0)
 let statusRefreshTimer: number | undefined
 
 const loadSystemStatus = async () => {
-  const [modelResult, qdrantResult, searchResult, inboxResult] = await Promise.allSettled([
-    modelService.health(),
-    settingsService.getAll(),
-    searchService.test(),
-    inboxService.summary(18)
-  ])
-
-  if (modelResult.status === 'fulfilled' && modelResult.value.success) {
-    const models = modelResult.value.data || []
-    systemStatus.value.model = models.some((item: Record<string, any>) =>
-      item.isAvailable === true
-      || item.available === true
-      || item.healthAvailable === true
-      || item.status === 'available'
-    ) ? 'active' : 'inactive'
-  } else {
-    systemStatus.value.model = 'error'
-  }
-
-  if (qdrantResult.status === 'fulfilled' && qdrantResult.value.success) {
-    const qdrant = qdrantResult.value.data?.qdrant || {}
-    systemStatus.value.qdrant = qdrant.host || qdrant.port ? 'active' : 'inactive'
-  } else {
-    systemStatus.value.qdrant = 'error'
-  }
-
-  systemStatus.value.search =
-    searchResult.status === 'fulfilled' && searchResult.value.success ? 'active' : 'error'
-
+  const [inboxResult] = await Promise.allSettled([inboxService.summary(18)])
   if (inboxResult.status === 'fulfilled' && inboxResult.value.success) {
     notificationCount.value = inboxResult.value.data?.items?.length || 0
   }
@@ -287,7 +260,6 @@ const iconMap: Record<string, any> = {
   calendar: CalendarOutline,
   time: TimeOutline,
   timer: TimeOutline,
-  note: DocumentTextOutline,
   reader: ReaderOutline,
   book: BookOutline,
   brain: CloudOutline,
@@ -340,7 +312,6 @@ const handleLogout = async () => {
     await router.replace('/login')
     message.success('已退出登录')
   } catch (error: any) {
-    authStore.clearSession()
     await router.replace('/login')
     message.warning(error?.message || '已清除本地登录状态')
   } finally {
@@ -416,6 +387,11 @@ watch(() => route.name, name => {
   }
 })
 
+watch(() => authStore.sessionGeneration, () => {
+  notificationCount.value = 0
+  navStore.loadQuickAccess()
+})
+
 watch(actualTheme, theme => {
   document.documentElement.setAttribute('data-theme', theme)
 })
@@ -454,7 +430,7 @@ onUnmounted(() => {
 .workspace-content {
   flex: 1;
   min-height: 0;
-  padding: 24px 28px 32px;
+  padding: 22px 24px 30px;
   overflow: auto;
 }
 
@@ -569,6 +545,12 @@ onUnmounted(() => {
 
 .mobile-nav {
   display: none;
+}
+
+@media (max-width: 1199px) {
+  .workspace-content {
+    padding: 18px 18px 28px;
+  }
 }
 
 @media (max-width: 767px) {

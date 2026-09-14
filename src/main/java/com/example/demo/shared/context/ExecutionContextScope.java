@@ -4,6 +4,7 @@ import org.slf4j.MDC;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 
@@ -36,6 +37,10 @@ public final class ExecutionContextScope implements AutoCloseable {
             throw new IllegalStateException("Execution context required");
         }
         return context;
+    }
+
+    public static Optional<ExecutionContext> current() {
+        return Optional.ofNullable(LOCAL.get());
     }
 
     public static Runnable wrap(ExecutionContext context, Runnable action) {

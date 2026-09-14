@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -77,14 +78,18 @@ public class EmailMessage {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Attachment {
+        /** 直接 owner，来自已验证的邮箱监听上下文。 */
+        @JsonProperty("user_id")
+        private Long userId;
         /** 原始文件名（含扩展名）。 */
         private String fileName;
         /** MIME 类型，例如 image/png、application/pdf。 */
         private String contentType;
         /** 字节数。 */
         private Long size;
-        /** 服务端落盘后的绝对路径。 */
-        private String filePath;
+        /** 当前用户 email-attachments 分类下的相对 storage key。 */
+        @JsonProperty("storage_key")
+        private String storageKey;
         /** 内联资源 Content-ID。 */
         private String contentId;
         /** Part 处置方式：attachment / inline / null。 */

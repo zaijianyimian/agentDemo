@@ -229,7 +229,8 @@ CREATE TABLE IF NOT EXISTS `chat_session` (
     `message_count` INT DEFAULT 0 COMMENT '消息数量',
     `last_message_time` DATETIME COMMENT '最后消息时间',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY `idx_chat_session_last_message` (`last_message_time`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天会话表';
 
 CREATE TABLE IF NOT EXISTS `chat_message` (
@@ -328,19 +329,8 @@ CREATE TABLE IF NOT EXISTS `knowledge_document` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识库文档表';
 
 -- ============================================
--- 10. 笔记与代码片段模块
+-- 10. 代码片段模块
 -- ============================================
-
-CREATE TABLE IF NOT EXISTS `note` (
-    `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '笔记ID',
-    `title` VARCHAR(255) NOT NULL COMMENT '标题',
-    `file_path` VARCHAR(500) COMMENT '文件存储路径',
-    `tags` VARCHAR(255) COMMENT '标签(逗号分隔)',
-    `ai_summary` VARCHAR(500) COMMENT 'AI生成的摘要',
-    `is_pinned` BOOLEAN DEFAULT FALSE COMMENT '是否置顶',
-    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='笔记表';
 
 CREATE TABLE IF NOT EXISTS `code_snippet` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '片段ID',
@@ -350,11 +340,9 @@ CREATE TABLE IF NOT EXISTS `code_snippet` (
     `description` VARCHAR(500) COMMENT '描述',
     `tags` VARCHAR(255) COMMENT '标签(逗号分隔)',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    KEY `idx_snippet_language` (`language`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代码片段表';
-
-CREATE INDEX `idx_note_pinned` ON `note`(`is_pinned` DESC, `update_time` DESC);
-CREATE INDEX `idx_snippet_language` ON `code_snippet`(`language`);
 
 -- ============================================
 -- 11. MCP工具与技能模块
@@ -423,7 +411,9 @@ CREATE TABLE IF NOT EXISTS `search_history` (
     `duration_ms` BIGINT COMMENT '搜索耗时（毫秒）',
     `session_id` VARCHAR(100) COMMENT '用户会话ID',
     `source_ip` VARCHAR(50) COMMENT '搜索来源IP',
-    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '搜索时间'
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '搜索时间',
+    KEY `idx_search_history_create_time` (`create_time`),
+    KEY `idx_search_history_query` (`query`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='搜索历史表';
 
 CREATE TABLE IF NOT EXISTS `user_interest` (
@@ -438,9 +428,6 @@ CREATE TABLE IF NOT EXISTS `user_interest` (
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY `uk_tag` (`tag`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户兴趣表';
-
-CREATE INDEX `idx_search_history_create_time` ON `search_history`(`create_time`);
-CREATE INDEX `idx_search_history_query` ON `search_history`(`query`);
 
 -- ============================================
 -- 13. 系统设置模块
@@ -527,25 +514,26 @@ CREATE TABLE IF NOT EXISTS `dispatched_task` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='派发任务主表';
 
 CREATE TABLE IF NOT EXISTS `push_config` (
-  `id`                          INT          NOT NULL DEFAULT 1 COMMENT '单行配置主键，固定为 1',
+  `id`                          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`                     BIGINT       NOT NULL COMMENT '所属用户ID',
   `push_email`                  VARCHAR(256)                  COMMENT '推送目标邮箱',
   `push_threshold`              VARCHAR(16)  NOT NULL DEFAULT 'medium' COMMENT '重要性阈值: high/medium/low',
   `batch_cron`                  VARCHAR(64)  NOT NULL DEFAULT '0 0 9 * * ?' COMMENT '批量推送 cron 表达式',
   `immediate_enabled`           TINYINT(1)   NOT NULL DEFAULT 1  COMMENT '是否启用实时推送',
-  `workspace_max_count`         INT          NOT NULL DEFAULT 50 COMMENT '每邮箱归档工作区最大数量',
-  `workspace_max_age_days`      INT          NOT NULL DEFAULT 30 COMMENT '归档保留天数',
-  `executor_timeout_seconds`    INT          NOT NULL DEFAULT 600 COMMENT '执行器超时时间（秒）',
+  `result_retention_days`       INT          NOT NULL DEFAULT 30 COMMENT '执行结果保留天数',
   `updated_at`                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推送与执行器全局配置（单行）';
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_push_config_user` (`user_id`),
+  CONSTRAINT `fk_push_config_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户派发结果推送配置';
 
-INSERT IGNORE INTO `push_config` (`id`) VALUES (1);
+-- push_config is user-owned; rows are created after authentication, never as a global singleton.
 
 -- ============================================
 -- 完成提示
 -- ============================================
 -- 数据库初始化完成！
--- 包含模块：用户认证、邮件、文件、日程、任务、聊天、知识库、笔记、工具技能、搜索、设置、派发执行
+-- 包含模块：用户认证、邮件、文件、日程、任务、聊天、知识库、工具技能、搜索、设置、派发执行
 -- ============================================
 
 -- =========================================================
@@ -557,11 +545,19 @@ INSERT IGNORE INTO `push_config` (`id`) VALUES (1);
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DELIMITER $$
+DROP PROCEDURE IF EXISTS `schema_init_multi_user_append`$$
+CREATE PROCEDURE `schema_init_multi_user_append`()
+BEGIN
+IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'scheduled_task' AND column_name = 'user_id'
+) THEN
+
 -- 当前 ScheduledTask 实体新增字段。
 ALTER TABLE `scheduled_task`
     ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
-    ADD COLUMN `trigger_status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '触发状态: 0=静止,1=运行中' AFTER `enabled`,
-    ADD COLUMN `requires_ai` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否走 AI 执行路径' AFTER `trigger_status`;
+    ADD COLUMN `trigger_status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '触发状态: 0=静止,1=运行中' AFTER `enabled`;
 
 -- JobLog 在原始 schema_init 中没有完整建表定义，这里补齐。
 CREATE TABLE IF NOT EXISTS `job_log` (
@@ -595,11 +591,13 @@ ALTER TABLE `email_config`
     ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
     DROP INDEX `uk_email`,
     ADD UNIQUE KEY `uk_email_config_user_email` (`user_id`, `email`),
+    ADD UNIQUE KEY `uk_email_config_user_id` (`user_id`, `id`),
     ADD KEY `idx_email_config_user_enabled` (`user_id`, `enabled`),
     ADD CONSTRAINT `fk_email_config_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
 
 ALTER TABLE `chat_session`
     ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD UNIQUE KEY `uk_chat_session_user_id` (`user_id`, `id`),
     ADD KEY `idx_chat_session_user_last_message` (`user_id`, `last_message_time`, `create_time`),
     ADD CONSTRAINT `fk_chat_session_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
 
@@ -609,13 +607,9 @@ ALTER TABLE `schedule_event`
     ADD CONSTRAINT `fk_schedule_event_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
 
 ALTER TABLE `scheduled_task`
+    ADD UNIQUE KEY `uk_scheduled_task_user_id` (`user_id`, `id`),
     ADD KEY `idx_task_user_enabled_next` (`user_id`, `enabled`, `next_execute_time`),
     ADD CONSTRAINT `fk_scheduled_task_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
-
-ALTER TABLE `note`
-    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
-    ADD KEY `idx_note_user_pinned_update` (`user_id`, `is_pinned`, `update_time`),
-    ADD CONSTRAINT `fk_note_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
 
 ALTER TABLE `code_snippet`
     ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
@@ -624,6 +618,7 @@ ALTER TABLE `code_snippet`
 
 ALTER TABLE `document`
     ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD COLUMN `storage_key` VARCHAR(512) NULL COMMENT '用户根目录下的相对存储键' AFTER `file_path`,
     ADD KEY `idx_document_user_status_create` (`user_id`, `status`, `create_time`),
     ADD CONSTRAINT `fk_document_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
 
@@ -662,6 +657,12 @@ ALTER TABLE `user_interest`
 
 ALTER TABLE `dispatched_task`
     ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD COLUMN `request_id` VARCHAR(128) NOT NULL COMMENT '来源请求幂等键' AFTER `user_id`,
+    ADD COLUMN `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本' AFTER `status`,
+    ADD COLUMN `attempt` INT NOT NULL DEFAULT 0 COMMENT '当前执行 attempt' AFTER `version`,
+    ADD COLUMN `error_code` VARCHAR(64) NULL COMMENT '稳定失败码' AFTER `error_message`,
+    ADD UNIQUE KEY `uk_dispatch_user_request` (`user_id`, `request_id`),
+    ADD UNIQUE KEY `uk_dispatch_user_id` (`user_id`, `id`),
     ADD KEY `idx_dispatch_user_status_created` (`user_id`, `status`, `created_at`),
     ADD CONSTRAINT `fk_dispatched_task_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
 
@@ -680,10 +681,104 @@ ALTER TABLE `skill`
     ADD KEY `idx_skill_user_enabled_category` (`user_id`, `enabled`, `category`),
     ADD CONSTRAINT `fk_skill_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE;
 
--- 子表通过父对象继承租户归属。
+-- 直接可寻址子资源保存 owner，并通过组合外键保证父子 owner 一致。
 ALTER TABLE `email_listener_state`
-    ADD CONSTRAINT `fk_email_listener_state_config`
-        FOREIGN KEY (`config_id`) REFERENCES `email_config`(`id`) ON DELETE CASCADE;
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD UNIQUE KEY `uk_email_listener_state_user_config` (`user_id`, `config_id`),
+    ADD KEY `idx_listener_state_user_status` (`user_id`, `status`),
+    ADD CONSTRAINT `fk_email_listener_state_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE,
+    ADD CONSTRAINT `fk_email_listener_state_owner_config`
+        FOREIGN KEY (`user_id`, `config_id`) REFERENCES `email_config`(`user_id`, `id`) ON DELETE CASCADE;
+
+ALTER TABLE `chat_message`
+    ADD COLUMN `user_id` BIGINT NOT NULL COMMENT '所属用户ID' AFTER `id`,
+    ADD KEY `idx_chat_message_user_session_time` (`user_id`, `session_id`, `create_time`),
+    ADD CONSTRAINT `fk_chat_message_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE,
+    ADD CONSTRAINT `fk_chat_message_owner_session`
+        FOREIGN KEY (`user_id`, `session_id`) REFERENCES `chat_session`(`user_id`, `id`) ON DELETE CASCADE;
+
+ALTER TABLE `job_log`
+    ADD CONSTRAINT `fk_job_log_owner_task`
+        FOREIGN KEY (`user_id`, `job_id`) REFERENCES `scheduled_task`(`user_id`, `id`) ON DELETE CASCADE;
+
+ALTER TABLE `schedule_event`
+    ADD COLUMN `storage_key` VARCHAR(512) NULL COMMENT '用户根目录下的相对存储键' AFTER `file_path`;
+
+-- 在线服务只写 storage_key；绝对/共享历史路径必须先由维护迁移处理。
+ALTER TABLE `schedule_event`
+    ADD CONSTRAINT `chk_schedule_event_no_new_file_path` CHECK (`file_path` IS NULL);
+ALTER TABLE `document`
+    ADD CONSTRAINT `chk_document_no_new_file_path` CHECK (`file_path` IS NULL);
+
+CREATE TABLE IF NOT EXISTS `dispatch_result_outbox` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL,
+    `event_id` VARCHAR(128) NOT NULL,
+    `request_id` VARCHAR(128) NOT NULL,
+    `task_id` BIGINT NOT NULL,
+    `attempt` INT NOT NULL,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    `payload` JSON NOT NULL,
+    `publish_attempts` INT NOT NULL DEFAULT 0,
+    `available_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `lease_until` DATETIME NULL,
+    `published_at` DATETIME NULL,
+    `last_error` TEXT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_dispatch_outbox_user_event` (`user_id`, `event_id`),
+    KEY `idx_dispatch_outbox_relay` (`status`, `available_at`, `lease_until`),
+    KEY `idx_dispatch_outbox_user_task_attempt` (`user_id`, `task_id`, `attempt`),
+    CONSTRAINT `fk_dispatch_outbox_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_dispatch_outbox_task` FOREIGN KEY (`user_id`, `task_id`)
+        REFERENCES `dispatched_task`(`user_id`, `id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='派发终态结果可靠发布 outbox';
+
+CREATE TABLE IF NOT EXISTS `consumed_event` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL,
+    `consumer_name` VARCHAR(128) NOT NULL,
+    `event_id` VARCHAR(128) NOT NULL,
+    `status` VARCHAR(20) NOT NULL,
+    `attempt` INT NOT NULL DEFAULT 1,
+    `resource_type` VARCHAR(64) NOT NULL,
+    `resource_id` VARCHAR(128) NOT NULL,
+    `error_message` TEXT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_consumed_event_owner_consumer_event` (`user_id`, `consumer_name`, `event_id`),
+    KEY `idx_consumed_event_status_updated` (`status`, `updated_at`),
+    CONSTRAINT `fk_consumed_event_user` FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户事件 consumer 幂等及失败记录';
+
+CREATE TABLE IF NOT EXISTS `file_migration_journal` (
+    `owner_user_id` BIGINT NOT NULL,
+    `resource_type` VARCHAR(64) NOT NULL,
+    `resource_id` BIGINT NOT NULL,
+    `source_path` VARCHAR(1024) NOT NULL,
+    `category` VARCHAR(64) NOT NULL,
+    `storage_key` VARCHAR(512) NOT NULL,
+    `checksum` VARCHAR(64) NOT NULL,
+    `status` VARCHAR(20) NOT NULL,
+    `attempt_count` INT NOT NULL DEFAULT 1,
+    `started_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `completed_at` DATETIME NULL,
+    `details` VARCHAR(1000) NULL,
+    PRIMARY KEY (`owner_user_id`, `resource_type`, `resource_id`),
+    UNIQUE KEY `uk_file_migration_owner_storage` (`owner_user_id`, `category`, `storage_key`),
+    KEY `idx_file_migration_status` (`status`, `started_at`),
+    CONSTRAINT `fk_file_migration_owner` FOREIGN KEY (`owner_user_id`)
+        REFERENCES `user_account`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='历史共享文件迁移 journal';
+
+END IF;
+END$$
+DELIMITER ;
+
+CALL `schema_init_multi_user_append`();
+DROP PROCEDURE IF EXISTS `schema_init_multi_user_append`;
 
 SET FOREIGN_KEY_CHECKS = 1;
 

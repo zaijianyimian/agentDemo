@@ -112,7 +112,6 @@
                 </td>
                 <td>
                   <span class="badge" :class="`badge-${task.taskType?.toLowerCase()}`">{{ task.taskType }}</span>
-                  <span v-if="task.requiresAi" class="badge badge-ai" title="触发时调用 Claude Code CLI">AI</span>
                 </td>
                 <td class="cell-cron">{{ task.cronExpression }}</td>
                 <td>
@@ -220,13 +219,6 @@
           <n-form-item-gi v-if="form.taskType === 'SKILL'" span="2" label="技能代码" path="skillCode">
             <n-input v-model:value="form.skillCode" placeholder="例如：DAILY_REPORT" />
           </n-form-item-gi>
-          <n-form-item-gi span="2" label="AI 处理">
-            <n-space align="center">
-              <n-switch v-model:value="form.requiresAi" />
-              <n-tag v-if="form.requiresAi" type="info" size="small">触发时调用 Claude Code CLI</n-tag>
-              <n-text v-else depth="3" style="font-size: 0.78rem">关闭：仅执行 taskType 对应逻辑</n-text>
-            </n-space>
-          </n-form-item-gi>
           <n-form-item-gi span="2" label="Cron 表达式" path="cronExpression">
             <n-input v-model:value="form.cronExpression" placeholder="6 字段 cron，例如 0 0 8 * * ?">
               <template #suffix>
@@ -326,7 +318,6 @@ const form = ref({
   cronExpression: '',
   params: '',
   skillCode: '',
-  requiresAi: false
 })
 
 const formRules = {
@@ -443,7 +434,7 @@ const loadLogs = async () => {
 
 const openCreateModal = () => {
   editingTask.value = null
-  form.value = { name: '', description: '', taskType: 'REMINDER', cronExpression: '', params: '', skillCode: '', requiresAi: false }
+  form.value = { name: '', description: '', taskType: 'REMINDER', cronExpression: '', params: '', skillCode: '' }
   showFormModal.value = true
 }
 
@@ -456,7 +447,6 @@ const editTask = (task: ScheduledTask) => {
     cronExpression: task.cronExpression,
     params: task.params || '',
     skillCode: task.skillCode || '',
-    requiresAi: task.requiresAi ?? false
   }
   showFormModal.value = true
 }

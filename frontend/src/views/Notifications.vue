@@ -165,7 +165,7 @@
 /**
  * 通知中心页面：通知列表/筛选、已读管理、监听器启停，并通过 SSE 实时接收新通知。
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NIcon, NRadioGroup, NRadioButton, NTag, NPagination, useMessage } from 'naive-ui'
 import {
@@ -183,9 +183,11 @@ import { connectEmailEventStream, type EmailNotificationEvent } from '@/services
 import { emailService } from '@/services/api/email'
 import EmptyStateWithGlow from '@/components/EmptyStateWithGlow.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const message = useMessage()
+const authStore = useAuthStore()
 const loading = ref(false)
 const notifications = ref<NotificationDTO[]>([])
 const listenerStatus = ref<ListenerStatusDTO[]>([])
@@ -440,6 +442,16 @@ function disconnectNotificationStream() {
   streamController?.abort()
   streamController = null
 }
+
+watch(() => authStore.sessionGeneration, () => {
+  disconnectNotificationStream()
+  notifications.value = []
+  listenerStatus.value = []
+  currentPage.value = 1
+  notificationSeq = 0
+  void loadListenerStatus()
+  connectNotificationStream()
+})
 
 onMounted(() => {
   loadListenerStatus()

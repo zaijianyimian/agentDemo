@@ -66,6 +66,12 @@ public class SecurityConfig {
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/settings/**")
+                        .hasAuthority("SCOPE_platform.admin")
+                        .requestMatchers(HttpMethod.POST, "/api/settings/**")
+                        .hasAuthority("SCOPE_platform.admin")
+                        .requestMatchers(HttpMethod.DELETE, "/api/settings/**")
+                        .hasAuthority("SCOPE_platform.admin")
                         .requestMatchers(
                                 "/api/backup/**",
                                 "/api/autonomy/**",

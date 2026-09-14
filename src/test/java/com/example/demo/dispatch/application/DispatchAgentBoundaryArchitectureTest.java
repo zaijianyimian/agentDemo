@@ -1,6 +1,5 @@
 package com.example.demo.dispatch.application;
 
-import com.example.demo.dispatch.application.executor.ExecutorRouter;
 import com.example.demo.dispatch.domain.DispatchedTask;
 import com.example.demo.infrastructure.graph.GraphGatewayClient;
 import org.junit.jupiter.api.Test;
@@ -44,11 +43,19 @@ class DispatchAgentBoundaryArchitectureTest {
     }
 
     @Test
-    void executorRouterOnlyMapsAnExplicitExecutorName() {
-        Set<String> methods = methodNames(ExecutorRouter.class);
-
-        assertNotNull(findMethod(ExecutorRouter.class, "pick", String.class));
-        assertFalse(methods.contains("pickFallback"));
+    void unsafeLocalExecutorRuntimeStaysDeleted() {
+        for (String className : Set.of(
+                "com.example.demo.dispatch.application.executor.Executor",
+                "com.example.demo.dispatch.application.executor.ExecutorRouter",
+                "com.example.demo.dispatch.application.executor.ClaudeCodeExecutor",
+                "com.example.demo.dispatch.application.executor.CodexExecutor",
+                "com.example.demo.dispatch.application.executor.OpenClawExecutor",
+                "com.example.demo.dispatch.application.executor.CliProcessRunner",
+                "com.example.demo.dispatch.application.executor.SandboxTranslator",
+                "com.example.demo.dispatch.application.WorkspaceManager",
+                "com.example.demo.dispatch.application.ExecutorToggleService")) {
+            assertThrows(ClassNotFoundException.class, () -> Class.forName(className), className);
+        }
     }
 
     @Test

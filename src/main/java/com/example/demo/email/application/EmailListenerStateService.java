@@ -49,6 +49,7 @@ public class EmailListenerStateService {
             return existing;
         }
         EmailListenerState created = EmailListenerState.builder()
+                .userId(config.getUserId())
                 .configId(config.getId())
                 .provider(MailProvider.fromConfig(config).name())
                 .listenMode(ListenMode.fromConfig(config).name())

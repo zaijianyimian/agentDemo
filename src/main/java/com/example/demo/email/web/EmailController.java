@@ -1,14 +1,13 @@
 package com.example.demo.email.web;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.email.application.EmailAuthConfigService;
+import com.example.demo.email.application.EmailConfigService;
 import com.example.demo.email.application.EmailListenerConfigSupport;
 import com.example.demo.email.application.EmailListenerScheduleService;
 import com.example.demo.email.application.EmailListenerService;
 import com.example.demo.email.domain.EmailConfig;
 import com.example.demo.email.domain.listener.ListenMode;
 import com.example.demo.email.domain.listener.MailProvider;
-import com.example.demo.email.persistence.EmailConfigMapper;
 import jakarta.annotation.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +28,7 @@ import java.util.HashMap;
 public class EmailController {
 
     @Resource
-    private EmailConfigMapper emailConfigMapper;
+    private EmailConfigService emailConfigService;
 
     @Resource
     private EmailListenerService emailListenerService;
@@ -50,7 +49,7 @@ public class EmailController {
      */
     @GetMapping("/config/list")
     public List<EmailConfig> listConfigs() {
-        List<EmailConfig> list = emailConfigMapper.selectList(null);
+        List<EmailConfig> list = emailConfigService.listAll();
         list.forEach(config -> {
             normalizeConfig(config);
             emailAuthConfigService.sanitizeForResponse(config);
@@ -63,9 +62,7 @@ public class EmailController {
      */
     @GetMapping("/config/enabled")
     public List<EmailConfig> listEnabledConfigs() {
-        List<EmailConfig> list = emailConfigMapper.selectList(
-                new LambdaQueryWrapper<EmailConfig>().eq(EmailConfig::getEnabled, true)
-        );
+        List<EmailConfig> list = emailConfigService.listEnabled();
         list.forEach(config -> {
             normalizeConfig(config);
             emailAuthConfigService.sanitizeForResponse(config);
@@ -78,7 +75,7 @@ public class EmailController {
      */
     @GetMapping("/config/{id}")
     public EmailConfig getConfig(@PathVariable Long id) {
-        EmailConfig config = emailConfigMapper.selectById(id);
+        EmailConfig config = emailConfigService.requireOwned(id);
         normalizeConfig(config);
         emailAuthConfigService.sanitizeForResponse(config);
         return config;
@@ -128,9 +125,9 @@ public class EmailController {
         }
         emailAuthConfigService.prepareForPersist(config, null);
 
-        emailConfigMapper.insert(config);
+        emailConfigService.create(config);
         if (Boolean.TRUE.equals(config.getEnabled())) {
-            EmailConfig saved = emailConfigMapper.selectById(config.getId());
+            EmailConfig saved = emailConfigService.requireOwned(config.getId());
             emailListenerScheduleService.scheduleEnabledListener(saved);
         }
         return ResponseEntity.ok("添加成功");
@@ -144,10 +141,7 @@ public class EmailController {
         if (config == null || config.getId() == null) {
             return ResponseEntity.badRequest().body("邮箱配置ID不能为空");
         }
-        EmailConfig existing = emailConfigMapper.selectById(config.getId());
-        if (existing == null) {
-            return ResponseEntity.badRequest().body("邮箱配置不存在");
-        }
+        EmailConfig existing = emailConfigService.requireOwned(config.getId());
         normalizeConfig(existing);
         emailAuthConfigService.decodeTransientFields(existing);
         normalizeConfig(config);
@@ -196,12 +190,12 @@ public class EmailController {
             return ResponseEntity.badRequest().body(authValidationError);
         }
         emailAuthConfigService.prepareForPersist(config, existing);
-        emailConfigMapper.updateById(config);
-        EmailConfig saved = emailConfigMapper.selectById(config.getId());
+        emailConfigService.update(config);
+        EmailConfig saved = emailConfigService.findOwned(config.getId());
         if (saved != null && Boolean.TRUE.equals(saved.getEnabled())) {
             emailListenerScheduleService.scheduleEnabledListener(saved);
         } else {
-            emailListenerScheduleService.stopAndUnschedule(config.getId());
+            emailListenerScheduleService.stopAndUnschedule(config);
         }
         return ResponseEntity.ok("更新成功");
     }
@@ -211,10 +205,11 @@ public class EmailController {
      */
     @DeleteMapping("/config/{id}")
     public ResponseEntity<String> deleteConfig(@PathVariable Long id) {
+        emailConfigService.requireOwned(id);
         // 先停止监听
-        emailListenerScheduleService.stopAndUnschedule(id);
+        emailListenerScheduleService.stopAndUnschedule(emailConfigService.requireOwned(id));
         // 再删除配置
-        emailConfigMapper.deleteById(id);
+        emailConfigService.delete(id);
         return ResponseEntity.ok("删除成功");
     }
 
@@ -240,10 +235,7 @@ public class EmailController {
      */
     @PostMapping("/listener/start/{id}")
     public ResponseEntity<String> startListener(@PathVariable Long id) {
-        EmailConfig config = emailConfigMapper.selectById(id);
-        if (config == null) {
-            return ResponseEntity.badRequest().body("邮箱配置不存在");
-        }
+        EmailConfig config = emailConfigService.requireOwned(id);
         normalizeConfig(config);
         emailAuthConfigService.decodeTransientFields(config);
         emailListenerConfigSupport.applyDefaults(config);
@@ -258,10 +250,10 @@ public class EmailController {
         EmailConfig update = new EmailConfig();
         update.setId(id);
         update.setEnabled(true);
-        emailConfigMapper.updateById(update);
+        emailConfigService.update(update);
 
         // 启动或交给时间轮安排监听
-        EmailConfig saved = emailConfigMapper.selectById(id);
+        EmailConfig saved = emailConfigService.requireOwned(id);
         emailListenerScheduleService.scheduleEnabledListener(saved);
         return ResponseEntity.ok("已启动监听: " + config.getEmail());
     }
@@ -271,10 +263,7 @@ public class EmailController {
      */
     @PostMapping("/listener/stop/{id}")
     public ResponseEntity<String> stopListener(@PathVariable Long id) {
-        EmailConfig config = emailConfigMapper.selectById(id);
-        if (config == null) {
-            return ResponseEntity.badRequest().body("邮箱配置不存在");
-        }
+        EmailConfig config = emailConfigService.requireOwned(id);
         normalizeConfig(config);
         emailAuthConfigService.decodeTransientFields(config);
 
@@ -282,10 +271,10 @@ public class EmailController {
         EmailConfig update = new EmailConfig();
         update.setId(id);
         update.setEnabled(false);
-        emailConfigMapper.updateById(update);
+        emailConfigService.update(update);
 
         // 停止监听并取消时间轮任务
-        emailListenerScheduleService.stopAndUnschedule(id);
+        emailListenerScheduleService.stopAndUnschedule(config);
         return ResponseEntity.ok("已停止监听: " + config.getEmail());
     }
 
@@ -333,16 +322,13 @@ public class EmailController {
             @PathVariable String provider,
             @PathVariable Long configId,
             @RequestBody(required = false) Map<String, Object> payload) {
-        EmailConfig config = emailConfigMapper.selectById(configId);
-        if (config == null) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "邮箱配置不存在"));
-        }
+        EmailConfig config = emailConfigService.requireOwned(configId);
         normalizeConfig(config);
         emailListenerConfigSupport.applyDefaults(config);
         if (config.getProvider() == null || !config.getProvider().equalsIgnoreCase(provider)) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "provider 与邮箱配置不匹配"));
         }
-        emailListenerService.handleWebhook(configId, payload == null ? Map.of() : payload);
+        emailListenerService.handleWebhook(config, payload == null ? Map.of() : payload);
         return ResponseEntity.ok(Map.of("success", true));
     }
 
@@ -353,17 +339,7 @@ public class EmailController {
      */
     @PostMapping("/config/{id}/test")
     public ResponseEntity<Map<String, Object>> testConfig(@PathVariable Long id) {
-        EmailConfig config = emailConfigMapper.selectById(id);
-        if (config == null) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "邮箱配置不存在"
-            ));
-        }
-        normalizeConfig(config);
-        emailAuthConfigService.decodeTransientFields(config);
-
-        EmailListenerService.EmailTestResult result = emailListenerService.testConnection(config);
+        EmailListenerService.EmailTestResult result = emailConfigService.testOwnedConnection(id);
         return ResponseEntity.ok(Map.of(
                 "success", result.isSuccess(),
                 "message", result.getMessage(),
@@ -378,20 +354,7 @@ public class EmailController {
      */
     @GetMapping("/config/{id}/network-check")
     public ResponseEntity<Map<String, Object>> checkNetwork(@PathVariable Long id) {
-        EmailConfig config = emailConfigMapper.selectById(id);
-        if (config == null) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "邮箱配置不存在"
-            ));
-        }
-        normalizeConfig(config);
-        emailAuthConfigService.decodeTransientFields(config);
-        EmailListenerService.NetworkCheckResult result = emailListenerService.checkNetworkConnectivity(
-                config.getHost(),
-                config.getPort() == null ? 993 : config.getPort(),
-                10000
-        );
+        EmailListenerService.NetworkCheckResult result = emailConfigService.checkOwnedNetwork(id);
         return ResponseEntity.ok(Map.of(
                 "success", result.isSuccess(),
                 "message", result.getMessage(),

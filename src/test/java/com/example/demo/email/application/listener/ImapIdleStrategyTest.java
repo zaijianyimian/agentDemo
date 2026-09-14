@@ -1,6 +1,7 @@
 package com.example.demo.email.application.listener;
 
 import com.example.demo.email.application.EmailListenerStateService;
+import com.example.demo.email.application.EmailListenerExecutionGuard;
 import com.example.demo.email.application.listener.strategy.MailSourceAdapter;
 import com.example.demo.email.domain.EmailConfig;
 import com.example.demo.email.domain.listener.ListenMode;
@@ -27,9 +28,12 @@ class ImapIdleStrategyTest {
         JavaMailSupport javaMailSupport = mock(JavaMailSupport.class);
         EmailListenerStateService stateService = mock(EmailListenerStateService.class);
         PollingStrategy pollingStrategy = mock(PollingStrategy.class);
+        EmailListenerExecutionGuard executionGuard = mock(EmailListenerExecutionGuard.class);
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        ImapIdleStrategy strategy = new ImapIdleStrategy(javaMailSupport, stateService, pollingStrategy, executor);
+        ImapIdleStrategy strategy = new ImapIdleStrategy(
+                javaMailSupport, stateService, pollingStrategy, executionGuard, executor);
         EmailConfig config = EmailConfig.builder().id(1L).email("a@example.com").build();
+        when(executionGuard.mayAccessProvider(config)).thenReturn(true);
         MailSourceAdapter adapter = fakeAdapter();
         when(javaMailSupport.connectStore(config)).thenThrow(new MessagingException("idle unavailable"));
 

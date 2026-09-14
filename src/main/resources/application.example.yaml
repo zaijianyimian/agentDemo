@@ -39,11 +39,12 @@ server:
       force-request: true
 
 app:
+  storage:
+    root: ${OWNED_STORAGE_ROOT:./data/users}
   # Python Graph 是 Java 与智能服务之间的唯一边界。
   graph:
     enabled: ${GRAPH_ENABLED:true}
     base-url: ${GRAPH_BASE_URL:http://127.0.0.1:8001}
-    internal-token: ${GRAPH_INTERNAL_TOKEN:}
     connect-timeout-seconds: ${GRAPH_CONNECT_TIMEOUT_SECONDS:5}
     response-timeout-seconds: ${GRAPH_RESPONSE_TIMEOUT_SECONDS:120}
 
@@ -55,11 +56,7 @@ app:
     enabled: ${DISPATCH_ENABLED:false}
     execution-queue: ${DISPATCH_EXECUTION_QUEUE:agent.execution.requests}
     result-queue: ${DISPATCH_RESULT_QUEUE:agent.execution.results}
-    workspace-root: ${DISPATCH_WORKSPACE_ROOT:./data/workspaces}
-    project-root: ${DISPATCH_PROJECT_ROOT:}
-    dispatched-root: ${DISPATCH_RESULT_ROOT:./data/dispatched}
     poll-interval-ms: ${DISPATCH_POLL_INTERVAL_MS:5000}
-    executor-timeout-seconds: ${DISPATCH_EXECUTOR_TIMEOUT_SECONDS:600}
 
   mail:
     smtp-host: ${SMTP_HOST:smtp.example.com}
@@ -71,7 +68,6 @@ app:
 
   schedule:
     enabled: ${SCHEDULE_ENABLED:true}
-    storage-path: ${SCHEDULE_STORAGE_PATH:./data/schedules}
     user-email: ${SCHEDULE_USER_EMAIL:your_mail@example.com}
     morning-reminder-cron: ${SCHEDULE_MORNING_REMINDER_CRON:"0 0 8 * * ?"}
     file-sort-cron: ${SCHEDULE_FILE_SORT_CRON:"0 0 19 * * ?"}
@@ -87,7 +83,6 @@ app:
       await-seconds: ${TASK_EXECUTOR_AWAIT_SECONDS:60}
 
   file:
-    upload-dir: ${FILE_UPLOAD_DIR:./data/documents}
     allowed-types: ${FILE_ALLOWED_TYPES:txt,md,pdf,doc,docx}
 
   backup:
@@ -136,3 +131,5 @@ management:
   health:
     db:
       enabled: true
+    rabbit:
+      enabled: ${RABBITMQ_HEALTH_ENABLED:${DISPATCH_ENABLED:false}}

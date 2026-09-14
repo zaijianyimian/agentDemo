@@ -8,9 +8,11 @@ import {
   connectEmailEventStream,
   type EmailNotificationEvent
 } from '@/services/email-events'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const notification = useNotification()
+const authStore = useAuthStore()
 
 let streamController: AbortController | null = null
 let reconnectTimer: number | null = null
@@ -73,6 +75,11 @@ watch(() => route.path, (path) => {
   } else {
     connect()
   }
+})
+
+watch(() => authStore.sessionGeneration, () => {
+  disconnect()
+  connect()
 })
 
 onMounted(connect)

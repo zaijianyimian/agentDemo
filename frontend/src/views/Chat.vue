@@ -1,6 +1,6 @@
 <template>
   <div class="chat-page agent-chat-page">
-    <aside class="session-sidebar" :class="{ collapsed: isListCollapsed }">
+    <aside id="chat-sessions" class="session-sidebar anchor-section" :class="{ collapsed: isListCollapsed }">
       <div class="session-head">
         <div v-if="!isListCollapsed">
           <span class="page-eyebrow">Conversations</span>
@@ -46,7 +46,7 @@
       </div>
     </aside>
 
-    <section class="chat-main">
+    <section id="chat-conversation" class="chat-main anchor-section">
       <header class="chat-context-bar">
         <div class="chat-context-copy">
           <span class="page-eyebrow">Agent Conversation</span>
@@ -104,9 +104,6 @@
             <div v-if="msg.role === 'assistant' && msg.content" class="message-actions">
               <button type="button" title="复制" @click="copyMessage(msg.content)">
                 <n-icon><CopyIcon /></n-icon><span>复制</span>
-              </button>
-              <button type="button" title="转笔记" @click="captureMessage('note', msg)">
-                <n-icon><DocumentIcon /></n-icon><span>笔记</span>
               </button>
               <button type="button" title="转任务" @click="captureMessage('task', msg)">
                 <n-icon><CheckmarkIcon /></n-icon><span>任务</span>
@@ -167,7 +164,7 @@
       </footer>
     </section>
 
-    <aside class="execution-panel">
+    <aside id="chat-execution" class="execution-panel anchor-section">
       <div class="execution-head">
         <span class="page-eyebrow">Execution</span>
         <strong>Agent 执行状态</strong>
@@ -246,7 +243,6 @@ import {
   ChevronBackOutline as ChevronBackIcon,
   ChevronForwardOutline as ChevronForwardIcon,
   CopyOutline as CopyIcon,
-  DocumentTextOutline as DocumentIcon,
   EllipsisHorizontal as MoreIcon,
   InformationCircleOutline as InformationIcon,
   MicOutline as MicIcon,
@@ -651,8 +647,8 @@ const copyMessage = async (content: string) => {
   }
 }
 
-/** 将 Agent 回答转换为笔记、任务、日程或长期记忆。 */
-const captureMessage = async (target: 'note' | 'task' | 'schedule' | 'memory', chatMessage: ChatMessage) => {
+/** 将 Agent 回答转换为任务、日程或长期记忆。 */
+const captureMessage = async (target: 'task' | 'schedule' | 'memory', chatMessage: ChatMessage) => {
   try {
     const payload = {
       sessionId: currentSession.value?.id,
@@ -660,13 +656,11 @@ const captureMessage = async (target: 'note' | 'task' | 'schedule' | 'memory', c
       role: chatMessage.role,
       titleHint: currentSession.value?.title
     }
-    const action = target === 'note'
-      ? chatActionService.createNote
-      : target === 'task'
-        ? chatActionService.createTask
-        : target === 'schedule'
-          ? chatActionService.createSchedule
-          : chatActionService.storeMemory
+    const action = target === 'task'
+      ? chatActionService.createTask
+      : target === 'schedule'
+        ? chatActionService.createSchedule
+        : chatActionService.storeMemory
     const response = await action(payload)
     if (response.success) message.success(response.data?.message || '处理成功')
     else message.error(response.message || '处理失败')
@@ -759,6 +753,10 @@ onUnmounted(() => {
   min-height: 560px;
   overflow: hidden;
   color: var(--text-primary);
+}
+
+.anchor-section {
+  scroll-margin-top: 18px;
 }
 
 .page-eyebrow {

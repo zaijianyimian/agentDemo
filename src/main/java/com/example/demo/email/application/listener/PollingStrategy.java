@@ -1,6 +1,7 @@
 package com.example.demo.email.application.listener;
 
 import com.example.demo.email.application.EmailListenerStateService;
+import com.example.demo.email.application.EmailListenerExecutionGuard;
 import com.example.demo.email.application.listener.strategy.ListenStrategy;
 import com.example.demo.email.application.listener.strategy.MailSourceAdapter;
 import com.example.demo.email.domain.EmailConfig;
@@ -29,15 +30,18 @@ public class PollingStrategy implements ListenStrategy {
 
     private final EmailListenerStateService stateService;
     private final EmailMessagePublisher publisher;
+    private final EmailListenerExecutionGuard executionGuard;
     private final ExecutorService executorService;
     private final Map<Long, Future<?>> tasks = new ConcurrentHashMap<>();
 
     public PollingStrategy(
             EmailListenerStateService stateService,
             EmailMessagePublisher publisher,
+            EmailListenerExecutionGuard executionGuard,
             @Qualifier("emailProcessingExecutor") ExecutorService executorService) {
         this.stateService = stateService;
         this.publisher = publisher;
+        this.executionGuard = executionGuard;
         this.executorService = executorService;
     }
 
@@ -66,6 +70,10 @@ public class PollingStrategy implements ListenStrategy {
         stateService.markStatus(config, ListenerStatus.RUNNING, null);
         while (!Thread.currentThread().isInterrupted()) {
             try {
+                if (!executionGuard.mayAccessProvider(config)) {
+                    log.info("[{}] owner、启用状态或配置版本已变化，停止旧监听", config.getEmail());
+                    break;
+                }
                 pollOnce(config, adapter, "poll");
                 Thread.sleep(interval * 1000L);
             } catch (InterruptedException e) {
@@ -91,6 +99,9 @@ public class PollingStrategy implements ListenStrategy {
      * @param trigger 触发来源。
      */
     public void pollOnce(EmailConfig config, MailSourceAdapter adapter, String trigger) {
+        if (!executionGuard.mayAccessProvider(config)) {
+            return;
+        }
         if (!isWithinListeningWindow(config)) {
             return;
         }

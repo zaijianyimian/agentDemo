@@ -3,6 +3,8 @@ package com.example.demo.schedule.application;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.demo.schedule.domain.ScheduleEvent;
 import com.example.demo.schedule.persistence.ScheduleEventMapper;
+import com.example.demo.shared.context.CurrentUserContext;
+import com.example.demo.shared.web.UserResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class ScheduleCommandService {
 
     private final ScheduleEventMapper scheduleEventMapper;
     private final ScheduleFileService scheduleFileService;
+    private final CurrentUserContext currentUser;
 
     // ------------------------------------------------------------------
     // 创建
@@ -61,6 +64,7 @@ public class ScheduleCommandService {
 
         LocalDateTime now = LocalDateTime.now();
         ScheduleEvent event = ScheduleEvent.builder()
+                .userId(currentUser.requireUserId())
                 .title(title.trim())
                 .description(description == null ? null : description.trim())
                 .eventTime(eventTime)
@@ -76,7 +80,7 @@ public class ScheduleCommandService {
 
         scheduleEventMapper.insert(event);
         refreshMarkdownFile(event.getEventDate());
-        event.setFilePath(scheduleEventMapper.selectById(event.getId()).getFilePath());
+        event.setStorageKey(scheduleEventMapper.selectById(event.getId()).getStorageKey());
         log.info("创建日程 id={} title='{}' time={}", event.getId(), event.getTitle(), event.getEventTime());
         return event;
     }
@@ -132,7 +136,7 @@ public class ScheduleCommandService {
                                      Boolean reminderEnabled) {
         ScheduleEvent existing = scheduleEventMapper.selectById(id);
         if (existing == null) {
-            throw new IllegalArgumentException("日程不存在: id=" + id);
+            throw new UserResourceNotFoundException("日程不存在");
         }
         if (title != null && !title.isBlank()) {
             existing.setTitle(title.trim());
@@ -206,7 +210,7 @@ public class ScheduleCommandService {
     private ScheduleEvent requireById(Long id) {
         ScheduleEvent event = scheduleEventMapper.selectById(id);
         if (event == null) {
-            throw new IllegalArgumentException("日程不存在: id=" + id);
+            throw new UserResourceNotFoundException("日程不存在");
         }
         return event;
     }
@@ -218,11 +222,11 @@ public class ScheduleCommandService {
         try {
             List<ScheduleEvent> dayEvents = scheduleEventMapper.selectList(new QueryWrapper<ScheduleEvent>()
                     .eq("event_date", date));
-            String filePath = scheduleFileService.saveScheduleByDate(date, dayEvents);
-            // 把最新 filePath 回写到所有当日 event（与原逻辑一致）
-            if (filePath != null) {
+            String storageKey = scheduleFileService.saveScheduleByDate(date, dayEvents);
+            if (storageKey != null) {
                 for (ScheduleEvent e : dayEvents) {
-                    e.setFilePath(filePath);
+                    e.setFilePath(null);
+                    e.setStorageKey(storageKey);
                     scheduleEventMapper.updateById(e);
                 }
             }

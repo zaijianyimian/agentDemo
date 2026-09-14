@@ -2,9 +2,11 @@ package com.example.demo.file.application;
 
 import com.example.demo.file.domain.Document;
 import com.example.demo.file.persistence.DocumentMapper;
+import com.example.demo.infrastructure.storage.OwnedStorageResolver;
 import com.example.demo.shared.application.FileContentExtractor;
+import com.example.demo.shared.context.CurrentUserContext;
+import com.example.demo.shared.web.UserResourceNotFoundException;
 import com.example.demo.system.application.SystemSettingsService;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,7 +16,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,33 +42,26 @@ public class FileUploadService {
             (byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0,
             (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1};
 
-    @Value("${app.file.upload-dir:./data/documents}")
-    private String uploadDir;
-
     @Value("${app.file.allowed-types:txt,md,pdf,doc,docx}")
     private String allowedTypes;
 
     private final DocumentMapper documentMapper;
     private final SystemSettingsService settingsService;
     private final FileContentExtractor contentExtractor;
+    private final OwnedStorageResolver storage;
+    private final CurrentUserContext currentUser;
 
     public FileUploadService(
             DocumentMapper documentMapper,
             SystemSettingsService settingsService,
-            FileContentExtractor contentExtractor) {
+            FileContentExtractor contentExtractor,
+            OwnedStorageResolver storage,
+            CurrentUserContext currentUser) {
         this.documentMapper = documentMapper;
         this.settingsService = settingsService;
         this.contentExtractor = contentExtractor;
-    }
-
-    /** 初始化上传目录。 */
-    @PostConstruct
-    public void init() {
-        try {
-            Files.createDirectories(Paths.get(resolveUploadDir()));
-        } catch (IOException error) {
-            log.error("创建上传目录失败: {}", resolveUploadDir(), error);
-        }
+        this.storage = storage;
+        this.currentUser = currentUser;
     }
 
     /**
@@ -83,14 +77,16 @@ public class FileUploadService {
         validateFile(file);
         String originalFilename = file.getOriginalFilename();
         String fileType = getFileExtension(originalFilename);
-        Path filePath = Paths.get(
-                resolveUploadDir(), UUID.randomUUID() + "." + fileType);
-        Files.createDirectories(filePath.getParent());
+        long userId = currentUser.requireUserId();
+        String storageKey = UUID.randomUUID() + "." + fileType;
+        Path filePath = storage.resolveForCreate(
+                userId, OwnedStorageResolver.Category.DOCUMENTS, storageKey);
         Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
         Document document = Document.builder()
+                .userId(userId)
                 .fileName(originalFilename)
-                .filePath(filePath.toString())
+                .storageKey(storageKey)
                 .fileType(fileType)
                 .fileSize(file.getSize())
                 .content(contentExtractor.extractContent(filePath, fileType))
@@ -104,24 +100,83 @@ public class FileUploadService {
 
     /** 查询全部文档。 */
     public List<Document> listDocuments() {
+        currentUser.requireUserId();
         return documentMapper.selectList(null);
     }
 
     /** 根据 ID 查询文档。 */
     public Document getDocument(Long id) {
-        return documentMapper.selectById(id);
+        return requireOwnedDocument(id);
+    }
+
+    public StoredDocumentContent readDocumentFile(Long id) throws IOException {
+        Document document = documentMapper.selectById(id);
+        if (document == null) {
+            throw new UserResourceNotFoundException("文档不存在");
+        }
+        if (document.getStorageKey() == null || document.getStorageKey().isBlank()) {
+            throw new IOException("文档尚未迁移到用户存储: " + id);
+        }
+        Path target = storage.resolveExisting(
+                document.getUserId(), OwnedStorageResolver.Category.DOCUMENTS, document.getStorageKey());
+        String contentType = Files.probeContentType(target);
+        return new StoredDocumentContent(document.getFileName(), Files.readAllBytes(target),
+                contentType == null ? "application/octet-stream" : contentType);
+    }
+
+    public StoredImage storeImage(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty() || file.getContentType() == null
+                || !file.getContentType().startsWith("image/")) {
+            throw new IOException("只支持非空图片文件");
+        }
+        String originalName = file.getOriginalFilename();
+        String extension = getFileExtension(originalName);
+        if (extension.isBlank() || !Set.of("png", "jpg", "jpeg", "gif", "webp", "svg").contains(extension)) {
+            throw new IOException("不支持的图片类型");
+        }
+        long userId = currentUser.requireUserId();
+        String storageKey = "images/" + UUID.randomUUID() + "." + extension;
+        Path target = storage.resolveForCreate(
+                userId, OwnedStorageResolver.Category.DOCUMENTS, storageKey);
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        return new StoredImage(storageKey.substring("images/".length()), originalName,
+                file.getSize(), file.getContentType());
+    }
+
+    public StoredImageContent readImage(String fileName) throws IOException {
+        if (fileName == null || fileName.isBlank() || fileName.contains("/") || fileName.contains("\\")) {
+            throw new IOException("非法图片文件名");
+        }
+        long userId = currentUser.requireUserId();
+        Path target = storage.resolveExisting(
+                userId, OwnedStorageResolver.Category.DOCUMENTS, "images/" + fileName);
+        String contentType = Files.probeContentType(target);
+        return new StoredImageContent(Files.readAllBytes(target),
+                contentType == null ? "application/octet-stream" : contentType);
     }
 
     /** 删除文档及本地文件。 */
     public void deleteDocument(Long id) throws IOException {
         Document document = documentMapper.selectById(id);
         if (document == null) {
-            throw new IOException("文档不存在: " + id);
+            throw new UserResourceNotFoundException("文档不存在");
         }
-        if (document.getFilePath() != null) {
-            Files.deleteIfExists(Paths.get(document.getFilePath()));
+        if (document.getStorageKey() == null || document.getStorageKey().isBlank()) {
+            throw new IOException("文档尚未迁移到用户存储: " + id);
         }
+        Path file = storage.resolveExisting(
+                document.getUserId(), OwnedStorageResolver.Category.DOCUMENTS, document.getStorageKey());
+        Files.deleteIfExists(file);
         documentMapper.deleteById(id);
+    }
+
+    private Document requireOwnedDocument(Long id) {
+        currentUser.requireUserId();
+        Document document = documentMapper.selectById(id);
+        if (document == null) {
+            throw new UserResourceNotFoundException("文档不存在");
+        }
+        return document;
     }
 
     private void validateFile(MultipartFile file) throws IOException {
@@ -192,10 +247,6 @@ public class FileUploadService {
         return dot < 0 ? "" : filename.substring(dot + 1).toLowerCase();
     }
 
-    private String resolveUploadDir() {
-        return settingsService.getSetting("file", "upload_dir", uploadDir);
-    }
-
     private List<String> resolveAllowedTypeList() {
         String configured = settingsService.getSetting("file", "allowed_types", allowedTypes);
         return List.of(configured.toLowerCase().replace(" ", "").split(","));
@@ -209,5 +260,14 @@ public class FileUploadService {
         } catch (NumberFormatException error) {
             return DEFAULT_MAX_FILE_SIZE;
         }
+    }
+
+    public record StoredImage(String fileName, String originalName, long fileSize, String contentType) {
+    }
+
+    public record StoredImageContent(byte[] bytes, String contentType) {
+    }
+
+    public record StoredDocumentContent(String fileName, byte[] bytes, String contentType) {
     }
 }

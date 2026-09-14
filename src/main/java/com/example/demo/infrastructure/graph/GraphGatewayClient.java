@@ -26,7 +26,6 @@ import java.util.Map;
 @Component
 public class GraphGatewayClient {
 
-    private static final String INTERNAL_TOKEN_HEADER = "X-Agent-Internal-Token";
     private static final String USER_ID_HEADER = "X-User-Id";
 
     private final GraphGatewayProperties properties;
@@ -58,7 +57,7 @@ public class GraphGatewayClient {
         }
         return webClient.post()
                 .uri("/internal/emails/dispatch")
-                .headers(headers -> applyInternalHeaders(headers, userId))
+                .headers(headers -> applyUserContextHeader(headers, userId))
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(payload)
                 .retrieve()
@@ -77,7 +76,7 @@ public class GraphGatewayClient {
     public String chat(long userId, String sessionId, String message) {
         GraphChatResponse response = webClient.post()
                 .uri("/internal/chat/complete")
-                .headers(headers -> applyInternalHeaders(headers, userId))
+                .headers(headers -> applyUserContextHeader(headers, userId))
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new GraphChatRequest(userId, sessionId, message))
                 .retrieve()
@@ -100,7 +99,7 @@ public class GraphGatewayClient {
     public Flux<String> streamChat(long userId, String sessionId, String message) {
         return webClient.post()
                 .uri("/internal/chat/stream")
-                .headers(headers -> applyInternalHeaders(headers, userId))
+                .headers(headers -> applyUserContextHeader(headers, userId))
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.TEXT_EVENT_STREAM)
                 .bodyValue(new GraphChatRequest(userId, sessionId, message))
@@ -115,9 +114,8 @@ public class GraphGatewayClient {
                 });
     }
 
-    private void applyInternalHeaders(org.springframework.http.HttpHeaders headers, long userId) {
+    private void applyUserContextHeader(org.springframework.http.HttpHeaders headers, long userId) {
         headers.set(USER_ID_HEADER, String.valueOf(userId));
-        headers.set(INTERNAL_TOKEN_HEADER, properties.getInternalToken());
     }
 
     private static String stripTrailingSlash(String value) {

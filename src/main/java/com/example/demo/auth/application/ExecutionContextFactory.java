@@ -2,13 +2,14 @@ package com.example.demo.auth.application;
 
 import com.example.demo.shared.context.ExecutionContext;
 import com.example.demo.shared.context.ExecutionPolicy;
+import com.example.demo.shared.context.PersistedOwnerExecutionContextFactory;
 import com.example.demo.shared.context.UserContext;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Component;
 
 /** Trusted entry points only. Resource repositories still enforce the supplied owner. */
 @Component
-public final class ExecutionContextFactory {
+public final class ExecutionContextFactory implements PersistedOwnerExecutionContextFactory {
     private final CurrentUserProvider currentUser;
     private final UserAccountCacheService users;
 
@@ -18,10 +19,12 @@ public final class ExecutionContextFactory {
     }
 
     public ExecutionContext forHttp(String trigger, ExecutionPolicy policy) {
-        return ExecutionContext.start(currentUser.requireCurrentUser(), trigger, ExecutionContext.Actor.USER, policy);
+        return ExecutionContext.start(currentUser.requireAuthenticatedHttpUser(), trigger,
+                ExecutionContext.Actor.USER, policy);
     }
 
     /** Caller must obtain ownerId from its persisted resource, never an external payload. */
+    @Override
     public ExecutionContext forPersistedOwner(Long ownerId, String trigger, ExecutionPolicy policy) {
         if (ownerId == null || ownerId <= 0) {
             throw new AuthenticationCredentialsNotFoundException("Resource owner required");

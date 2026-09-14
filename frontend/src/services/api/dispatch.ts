@@ -24,9 +24,7 @@ export interface PushConfigPayload {
   pushThreshold?: 'high' | 'medium' | 'low'
   batchCron?: string
   immediateEnabled?: boolean
-  workspaceMaxCount?: number
-  workspaceMaxAgeDays?: number
-  executorTimeoutSeconds?: number
+  resultRetentionDays?: number
 }
 
 export const dispatchedService = {
@@ -47,29 +45,6 @@ export const dispatchedService = {
 
   rerun: async (id: number): Promise<ApiResponse<void>> => {
     const response = await api.post(`/dispatched/${id}/rerun`)
-    return response.data
-  },
-
-  executorAvailability: async (): Promise<ApiResponse<Record<string, boolean>>> => {
-    const response = await api.get('/dispatched/executors/availability')
-    return response.data
-  },
-
-  /**
-   * 拉取 Settings 页面配置的 executor 启停状态（如 {claude-code: true, codex: false}）。
-   */
-  executorSettings: async (): Promise<ApiResponse<Record<string, boolean>>> => {
-    const response = await api.get('/dispatched/executors/settings')
-    return response.data
-  },
-
-  /**
-   * 一次性保存所有 executor 启停状态。
-   */
-  updateExecutorSettings: async (
-    states: Record<string, boolean>
-  ): Promise<ApiResponse<Record<string, boolean>>> => {
-    const response = await api.put('/dispatched/executors/settings', states)
     return response.data
   }
 }

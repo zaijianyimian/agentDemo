@@ -31,7 +31,7 @@ class ExecutionContextFactoryTest {
     @Test
     void httpFactoryUsesAuthenticatedUserAndPoliciesCannotBeMutated() {
         var current = mock(CurrentUserProvider.class);
-        when(current.requireCurrentUser()).thenReturn(new UserContext(7));
+        when(current.requireAuthenticatedHttpUser()).thenReturn(new UserContext(7));
         var mutable = new HashSet<>(Set.of("read_mail"));
         var policy = new ExecutionPolicy(mutable, false, false);
         var context = new ExecutionContextFactory(current, mock(UserAccountCacheService.class))
@@ -55,5 +55,22 @@ class ExecutionContextFactoryTest {
                 ExecutionPolicy.readOnly());
         assertThatThrownBy(() -> new EventContext(context, UUID.randomUUID(), "", 0, Instant.now(), null))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void backgroundOwnerIsVisibleButCannotMasqueradeAsHttpAuthentication() {
+        var provider = new CurrentUserProvider(mock(AuthService.class));
+        var factory = new ExecutionContextFactory(provider, mock(UserAccountCacheService.class));
+        var background = ExecutionContext.start(new UserContext(23), "scheduled-task",
+                ExecutionContext.Actor.SYSTEM, ExecutionPolicy.readOnly());
+
+        try (var ignored = ExecutionContextScope.open(background)) {
+            assertThat(provider.requireUserId()).isEqualTo(23L);
+            assertThatThrownBy(() -> factory.forHttp("http", ExecutionPolicy.readOnly()))
+                    .isInstanceOf(org.springframework.security.core.AuthenticationException.class);
+        }
+
+        assertThatThrownBy(provider::requireCurrentUser)
+                .isInstanceOf(org.springframework.security.core.AuthenticationException.class);
     }
 }

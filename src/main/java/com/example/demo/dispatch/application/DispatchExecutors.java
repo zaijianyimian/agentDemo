@@ -1,5 +1,6 @@
 package com.example.demo.dispatch.application;
 
+import com.example.demo.shared.context.ContextPropagatingExecutorService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -18,7 +19,8 @@ public class DispatchExecutors {
 
     @Bean(name = "dispatchWorkerPool", destroyMethod = "shutdown")
     public ExecutorService dispatchWorkerPool() {
-        return Executors.newFixedThreadPool(2, namedDaemonFactory("dispatch-worker"));
+        return new ContextPropagatingExecutorService(
+                Executors.newFixedThreadPool(2, namedDaemonFactory("dispatch-worker")));
     }
 
     private static ThreadFactory namedDaemonFactory(String prefix) {

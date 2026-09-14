@@ -5,12 +5,11 @@ import com.example.demo.email.application.EmailListenerService;
 import com.example.demo.email.domain.EmailConfig;
 import com.example.demo.inbox.dto.InboxItem;
 import com.example.demo.inbox.dto.InboxSummary;
-import com.example.demo.note.application.NoteService;
-import com.example.demo.note.domain.Note;
 import com.example.demo.schedule.application.ScheduleEventService;
 import com.example.demo.schedule.domain.ScheduleEvent;
 import com.example.demo.task.application.ScheduledTaskService;
 import com.example.demo.task.domain.ScheduledTask;
+import com.example.demo.shared.context.CurrentUserContext;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -26,7 +25,7 @@ import java.util.stream.Stream;
 /**
  * 统一收件箱业务服务。
  *
- * <p>聚合 Java 持有的日程、任务、笔记和邮箱状态。Search、Autonomy 等 Agent 结果已经迁移到
+ * <p>聚合 Java 持有的日程、任务和邮箱状态。Search、Autonomy 等 Agent 结果已经迁移到
  * Python Agent Engine，不再由 Java 读取本地扫描结果。</p>
  */
 @Service
@@ -34,21 +33,21 @@ public class UnifiedInboxService {
 
     private final ScheduleEventService scheduleEventService;
     private final ScheduledTaskService scheduledTaskService;
-    private final NoteService noteService;
     private final EmailConfigService emailConfigService;
     private final EmailListenerService emailListenerService;
+    private final CurrentUserContext currentUser;
 
     public UnifiedInboxService(
             ScheduleEventService scheduleEventService,
             ScheduledTaskService scheduledTaskService,
-            NoteService noteService,
             EmailConfigService emailConfigService,
-            EmailListenerService emailListenerService) {
+            EmailListenerService emailListenerService,
+            CurrentUserContext currentUser) {
         this.scheduleEventService = scheduleEventService;
         this.scheduledTaskService = scheduledTaskService;
-        this.noteService = noteService;
         this.emailConfigService = emailConfigService;
         this.emailListenerService = emailListenerService;
+        this.currentUser = currentUser;
     }
 
     /**
@@ -58,12 +57,15 @@ public class UnifiedInboxService {
      * @return 收件箱摘要。
      */
     public InboxSummary buildSummary(int limit) {
+        long ownerId = currentUser.requireUserId();
         int safeLimit = Math.max(1, limit);
         List<InboxItem> rawItems = new ArrayList<>();
-        List<ScheduleEvent> schedules = scheduleEventService.listByEventTimeDesc();
-        List<ScheduledTask> tasks = scheduledTaskService.listByUpdateTimeDesc();
-        List<Note> notes = noteService.getAllNotes();
-        List<EmailConfig> emails = emailConfigService.listAll();
+        List<ScheduleEvent> schedules = scheduleEventService.listByEventTimeDesc().stream()
+                .filter(item -> Long.valueOf(ownerId).equals(item.getUserId())).toList();
+        List<ScheduledTask> tasks = scheduledTaskService.listByUpdateTimeDesc().stream()
+                .filter(item -> Long.valueOf(ownerId).equals(item.getUserId())).toList();
+        List<EmailConfig> emails = emailConfigService.listAll().stream()
+                .filter(item -> Long.valueOf(ownerId).equals(item.getUserId())).toList();
         Map<Long, Map<String, Object>> listenerStatus = emailListenerService.getListenerStatus();
 
         schedules.stream().filter(item -> item.getEventTime() != null).limit(5).forEach(item ->
@@ -95,17 +97,6 @@ public class UnifiedInboxService {
                         "cron", defaultText(task.getCronExpression(), "")))
                 .build()));
 
-        notes.stream().limit(5).forEach(note -> rawItems.add(InboxItem.builder()
-                .category("note")
-                .title(note.getTitle())
-                .summary(buildNoteSummary(note))
-                .status(Boolean.TRUE.equals(note.getIsPinned()) ? "pinned" : "recent")
-                .route("/notes")
-                .accent("#fbbf24")
-                .time(note.getUpdateTime())
-                .meta(Map.of("id", note.getId(), "tags", defaultText(note.getTags(), "")))
-                .build()));
-
         emails.stream().limit(4).forEach(config -> rawItems.add(InboxItem.builder()
                 .category("mail")
                 .title(config.getEmail())
@@ -133,8 +124,6 @@ public class UnifiedInboxService {
                 .filter(item -> LocalDate.now().equals(item.getEventDate())).count());
         counts.put("enabledTasks", tasks.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getEnabled())).count());
-        counts.put("pinnedNotes", notes.stream()
-                .filter(item -> Boolean.TRUE.equals(item.getIsPinned())).count());
         counts.put("recentSearches", 0);
         counts.put("activeMailboxes", emails.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getEnabled())).count());
@@ -167,14 +156,6 @@ public class UnifiedInboxService {
                         defaultText(task.getCronExpression(), ""),
                         defaultText(result, "等待执行"))
                 .filter(text -> !text.isBlank()).toList());
-    }
-
-    private String buildNoteSummary(Note note) {
-        if (note.getTags() != null && !note.getTags().isBlank()) {
-            return "标签 · " + note.getTags();
-        }
-        String content = defaultText(note.getContent(), "最近更新的笔记内容");
-        return content.length() > 100 ? content.substring(0, 100) + "..." : content;
     }
 
     private String buildEmailSummary(EmailConfig config, String listener) {

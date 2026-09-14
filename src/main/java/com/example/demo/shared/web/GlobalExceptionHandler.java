@@ -4,6 +4,8 @@ import com.example.demo.shared.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -26,6 +28,22 @@ import java.util.concurrent.TimeoutException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAuthentication(AuthenticationException exception) {
+        return failure(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", "未登录或令牌失效");
+    }
+
+    @ExceptionHandler(UserResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleUserResourceNotFound(
+            UserResourceNotFoundException exception) {
+        return failure(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "资源不存在");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAccessDenied(AccessDeniedException exception) {
+        return failure(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "无权限访问该资源");
+    }
 
     /**
      * 处理请求体参数校验异常。

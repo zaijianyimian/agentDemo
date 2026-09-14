@@ -2,8 +2,13 @@ package com.example.demo.email.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.email.domain.EmailConfig;
+import com.example.demo.email.domain.OwnedEmailConfigRef;
 import com.example.demo.email.persistence.EmailConfigMapper;
-import com.example.demo.infrastructure.security.CurrentUserProvider;
+import com.example.demo.shared.context.CurrentUserContext;
+import com.example.demo.shared.context.ExecutionContextScope;
+import com.example.demo.shared.context.ExecutionPolicy;
+import com.example.demo.shared.context.PersistedOwnerExecutionContextFactory;
+import com.example.demo.shared.web.UserResourceNotFoundException;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,9 +43,10 @@ public class EmailListenerScheduleService {
     private final EmailConfigMapper emailConfigMapper;
     private final EmailAuthConfigService emailAuthConfigService;
     private final EmailListenerService emailListenerService;
-    private final CurrentUserProvider currentUserProvider;
+    private final CurrentUserContext currentUserProvider;
+    private final PersistedOwnerExecutionContextFactory executionContexts;
     private final TimeWheel timeWheel = new TimeWheel(TICK_MILLIS, WHEEL_SIZE);
-    private final Map<Long, List<WheelTask>> scheduledTasks = new ConcurrentHashMap<>();
+    private final Map<OwnedEmailConfigRef, List<WheelTask>> scheduledTasks = new ConcurrentHashMap<>();
     private final AtomicBoolean initialized = new AtomicBoolean(false);
 
     @Value("${app.email.listener.enabled:true}")
@@ -50,11 +56,13 @@ public class EmailListenerScheduleService {
             EmailConfigMapper emailConfigMapper,
             EmailAuthConfigService emailAuthConfigService,
             EmailListenerService emailListenerService,
-            CurrentUserProvider currentUserProvider) {
+            CurrentUserContext currentUserProvider,
+            PersistedOwnerExecutionContextFactory executionContexts) {
         this.emailConfigMapper = emailConfigMapper;
         this.emailAuthConfigService = emailAuthConfigService;
         this.emailListenerService = emailListenerService;
         this.currentUserProvider = currentUserProvider;
+        this.executionContexts = executionContexts;
     }
 
     // ==================== 启动与重载 ====================
@@ -73,7 +81,7 @@ public class EmailListenerScheduleService {
             return;
         }
         timeWheel.start();
-        reloadListeners();
+        reloadAllListenersForLifecycleInternal();
     }
 
     @PreDestroy
@@ -84,29 +92,25 @@ public class EmailListenerScheduleService {
     /**
      * 重载邮箱监听。
      *
-     * <p>系统启动线程没有登录态时执行全局重载；HTTP 用户请求有 JWT 时只停止、重建当前用户自己的
-     * 邮箱任务，避免一个用户点击“重载”影响其他用户。</p>
+     * <p>HTTP 用户请求只停止、重建当前用户自己的邮箱任务，避免一个用户点击“重载”影响其他用户。</p>
      */
     public void reloadListeners() {
-        if (currentUserProvider.currentUserId().isPresent()) {
-            List<EmailConfig> userConfigs = emailConfigMapper.selectList(null);
-            userConfigs.forEach(config -> stopAndUnschedule(config.getId()));
-            List<EmailConfig> enabledConfigs = userConfigs.stream()
-                    .filter(config -> Boolean.TRUE.equals(config.getEnabled()))
-                    .toList();
-            log.info("当前用户重载 {} 个启用邮箱配置", enabledConfigs.size());
-            enabledConfigs.forEach(this::scheduleEnabledListener);
-            return;
-        }
+        long ownerId = currentUserProvider.requireUserId();
+        List<EmailConfig> userConfigs = emailConfigMapper.selectList(null);
+        userConfigs.forEach(this::stopAndUnschedule);
+        List<EmailConfig> enabledConfigs = userConfigs.stream()
+                .filter(config -> Boolean.TRUE.equals(config.getEnabled()))
+                .toList();
+        log.info("用户 {} 重载 {} 个启用邮箱配置", ownerId, enabledConfigs.size());
+        enabledConfigs.forEach(this::scheduleEnabledListener);
+    }
 
+    private void reloadAllListenersForLifecycleInternal() {
         cancelAllSchedules();
-        emailListenerService.stopAllListeners();
-        List<EmailConfig> configs = emailConfigMapper.selectList(
-                new LambdaQueryWrapper<EmailConfig>()
-                        .eq(EmailConfig::getEnabled, true)
-        );
+        emailListenerService.stopAllListenersForLifecycleInternal();
+        List<EmailConfig> configs = emailConfigMapper.selectEnabledForInternalScan();
         log.info("系统全局加载 {} 个启用邮箱配置，交给时间轮调度", configs.size());
-        configs.forEach(this::scheduleEnabledListener);
+        configs.forEach(config -> runAsPersistedOwner(config, () -> scheduleOwnedListener(config)));
     }
 
     /**
@@ -123,14 +127,20 @@ public class EmailListenerScheduleService {
      * @param config 邮箱配置。
      */
     public void scheduleEnabledListener(EmailConfig config) {
+        requireCurrentOwner(config);
+        scheduleOwnedListener(config);
+    }
+
+    private void scheduleOwnedListener(EmailConfig config) {
         if (config == null || config.getId() == null) {
             return;
         }
+        OwnedEmailConfigRef reference = referenceOf(config);
         emailAuthConfigService.decodeTransientFields(config);
-        cancelSchedule(config.getId());
+        cancelSchedule(reference);
 
         if (!Boolean.TRUE.equals(config.getEnabled())) {
-            emailListenerService.stopListener(config.getId());
+            emailListenerService.stopListener(config);
             return;
         }
 
@@ -145,7 +155,7 @@ public class EmailListenerScheduleService {
             scheduleStop(config);
             log.info("[{}] 当前在监听时间段内，已启动并安排结束事件", config.getEmail());
         } else {
-            emailListenerService.stopListener(config.getId());
+            emailListenerService.stopListener(config);
             scheduleStart(config);
             log.info("[{}] 当前不在监听时间段内，已安排下一次开始事件", config.getEmail());
         }
@@ -156,9 +166,19 @@ public class EmailListenerScheduleService {
      *
      * @param configId 邮箱配置 ID。
      */
+    public void stopAndUnschedule(EmailConfig config) {
+        requireCurrentOwner(config);
+        OwnedEmailConfigRef reference = referenceOf(config);
+        cancelSchedule(reference);
+        emailListenerService.stopListener(config);
+    }
+
     public void stopAndUnschedule(Long configId) {
-        cancelSchedule(configId);
-        emailListenerService.stopListener(configId);
+        EmailConfig config = emailConfigMapper.selectById(configId);
+        if (config == null) {
+            throw new UserResourceNotFoundException("邮箱配置不存在");
+        }
+        stopAndUnschedule(config);
     }
 
     /**
@@ -174,33 +194,33 @@ public class EmailListenerScheduleService {
 
     private void scheduleStart(EmailConfig config) {
         Duration delay = delayUntil(config.getListenStartTime());
-        WheelTask task = timeWheel.schedule(delay, () -> {
+        WheelTask task = timeWheel.schedule(delay, asActiveOwner(config, () -> {
             EmailConfig latest = loadEnabledConfig(config.getId());
             if (latest == null) {
-                cancelSchedule(config.getId());
+                cancelSchedule(referenceOf(config));
                 return;
             }
             emailAuthConfigService.decodeTransientFields(latest);
             emailListenerService.startListener(latest);
             scheduleStop(latest);
             log.info("[{}] 时间轮触发开始监听", latest.getEmail());
-        });
-        trackTask(config.getId(), task);
+        }));
+        trackTask(referenceOf(config), task);
     }
 
     private void scheduleStop(EmailConfig config) {
         Duration delay = delayUntil(config.getListenEndTime());
-        WheelTask task = timeWheel.schedule(delay, () -> {
-            emailListenerService.stopListener(config.getId());
+        WheelTask task = timeWheel.schedule(delay, asActiveOwner(config, () -> {
+            emailListenerService.stopListener(config);
             EmailConfig latest = loadEnabledConfig(config.getId());
             if (latest == null) {
-                cancelSchedule(config.getId());
+                cancelSchedule(referenceOf(config));
                 return;
             }
             scheduleStart(latest);
             log.info("[{}] 时间轮触发停止监听", latest.getEmail());
-        });
-        trackTask(config.getId(), task);
+        }));
+        trackTask(referenceOf(config), task);
     }
 
     private EmailConfig loadEnabledConfig(Long configId) {
@@ -211,15 +231,15 @@ public class EmailListenerScheduleService {
         return latest;
     }
 
-    private void trackTask(Long configId, WheelTask task) {
-        List<WheelTask> tasks = scheduledTasks.computeIfAbsent(configId,
+    private void trackTask(OwnedEmailConfigRef reference, WheelTask task) {
+        List<WheelTask> tasks = scheduledTasks.computeIfAbsent(reference,
                 ignored -> new CopyOnWriteArrayList<>());
         tasks.removeIf(WheelTask::isDone);
         tasks.add(task);
     }
 
-    private void cancelSchedule(Long configId) {
-        List<WheelTask> tasks = scheduledTasks.remove(configId);
+    private void cancelSchedule(OwnedEmailConfigRef reference) {
+        List<WheelTask> tasks = scheduledTasks.remove(reference);
         if (tasks == null) {
             return;
         }
@@ -227,8 +247,34 @@ public class EmailListenerScheduleService {
     }
 
     private void cancelAllSchedules() {
-        List<Long> configIds = new ArrayList<>(scheduledTasks.keySet());
-        configIds.forEach(this::cancelSchedule);
+        List<OwnedEmailConfigRef> references = new ArrayList<>(scheduledTasks.keySet());
+        references.forEach(this::cancelSchedule);
+    }
+
+    private void requireCurrentOwner(EmailConfig config) {
+        if (config == null || config.getId() == null || config.getUserId() == null
+                || currentUserProvider.requireUserId() != config.getUserId()) {
+            throw new UserResourceNotFoundException("邮箱配置不存在");
+        }
+    }
+
+    private OwnedEmailConfigRef referenceOf(EmailConfig config) {
+        return new OwnedEmailConfigRef(config.getUserId(), config.getId());
+    }
+
+    private Runnable asActiveOwner(EmailConfig config, Runnable action) {
+        return () -> runAsPersistedOwner(config, action);
+    }
+
+    private void runAsPersistedOwner(EmailConfig config, Runnable action) {
+        try (var ignored = ExecutionContextScope.open(executionContexts.forPersistedOwner(
+                config.getUserId(), "email-listener-schedule", ExecutionPolicy.readOnly()))) {
+            action.run();
+        } catch (RuntimeException rejectedOwner) {
+            cancelSchedule(referenceOf(config));
+            emailListenerService.stopListenerForLifecycleInternal(referenceOf(config));
+            log.info("邮箱监听任务已停止：owner 已禁用或配置已失效, configId={}", config.getId());
+        }
     }
 
     // ==================== 时间计算与判定 ====================

@@ -46,7 +46,6 @@ app:
   graph:
     enabled: ${GRAPH_ENABLED:false}
     base-url: ${GRAPH_BASE_URL:http://127.0.0.1:8001}
-    internal-token: ${GRAPH_INTERNAL_TOKEN:}
     connect-timeout-seconds: ${GRAPH_CONNECT_TIMEOUT_SECONDS:5}
     response-timeout-seconds: ${GRAPH_RESPONSE_TIMEOUT_SECONDS:120}
 ```
@@ -54,13 +53,11 @@ app:
 Java 内部调用会携带：
 
 ```http
-X-Agent-Internal-Token: <GRAPH_INTERNAL_TOKEN>
 X-User-Id: 123
 ```
 
-Python 必须同时校验：
+Python 必须校验：
 
-- `X-Agent-Internal-Token` 正确；
 - `X-User-Id` 是合法整数；
 - Header 中的 user id 与 JSON Body 的 `user_id` 一致。
 
@@ -222,7 +219,7 @@ alter table email_message
 POST /internal/emails/dispatch
         |
         v
-校验 internal token + user_id
+校验 user_id 上下文
         |
         v
 PG UPSERT email_message
@@ -444,35 +441,25 @@ async def stream_chat(request: ChatRequest) -> StreamingResponse:
     )
 ```
 
-## 11. 内部 API 鉴权
+## 11. 内部 API 用户上下文
 
-建议 Python 增加统一 dependency：
+Java 与 Python 之间不使用共享 Token。建议 Python 增加统一 dependency，读取可信网络内 Java 传递的用户上下文：
 
 ```python
-from fastapi import Header, HTTPException, status
+from fastapi import Header
 
 
-async def verify_internal_request(
-        x_agent_internal_token: str = Header(alias="X-Agent-Internal-Token"),
+async def resolve_internal_user(
         x_user_id: int = Header(alias="X-User-Id"),
 ) -> int:
-    """校验 Java 到 Python 的内部请求。
+    """读取 Java 到 Python 内部请求中的用户上下文。
 
     Args:
-        x_agent_internal_token: Java/Python 共享内部密钥。
         x_user_id: Java 从 JWT 中解析出的用户 ID。
 
     Returns:
         可信用户 ID。
-
-    Raises:
-        HTTPException: 内部密钥不合法时抛出。
     """
-    if x_agent_internal_token != settings.internal_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="invalid internal token",
-        )
     return x_user_id
 ```
 
@@ -488,7 +475,7 @@ if trusted_user_id != request.user_id:
 - 内网/VPC；
 - TLS；
 - mTLS 或网关级身份；
-- internal token 定期轮换。
+- 防火墙或安全组仅允许 Java 服务访问内部 API。
 
 ## 12. LangGraph 多用户 checkpoint
 
@@ -612,10 +599,9 @@ app/
 8. Python 实现 `/internal/chat/stream`。
 9. 本地保持 `GRAPH_ENABLED=false` 分别验证 Java 旧链路。
 10. 启动 Python Graph，先直接 curl 三个 internal API。
-11. 设置同一 `GRAPH_INTERNAL_TOKEN`。
-12. Java 设置 `GRAPH_ENABLED=true`。
-13. 用两个不同 Java 用户分别创建会话和邮箱，做交叉 ID 越权测试。
-14. 确认 Python PG 中每条 AI 数据都有正确 user_id。
+11. Java 设置 `GRAPH_ENABLED=true`。
+12. 用两个不同 Java 用户分别创建会话和邮箱，做交叉 ID 越权测试。
+13. 确认 Python PG 中每条 AI 数据都有正确 user_id。
 
 ## 17. 必测场景
 
@@ -663,7 +649,7 @@ WHERE email_id = %s AND user_id = %s
 后续继续多用户化时，建议按优先级逐表处理：
 
 1. schedule / scheduled_task；
-2. note / document / knowledge_base；
+2. document / knowledge_base；
 3. user_interest / search_history；
 4. 用户自定义 model / MCP / skill；
 5. autonomy / dispatch 数据。
@@ -677,7 +663,6 @@ WHERE email_id = %s AND user_id = %s
 ```env
 GRAPH_ENABLED=true
 GRAPH_BASE_URL=http://graph:8001
-GRAPH_INTERNAL_TOKEN=<same-secret-as-python>
 ```
 
 Java 不需要 PostgreSQL 驱动，不需要第二数据源，也不需要知道 PG 表结构。

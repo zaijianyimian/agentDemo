@@ -24,6 +24,8 @@ public class ChatMessageEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private Long userId;
+
     /**
      * 会话ID
      */

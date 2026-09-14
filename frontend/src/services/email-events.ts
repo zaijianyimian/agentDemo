@@ -1,5 +1,11 @@
 // 邮箱新事件 SSE 连接工具：订阅后端 /api/email/events，解析 new-email 事件并回调
 import { getAccessToken } from '@/services/auth-token'
+import {
+  captureSession,
+  isCurrentSession,
+  registerSessionController,
+  type SessionSnapshot
+} from '@/services/session-lifecycle'
 
 export interface EmailNotificationEvent {
   accountEmail?: string
@@ -10,6 +16,17 @@ export interface EmailNotificationEvent {
   receivedDate?: string
   detectedAt?: string
   messageId?: string
+}
+
+interface UserEventEnvelope<T> {
+  event_id: string
+  schema_version: number
+  user_id: number
+  occurred_at: string
+  event_type: string
+  resource_type: string
+  resource_id: string
+  payload: T
 }
 
 type EmailEventHandlers = {
@@ -25,14 +42,17 @@ export function connectEmailEventStream(handlers: EmailEventHandlers): AbortCont
   const token = getAccessToken()
   if (!token) return null
 
+  const snapshot = captureSession()
+  if (!snapshot.userId) return null
   const controller = new AbortController()
+  const unregister = registerSessionController(controller, snapshot.generation)
 
-  void readEmailEventStream(controller, token, handlers).catch((error) => {
-    if (!controller.signal.aborted) {
+  void readEmailEventStream(controller, token, snapshot, handlers).catch((error) => {
+    if (!controller.signal.aborted && isCurrentSession(snapshot)) {
       console.warn('[邮箱监听SSE] 连接断开', error)
       handlers.onDisconnect?.()
     }
-  })
+  }).finally(unregister)
 
   return controller
 }
@@ -40,6 +60,7 @@ export function connectEmailEventStream(handlers: EmailEventHandlers): AbortCont
 async function readEmailEventStream(
   controller: AbortController,
   token: string,
+  snapshot: SessionSnapshot,
   handlers: EmailEventHandlers
 ) {
   const response = await fetch('/api/email/events', {
@@ -71,13 +92,13 @@ async function readEmailEventStream(
     while (match?.index != null) {
       const rawEvent = buffer.slice(0, match.index)
       buffer = buffer.slice(match.index + match[0].length)
-      handleSseEvent(rawEvent, handlers)
+      handleSseEvent(rawEvent, snapshot, handlers)
       match = /\r?\n\r?\n/.exec(buffer)
     }
   }
 }
 
-function handleSseEvent(rawEvent: string, handlers: EmailEventHandlers) {
+function handleSseEvent(rawEvent: string, snapshot: SessionSnapshot, handlers: EmailEventHandlers) {
   const lines = rawEvent.split(/\r?\n/)
   let eventName = 'message'
   const dataLines: string[] = []
@@ -93,7 +114,14 @@ function handleSseEvent(rawEvent: string, handlers: EmailEventHandlers) {
   if (eventName !== 'new-email' || dataLines.length === 0) return
 
   try {
-    handlers.onEmail(JSON.parse(dataLines.join('\n')) as EmailNotificationEvent)
+    const envelope = JSON.parse(dataLines.join('\n')) as UserEventEnvelope<EmailNotificationEvent>
+    if (envelope.schema_version !== 1 || envelope.event_type !== 'new-email' || !envelope.payload) {
+      throw new Error('不支持的邮件事件格式')
+    }
+    if (!isCurrentSession(snapshot) || String(envelope.user_id) !== snapshot.userId) {
+      return
+    }
+    handlers.onEmail(envelope.payload)
   } catch (error) {
     console.warn('[邮箱监听SSE] 解析新邮件事件失败', error)
   }

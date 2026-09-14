@@ -3,7 +3,9 @@ package com.example.demo.task.application;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.example.demo.email.application.EmailSenderService;
-import com.example.demo.system.application.SystemSettingsService;
+import com.example.demo.email.application.EmailConfigService;
+import com.example.demo.shared.context.CurrentUserContext;
+import com.example.demo.shared.web.UserResourceNotFoundException;
 import com.example.demo.task.domain.JobLog;
 import com.example.demo.task.domain.ScheduledTask;
 import com.example.demo.task.persistence.JobLogMapper;
@@ -31,21 +33,25 @@ public class ScheduledTaskService {
     private final ScheduledTaskMapper taskMapper;
     private final JobLogMapper jobLogMapper;
     private final EmailSenderService emailSenderService;
-    private final SystemSettingsService systemSettingsService;
+    private final EmailConfigService emailConfigService;
+    private final CurrentUserContext currentUser;
 
     public ScheduledTaskService(
             ScheduledTaskMapper taskMapper,
             JobLogMapper jobLogMapper,
             EmailSenderService emailSenderService,
-            SystemSettingsService systemSettingsService) {
+            EmailConfigService emailConfigService,
+            CurrentUserContext currentUser) {
         this.taskMapper = taskMapper;
         this.jobLogMapper = jobLogMapper;
         this.emailSenderService = emailSenderService;
-        this.systemSettingsService = systemSettingsService;
+        this.emailConfigService = emailConfigService;
+        this.currentUser = currentUser;
     }
 
     /** 创建定时任务。 */
     public ScheduledTask createTask(ScheduledTask task) {
+        task.setUserId(currentUser.requireUserId());
         normalizeTask(task);
         validateCron(task.getCronExpression());
         task.setExecuteCount(0);
@@ -64,8 +70,9 @@ public class ScheduledTaskService {
     public ScheduledTask updateTask(ScheduledTask task) {
         ScheduledTask existing = taskMapper.selectById(task.getId());
         if (existing == null) {
-            throw new IllegalArgumentException("任务不存在: " + task.getId());
+            throw new UserResourceNotFoundException("任务不存在");
         }
+        task.setUserId(existing.getUserId());
         normalizeTask(task);
         validateCron(task.getCronExpression());
         if (task.getEnabled() == null) {
@@ -79,6 +86,7 @@ public class ScheduledTaskService {
 
     /** 删除任务及执行日志。 */
     public void deleteTask(Long id) {
+        requireTask(id);
         jobLogMapper.deleteByJobId(id);
         taskMapper.deleteById(id);
     }
@@ -106,6 +114,7 @@ public class ScheduledTaskService {
     public String executeTask(Long id, String triggerType) {
         ScheduledTask task = requireTask(id);
         JobLog jobLog = JobLog.builder()
+                .userId(task.getUserId())
                 .jobId(task.getId())
                 .jobName(task.getName())
                 .handler(task.getTaskType())
@@ -191,16 +200,18 @@ public class ScheduledTaskService {
 
     /** 根据 ID 查询任务。 */
     public ScheduledTask getTask(Long id) {
-        return taskMapper.selectById(id);
+        return requireTask(id);
     }
 
     /** 查询最近执行日志。 */
     public List<JobLog> recentLogs(Long jobId, int limit) {
+        requireTask(jobId);
         return jobLogMapper.selectRecentByJobId(jobId, Math.max(1, Math.min(limit, 200)));
     }
 
     /** 分页查询执行日志。 */
     public IPage<JobLog> pageLogs(Long jobId, int page, int size) {
+        requireTask(jobId);
         return jobLogMapper.pageByJobId(
                 jobId,
                 Math.max(1, page),
@@ -210,7 +221,7 @@ public class ScheduledTaskService {
     private ScheduledTask requireTask(Long id) {
         ScheduledTask task = taskMapper.selectById(id);
         if (task == null) {
-            throw new IllegalArgumentException("任务不存在: " + id);
+            throw new UserResourceNotFoundException("任务不存在");
         }
         return task;
     }
@@ -242,7 +253,11 @@ public class ScheduledTaskService {
     }
 
     private String executeReminderTask(ScheduledTask task) {
-        String userEmail = systemSettingsService.getSetting("user", "email", null);
+        String userEmail = emailConfigService.listEnabled().stream()
+                .map(com.example.demo.email.domain.EmailConfig::getEmail)
+                .filter(email -> email != null && !email.isBlank())
+                .findFirst()
+                .orElse(null);
         if (userEmail == null || userEmail.isBlank()) {
             return "提醒已触发（未配置通知邮箱）: " + safeDescription(task);
         }

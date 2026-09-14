@@ -4,16 +4,13 @@ import com.example.demo.file.domain.Document;
 import com.example.demo.file.application.FileUploadService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * 文件上传控制器
@@ -25,19 +22,12 @@ import java.util.UUID;
 public class FileController {
 
     private final FileUploadService fileUploadService;
-    private final String uploadDir = "./data/uploads";
 
     /**
      * 构造时注入上传服务并确保本地图片目录存在
      */
     public FileController(FileUploadService fileUploadService) {
         this.fileUploadService = fileUploadService;
-        // 确保上传目录存在
-        try {
-            Files.createDirectories(Paths.get(uploadDir));
-        } catch (IOException e) {
-            log.warn("无法创建上传目录: {}", e.getMessage());
-        }
     }
 
     /**
@@ -47,39 +37,20 @@ public class FileController {
     @PostMapping("/upload/image")
     public ResponseEntity<Map<String, Object>> uploadImage(@RequestParam("file") MultipartFile file) {
         try {
-            // 检查文件类型
-            String contentType = file.getContentType();
-            if (contentType == null || !contentType.startsWith("image/")) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "success", false,
-                        "message", "只支持图片文件"
-                ));
-            }
-
-            // 生成唯一文件名
-            String originalFilename = file.getOriginalFilename();
-            String extension = originalFilename != null && originalFilename.contains(".")
-                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
-                    : ".png";
-            String newFilename = UUID.randomUUID().toString() + extension;
-
-            // 保存文件
-            Path filePath = Paths.get(uploadDir, newFilename);
-            Files.copy(file.getInputStream(), filePath);
-
-            log.info("图片上传成功: {}", newFilename);
+            FileUploadService.StoredImage stored = fileUploadService.storeImage(file);
+            log.info("图片上传成功: {}", stored.fileName());
 
             // 返回可访问的URL
-            String fileUrl = "/api/file/image/" + newFilename;
+            String fileUrl = "/api/file/image/" + stored.fileName();
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "message", "图片上传成功",
                     "data", Map.of(
                             "url", fileUrl,
-                            "fileName", newFilename,
-                            "originalName", originalFilename,
-                            "fileSize", file.getSize()
+                            "fileName", stored.fileName(),
+                            "originalName", stored.originalName(),
+                            "fileSize", stored.fileSize()
                     )
             ));
         } catch (IOException e) {
@@ -97,25 +68,12 @@ public class FileController {
     @GetMapping("/image/{filename}")
     public ResponseEntity<byte[]> getImage(@PathVariable String filename) {
         try {
-            Path baseDir = Paths.get(uploadDir).toAbsolutePath().normalize();
-            Path filePath = baseDir.resolve(filename).normalize();
-            if (!filePath.startsWith(baseDir) || !Files.isRegularFile(filePath)) {
-                return ResponseEntity.notFound().build();
-            }
-            if (!Files.exists(filePath)) {
-                return ResponseEntity.notFound().build();
-            }
-
-            byte[] content = Files.readAllBytes(filePath);
-            String contentType = Files.probeContentType(filePath);
-            if (contentType == null) {
-                contentType = "image/png";
-            }
+            FileUploadService.StoredImageContent content = fileUploadService.readImage(filename);
 
             return ResponseEntity.ok()
-                    .header("Content-Type", contentType)
+                    .header("Content-Type", content.contentType())
                     .header("Cache-Control", "max-age=31536000")
-                    .body(content);
+                    .body(content.bytes());
         } catch (IOException e) {
             log.error("读取图片失败", e);
             return ResponseEntity.internalServerError().build();
@@ -198,6 +156,20 @@ public class FileController {
                 "success", true,
                 "data", document
         ));
+    }
+
+    @GetMapping("/{id}/content")
+    public ResponseEntity<byte[]> downloadDocument(@PathVariable Long id) {
+        try {
+            FileUploadService.StoredDocumentContent content = fileUploadService.readDocumentFile(id);
+            return ResponseEntity.ok()
+                    .header("Content-Type", content.contentType())
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + content.fileName().replace("\"", "") + "\"")
+                    .body(content.bytes());
+        } catch (IOException error) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**

@@ -19,29 +19,38 @@ class ExecutionContextPropagationTest {
 
     @Test
     void reusesThreadWithoutLeakingAfterSuccessFailureAndCancellation() throws Exception {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        ExecutorService executor = new ContextPropagatingExecutorService(Executors.newSingleThreadExecutor());
         try {
             var a = context(1);
             var b = context(2);
-            assertThat(executor.submit(ExecutionContextScope.wrapCallable(a,
-                    () -> ExecutionContextScope.requireCurrent().user().userId())).get()).isEqualTo(1L);
-            assertThatThrownBy(() -> executor.submit(ExecutionContextScope.wrap(a,
-                    () -> { throw new IllegalArgumentException("failed task"); })).get())
-                    .isInstanceOf(ExecutionException.class);
+            try (var ignored = ExecutionContextScope.open(a)) {
+                assertThat(executor.submit(
+                        () -> ExecutionContextScope.requireCurrent().user().userId()).get()).isEqualTo(1L);
+                assertThatThrownBy(() -> executor.submit(
+                        () -> { throw new IllegalArgumentException("failed task"); }).get())
+                        .isInstanceOf(ExecutionException.class);
+            }
             CountDownLatch started = new CountDownLatch(1);
-            Future<?> cancelled = executor.submit(ExecutionContextScope.wrap(a, () -> {
-                started.countDown();
-                try { new CountDownLatch(1).await(); }
-                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
-            }));
+            Future<?> cancelled;
+            try (var ignored = ExecutionContextScope.open(a)) {
+                cancelled = executor.submit(() -> {
+                    started.countDown();
+                    try { new CountDownLatch(1).await(); }
+                    catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                });
+            }
             assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> cancelled.get(10, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
             cancelled.cancel(true);
             executor.submit(() -> {
                 assertThatThrownBy(ExecutionContextScope::requireCurrent).isInstanceOf(IllegalStateException.class);
                 assertThat(MDC.get("userId")).isNull();
             }).get(5, TimeUnit.SECONDS);
-            assertThat(executor.submit(ExecutionContextScope.wrapCallable(b,
-                    () -> ExecutionContextScope.requireCurrent().user().userId())).get()).isEqualTo(2L);
+            try (var ignored = ExecutionContextScope.open(b)) {
+                assertThat(executor.submit(
+                        () -> ExecutionContextScope.requireCurrent().user().userId()).get()).isEqualTo(2L);
+            }
         } finally {
             executor.shutdownNow();
         }

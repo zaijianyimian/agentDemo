@@ -117,7 +117,7 @@ public class EmailListenerService {
     public void destroy() {
         log.info("关闭邮件监听服务...");
         shuttingDown = true;
-        stopAllListeners();
+        stopAllListenersForLifecycleInternal();
         executorService.shutdown();
     }
 
@@ -129,10 +129,7 @@ public class EmailListenerService {
      */
     public void loadAndStartListeners() {
         // 查询所有启用的邮箱配置
-        List<EmailConfig> configs = emailConfigMapper.selectList(
-                new LambdaQueryWrapper<EmailConfig>()
-                        .eq(EmailConfig::getEnabled, true)
-        );
+        List<EmailConfig> configs = emailConfigMapper.selectEnabledForInternalScan();
 
         log.info("找到 {} 个启用的邮箱配置", configs.size());
 
@@ -783,8 +780,8 @@ public class EmailListenerService {
     /**
      * 停止所有邮箱监听。在应用关闭或全量重载时使用。
      */
-    public void stopAllListeners() {
-        emailListenerManager.stopAll();
+    public void stopAllListenersForLifecycleInternal() {
+        emailListenerManager.stopAllForLifecycleInternal();
         for (Long configId : new ArrayList<>(storeMap.keySet())) {
             cleanup(configId);
         }
@@ -793,21 +790,21 @@ public class EmailListenerService {
     /**
      * 停止指定邮箱的监听。会清理连接，关联的时间轮任务由调度服务负责取消。
      */
-    public void stopListener(Long configId) {
-        emailListenerManager.stop(configId);
+    public void stopListener(EmailConfig ownedConfig) {
+        Long configId = ownedConfig.getId();
+        emailListenerManager.stop(ownedConfig);
         EmailConfig config = configMap.get(configId);
         String email = config != null ? config.getEmail() : String.valueOf(configId);
         cleanup(configId);
         log.info("[{}] 已停止邮箱监听", email);
     }
 
-    /**
-     * 重新加载监听：先停所有连接，再从 DB 拉取并启动。
-     * 等价于 {@link #stopAllListeners()} + {@link #loadAndStartListeners()}。
-     */
-    public void reloadListeners() {
-        stopAllListeners();
-        loadAndStartListeners();
+    public void stopListenerForLifecycleInternal(com.example.demo.email.domain.OwnedEmailConfigRef reference) {
+        emailListenerManager.stopForLifecycleInternal(reference);
+        EmailConfig config = configMap.get(reference.configId());
+        if (config != null && reference.userId() == config.getUserId()) {
+            cleanup(reference.configId());
+        }
     }
 
     /**
@@ -836,8 +833,8 @@ public class EmailListenerService {
         return status;
     }
 
-    public void handleWebhook(Long configId, Map<String, Object> payload) {
-        emailListenerManager.handleWebhook(configId, payload);
+    public void handleWebhook(EmailConfig config, Map<String, Object> payload) {
+        emailListenerManager.handleWebhook(config, payload);
     }
 
     // ==================== 测试连接 ====================

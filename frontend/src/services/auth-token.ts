@@ -19,5 +19,23 @@ export const clearTokens = () => {
 
 export const hasAccessToken = (): boolean => !!getAccessToken()
 
+export const getCurrentUserId = (token: string = getAccessToken()): string | null => {
+  if (!token) return null
+  try {
+    const payloadPart = token.split('.')[1]
+    if (!payloadPart) return null
+    const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(normalized)) as { userId?: unknown }
+    const userId = payload.userId
+    if ((typeof userId === 'number' && Number.isSafeInteger(userId) && userId > 0)
+      || (typeof userId === 'string' && /^[1-9]\d*$/.test(userId))) {
+      return String(userId)
+    }
+  } catch {
+    // Invalid tokens are rejected by the backend; they must not create a cache namespace.
+  }
+  return null
+}
+
 export const buildLoginRedirectUrl = (pathWithQuery: string): string =>
   `/login?redirect=${encodeURIComponent(pathWithQuery)}`

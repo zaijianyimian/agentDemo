@@ -1,6 +1,7 @@
 package com.example.demo.email.application.listener;
 
 import com.example.demo.email.application.EmailListenerStateService;
+import com.example.demo.email.application.EmailListenerExecutionGuard;
 import com.example.demo.email.application.listener.strategy.ListenStrategy;
 import com.example.demo.email.application.listener.strategy.MailSourceAdapter;
 import com.example.demo.email.domain.EmailConfig;
@@ -25,11 +26,16 @@ public class WebhookStrategy implements ListenStrategy {
 
     private final EmailListenerStateService stateService;
     private final EmailMessagePublisher publisher;
+    private final EmailListenerExecutionGuard executionGuard;
     private final Map<Long, MailSourceAdapter> adapters = new ConcurrentHashMap<>();
 
-    public WebhookStrategy(EmailListenerStateService stateService, EmailMessagePublisher publisher) {
+    public WebhookStrategy(
+            EmailListenerStateService stateService,
+            EmailMessagePublisher publisher,
+            EmailListenerExecutionGuard executionGuard) {
         this.stateService = stateService;
         this.publisher = publisher;
+        this.executionGuard = executionGuard;
     }
 
     @Override
@@ -39,6 +45,9 @@ public class WebhookStrategy implements ListenStrategy {
 
     @Override
     public void start(EmailConfig config, MailSourceAdapter adapter) {
+        if (!executionGuard.mayAccessProvider(config)) {
+            throw new IllegalStateException("邮箱 owner、启用状态或配置版本已失效");
+        }
         EmailListenerState state = stateService.getOrCreate(config);
         SubscriptionRegistration registration = adapter.registerOrRenewSubscription(config, state);
         if (registration != null) {
@@ -62,6 +71,9 @@ public class WebhookStrategy implements ListenStrategy {
     @Override
     public void handleWebhook(EmailConfig config, MailSourceAdapter adapter, Map<String, Object> payload) {
         try {
+            if (!executionGuard.mayAccessProvider(config)) {
+                throw new IllegalStateException("邮箱 owner、启用状态或配置版本已失效");
+            }
             EmailListenerState state = stateService.getOrCreate(config);
             List<MailboxMessage> messages = adapter.fetchFromNotification(config, state, payload);
             for (MailboxMessage message : messages) {

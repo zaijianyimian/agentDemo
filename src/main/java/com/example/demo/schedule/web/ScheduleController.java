@@ -1,14 +1,11 @@
 package com.example.demo.schedule.web;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.example.demo.schedule.application.ScheduleEventService;
 import com.example.demo.schedule.application.ScheduleFileService;
+import com.example.demo.schedule.application.ScheduleNotificationService;
 import com.example.demo.schedule.domain.ScheduleEvent;
-import com.example.demo.schedule.persistence.ScheduleEventMapper;
 import com.example.demo.shared.dto.ApiResponse;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
@@ -22,9 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -37,36 +32,29 @@ import java.util.Map;
  * <p>Java 仅负责日程 CRUD、文件同步和 SSE 事件。自然语言解析、邮件日程抽取与 AI 总结已经迁移
  * 到 Python Agent Engine。</p>
  */
-@Slf4j
 @RestController
 @RequestMapping("/api/schedule")
 public class ScheduleController {
 
     @Resource
-    private ScheduleEventMapper scheduleEventMapper;
+    private ScheduleEventService scheduleEvents;
 
     @Resource
     private ScheduleFileService scheduleFileService;
 
     @Resource
-    private ObjectMapper objectMapper;
-
-    private final Sinks.Many<ServerSentEvent<String>> scheduleEventSink =
-            Sinks.many().multicast().onBackpressureBuffer();
+    private ScheduleNotificationService scheduleNotifications;
 
     /** 查询全部日程。 */
     @GetMapping("/list")
     public ApiResponse<List<ScheduleEvent>> listAll() {
-        return ApiResponse.success(scheduleEventMapper.selectList(null));
+        return ApiResponse.success(scheduleEvents.listAll());
     }
 
     /** 查询最近日程。 */
     @GetMapping("/latest")
     public ApiResponse<List<ScheduleEvent>> getLatest(@RequestParam(defaultValue = "5") int limit) {
-        List<ScheduleEvent> events = scheduleEventMapper.selectList(
-                new QueryWrapper<ScheduleEvent>()
-                        .orderByDesc("update_time")
-                        .orderByDesc("create_time"));
+        List<ScheduleEvent> events = scheduleEvents.listLatest();
         return ApiResponse.success(events.stream().limit(Math.max(1, limit)).toList());
     }
 
@@ -91,7 +79,7 @@ public class ScheduleController {
     /** 根据 ID 查询日程。 */
     @GetMapping("/{id}")
     public ApiResponse<ScheduleEvent> getById(@PathVariable Long id) {
-        ScheduleEvent event = scheduleEventMapper.selectById(id);
+        ScheduleEvent event = scheduleEvents.findOwned(id);
         return event == null ? ApiResponse.error("日程不存在") : ApiResponse.success(event);
     }
 
@@ -100,26 +88,14 @@ public class ScheduleController {
     public ApiResponse<List<ScheduleEvent>> getByDateRange(
             @RequestParam String startDate,
             @RequestParam String endDate) {
-        return ApiResponse.success(scheduleEventMapper.selectList(
-                new QueryWrapper<ScheduleEvent>()
-                        .ge("event_date", LocalDate.parse(startDate))
-                        .le("event_date", LocalDate.parse(endDate))));
+        return ApiResponse.success(scheduleEvents.listBetween(
+                LocalDate.parse(startDate), LocalDate.parse(endDate)));
     }
 
     /** 订阅日程变化。 */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> stream() {
-        Flux<ServerSentEvent<String>> initial = Flux.just(
-                ServerSentEvent.<String>builder()
-                        .event("connected")
-                        .data("schedule-stream-ready")
-                        .build());
-        Flux<ServerSentEvent<String>> heartbeat = Flux.interval(Duration.ofSeconds(20))
-                .map(ignored -> ServerSentEvent.<String>builder()
-                        .event("ping")
-                        .data("keep-alive")
-                        .build());
-        return initial.concatWith(scheduleEventSink.asFlux().mergeWith(heartbeat));
+        return scheduleNotifications.subscribe();
     }
 
     /** 查询全部日程文件。 */
@@ -153,12 +129,12 @@ public class ScheduleController {
     /** 按日程 ID 读取对应文件。 */
     @GetMapping("/{id}/file")
     public ResponseEntity<Map<String, Object>> getScheduleFileByEventId(@PathVariable Long id) {
-        ScheduleEvent event = scheduleEventMapper.selectById(id);
+        ScheduleEvent event = scheduleEvents.findOwned(id);
         if (event == null) {
             return ResponseEntity.notFound().build();
         }
-        String content = event.getFilePath() != null
-                ? scheduleFileService.readScheduleFileByPath(event.getFilePath())
+        String content = event.getStorageKey() != null
+                ? scheduleFileService.readScheduleFileByName(event.getStorageKey())
                 : scheduleFileService.readScheduleFile(event.getEventDate());
         Map<String, Object> result = new HashMap<>();
         result.put("event", event);
@@ -172,7 +148,7 @@ public class ScheduleController {
     @PostMapping
     public ApiResponse<ScheduleEvent> add(@RequestBody ScheduleEvent event) {
         prepareForCreate(event);
-        scheduleEventMapper.insert(event);
+        scheduleEvents.create(event);
         syncScheduleFile(event.getEventDate());
         publishScheduleEvent("created", event);
         return ApiResponse.success(event, "日程创建成功");
@@ -181,7 +157,7 @@ public class ScheduleController {
     /** 更新日程。 */
     @PutMapping("/{id}")
     public ApiResponse<ScheduleEvent> update(@PathVariable Long id, @RequestBody ScheduleEvent event) {
-        ScheduleEvent existing = scheduleEventMapper.selectById(id);
+        ScheduleEvent existing = scheduleEvents.findOwned(id);
         if (existing == null) {
             return ApiResponse.error("日程不存在");
         }
@@ -192,10 +168,10 @@ public class ScheduleController {
         if (event.getEventTime() != null) {
             event.setEventDate(event.getEventTime().toLocalDate());
         }
-        scheduleEventMapper.updateById(event);
+        scheduleEvents.update(event);
         syncScheduleFile(previousDate);
         syncScheduleFile(event.getEventDate());
-        ScheduleEvent updated = scheduleEventMapper.selectById(id);
+        ScheduleEvent updated = scheduleEvents.requireOwned(id);
         publishScheduleEvent("updated", updated);
         return ApiResponse.success(updated, "日程更新成功");
     }
@@ -203,8 +179,11 @@ public class ScheduleController {
     /** 删除日程。 */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
-        ScheduleEvent existing = scheduleEventMapper.selectById(id);
-        scheduleEventMapper.deleteById(id);
+        ScheduleEvent existing = scheduleEvents.findOwned(id);
+        if (existing == null) {
+            return ApiResponse.error("日程不存在");
+        }
+        scheduleEvents.delete(id);
         if (existing != null) {
             syncScheduleFile(existing.getEventDate());
             publishScheduleEvent("deleted", existing);
@@ -229,7 +208,7 @@ public class ScheduleController {
     }
 
     private List<ScheduleEvent> queryByDate(LocalDate date) {
-        return scheduleEventMapper.selectList(new QueryWrapper<ScheduleEvent>().eq("event_date", date));
+        return scheduleEvents.listByDate(date);
     }
 
     private void prepareForCreate(ScheduleEvent event) {
@@ -254,13 +233,13 @@ public class ScheduleController {
     }
 
     private ApiResponse<ScheduleEvent> updateStatus(Long id, String status, String message) {
-        ScheduleEvent event = scheduleEventMapper.selectById(id);
+        ScheduleEvent event = scheduleEvents.findOwned(id);
         if (event == null) {
             return ApiResponse.error("日程不存在");
         }
         event.setStatus(status);
         event.setUpdateTime(LocalDateTime.now());
-        scheduleEventMapper.updateById(event);
+        scheduleEvents.update(event);
         syncScheduleFile(event.getEventDate());
         publishScheduleEvent(status, event);
         return ApiResponse.success(event, message);
@@ -274,19 +253,19 @@ public class ScheduleController {
         if (events.isEmpty()) {
             scheduleFileService.deleteScheduleFile(date);
         } else {
-            scheduleFileService.saveScheduleByDate(date, events);
+            String storageKey = scheduleFileService.saveScheduleByDate(date, events);
+            if (storageKey != null) {
+                for (ScheduleEvent event : events) {
+                    event.setFilePath(null);
+                    event.setStorageKey(storageKey);
+                    scheduleEvents.updateStorageKey(event.getId(), storageKey);
+                }
+            }
         }
     }
 
     private void publishScheduleEvent(String eventName, ScheduleEvent event) {
-        try {
-            scheduleEventSink.tryEmitNext(ServerSentEvent.<String>builder()
-                    .event(eventName)
-                    .data(objectMapper.writeValueAsString(event))
-                    .build());
-        } catch (JsonProcessingException error) {
-            log.warn("序列化日程 SSE 事件失败: {}", error.getMessage());
-        }
+        scheduleNotifications.publish(eventName, event);
     }
 
     private String valueOrEmpty(String value) {

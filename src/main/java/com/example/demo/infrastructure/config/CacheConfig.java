@@ -1,6 +1,6 @@
 package com.example.demo.infrastructure.config;
 
-import com.example.demo.infrastructure.security.CurrentUserProvider;
+import com.example.demo.shared.context.CurrentUserContext;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CachingConfigurer;
@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * Caffeine 缓存配置。
  *
- * <p>默认 KeyGenerator 会把当前 userId 放进缓存键，避免业务配置、知识库、Note 等用户数据
+ * <p>默认 KeyGenerator 会把当前 userId 放进缓存键，避免业务配置、知识库等用户数据
  * 因相同方法参数命中另一个用户的缓存。系统后台无用户上下文时使用 {@code system} scope。</p>
  */
 @Configuration
@@ -48,9 +48,9 @@ public class CacheConfig implements CachingConfigurer {
     public static final String PERSONAL_INSIGHTS = "personalInsights";
     public static final String EMAIL_CONFIG_LIST = "emailConfigList";
 
-    private final CurrentUserProvider currentUserProvider;
+    private final CurrentUserContext currentUserProvider;
 
-    public CacheConfig(CurrentUserProvider currentUserProvider) {
+    public CacheConfig(CurrentUserContext currentUserProvider) {
         this.currentUserProvider = currentUserProvider;
     }
 

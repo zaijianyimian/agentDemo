@@ -7,6 +7,13 @@ import {
   getRefreshToken,
   setTokens
 } from '@/services/auth-token'
+import {
+  advanceSessionGeneration,
+  captureSession,
+  isCurrentSession,
+  registerSessionController,
+  type SessionSnapshot
+} from '@/services/session-lifecycle'
 
 // 统一 API 客户端：支持可配置后端地址、认证注入、令牌刷新和标准错误消息透传。
 
@@ -33,7 +40,28 @@ const api = axios.create({
   }
 })
 
+type SessionRequestMetadata = {
+  snapshot: SessionSnapshot
+  unregister: () => void
+}
+
 api.interceptors.request.use(config => {
+  const snapshot = captureSession()
+  const controller = new AbortController()
+  const callerSignal = config.signal
+  if (callerSignal) {
+    if (callerSignal.aborted) {
+      controller.abort()
+    } else {
+      callerSignal.addEventListener?.('abort', () => controller.abort(), { once: true })
+    }
+  }
+  config.signal = controller.signal
+  ;(config as any)._sessionMetadata = {
+    snapshot,
+    unregister: registerSessionController(controller, snapshot.generation)
+  } satisfies SessionRequestMetadata
+
   const requestUrl = String(config.url || '')
   if (isPublicAuthRoute(requestUrl)) {
     if (config.headers && 'Authorization' in config.headers) {
@@ -79,9 +107,21 @@ const applyBackendErrorMessage = (error: any): void => {
 }
 
 api.interceptors.response.use(
-  response => response,
+  response => {
+    const metadata = (response.config as any)._sessionMetadata as SessionRequestMetadata | undefined
+    metadata?.unregister()
+    if (metadata && !isCurrentSession(metadata.snapshot)) {
+      return Promise.reject(new axios.CanceledError('Discarded response from a previous user session'))
+    }
+    return response
+  },
   async error => {
     const originalRequest = error.config as any
+    const metadata = originalRequest?._sessionMetadata as SessionRequestMetadata | undefined
+    metadata?.unregister()
+    if (metadata && !isCurrentSession(metadata.snapshot)) {
+      return Promise.reject(new axios.CanceledError('Discarded response from a previous user session'))
+    }
     const status = error?.response?.status
     const requestUrl = String(originalRequest?.url || '')
     const shouldSkipRefresh = isPublicAuthRoute(requestUrl)
@@ -124,16 +164,21 @@ api.interceptors.response.use(
           return api(originalRequest)
         } catch (_error) {
           clearTokens()
+          advanceSessionGeneration()
           if (window.location.pathname !== '/login') {
             window.location.href = buildLoginRedirectUrl(
               window.location.pathname + window.location.search
             )
           }
         }
-      } else if (window.location.pathname !== '/login') {
-        window.location.href = buildLoginRedirectUrl(
-          window.location.pathname + window.location.search
-        )
+      } else {
+        clearTokens()
+        advanceSessionGeneration()
+        if (window.location.pathname !== '/login') {
+          window.location.href = buildLoginRedirectUrl(
+            window.location.pathname + window.location.search
+          )
+        }
       }
     }
 

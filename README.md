@@ -13,7 +13,7 @@ Browser / Frontend
 Spring Boot (Java)
   - Auth / JWT / Multi-tenant
   - Email listener / OAuth / IMAP / POP3 / Gmail / Graph
-  - Schedule / Task / Note / File / System CRUD
+  - Schedule / Task / File / System CRUD
   - HTTP / SSE API
        |
        | GraphGatewayClient
@@ -38,7 +38,6 @@ Python Agent Engine
 - `chat`：HTTP/SSE Graph 网关以及兼容的普通会话业务接口；不执行本地 LLM/Agent。
 - `schedule`：普通日程 CRUD、文件能力与事件推送。
 - `task`：普通定时任务、提醒和执行记录。
-- `note`：笔记 CRUD 与关键词查询，不进行向量语义检索。
 - `file`：文件上传、校验、内容提取和元数据管理，不执行 AI 分析。
 - `inbox`：Java 业务数据的统一收件箱聚合，不执行自主决策或语义搜索。
 - `personal`：普通个人生产力业务能力。
@@ -121,7 +120,7 @@ GraphGatewayClient
 
 - 用户与认证数据
 - 邮箱配置与监听状态
-- 日程、任务、笔记等普通业务数据
+- 日程、任务等普通业务数据
 - 文件元数据
 - 系统设置
 
@@ -186,7 +185,6 @@ src/main/java/com/example/demo/
 │   ├── properties/
 │   ├── security/
 │   └── web/
-├── note/              # 笔记 CRUD
 ├── personal/          # 个人生产力业务
 ├── schedule/          # 日程业务
 ├── shared/            # 共享 DTO / 基础能力
@@ -203,10 +201,9 @@ app:
   graph:
     enabled: true
     base-url: http://127.0.0.1:8001
-    internal-token: ${GRAPH_INTERNAL_TOKEN:}
 ```
 
-内部调用会携带用户上下文和内部鉴权信息。生产环境应设置独立的 `GRAPH_INTERNAL_TOKEN`，不要将其提交到仓库。
+内部调用会携带 `X-User-Id` 用户上下文，不再发送共享 Token。部署时应通过内网、网关访问控制或 mTLS 限制内部接口的可访问范围。
 
 ## 本地检查
 

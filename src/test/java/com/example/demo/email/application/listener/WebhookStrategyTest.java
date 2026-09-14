@@ -1,6 +1,7 @@
 package com.example.demo.email.application.listener;
 
 import com.example.demo.email.application.EmailListenerStateService;
+import com.example.demo.email.application.EmailListenerExecutionGuard;
 import com.example.demo.email.application.listener.strategy.MailSourceAdapter;
 import com.example.demo.email.domain.EmailConfig;
 import com.example.demo.email.domain.EmailListenerState;
@@ -25,8 +26,10 @@ class WebhookStrategyTest {
     void publishesWebhookFetchedMessageOnceAndAdvancesCursor() {
         EmailListenerStateService stateService = mock(EmailListenerStateService.class);
         EmailMessagePublisher publisher = mock(EmailMessagePublisher.class);
-        WebhookStrategy strategy = new WebhookStrategy(stateService, publisher);
+        EmailListenerExecutionGuard executionGuard = mock(EmailListenerExecutionGuard.class);
+        WebhookStrategy strategy = new WebhookStrategy(stateService, publisher, executionGuard);
         EmailConfig config = EmailConfig.builder().id(1L).email("a@example.com").build();
+        when(executionGuard.mayAccessProvider(config)).thenReturn(true);
         EmailListenerState state = EmailListenerState.builder()
                 .configId(1L)
                 .cursorType("GMAIL_HISTORY_ID")

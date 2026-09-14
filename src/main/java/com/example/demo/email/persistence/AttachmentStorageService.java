@@ -1,7 +1,8 @@
 package com.example.demo.email.persistence;
 
 import com.example.demo.email.domain.EmailMessage;
-import com.example.demo.infrastructure.properties.EmailAttachmentProperties;
+import com.example.demo.infrastructure.storage.OwnedStorageResolver;
+import com.example.demo.shared.context.CurrentUserContext;
 import jakarta.mail.BodyPart;
 import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
@@ -12,12 +13,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 /**
- * 附件落盘服务：把 JavaMail BodyPart 写入 ${app.email.attachment-dir}/{messageId}/{safeName}，
+ * 附件落盘服务：把 JavaMail BodyPart 写入 data/users/{userId}/email-attachments/{messageId}/{safeName}，
  * 返回 {@link EmailMessage.Attachment} 供 {@link com.example.demo.email.domain.EmailMessage} 携带。
  *
  * <p>落盘后即使后续 AI 解析失败，文件本身保留，可在前端 EmailDetail 页下载。</p>
@@ -27,7 +27,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AttachmentStorageService {
 
-    private final EmailAttachmentProperties properties;
+    private final OwnedStorageResolver storage;
+    private final CurrentUserContext currentUser;
 
     /**
      * 把附件 bodyPart 落盘。
@@ -43,8 +44,10 @@ public class AttachmentStorageService {
         String fileName = sanitizeFileName(originalName);
         String safeMessageId = sanitizeFileName(messageId == null ? "unknown" : messageId);
 
-        Path target = resolveTarget(safeMessageId, fileName);
-        Files.createDirectories(target.getParent());
+        long userId = currentUser.requireUserId();
+        String storageKey = resolveStorageKey(userId, safeMessageId, fileName);
+        Path target = storage.resolveForCreate(
+                userId, OwnedStorageResolver.Category.EMAIL_ATTACHMENTS, storageKey);
 
         long size;
         try (InputStream in = part.getInputStream()) {
@@ -54,28 +57,38 @@ public class AttachmentStorageService {
                 accountEmail, messageId, fileName, size, target);
 
         return EmailMessage.Attachment.builder()
+                .userId(userId)
                 .fileName(originalName == null ? fileName : originalName)
                 .contentType(part.getContentType())
                 .size(size)
-                .filePath(target.toString())
+                .storageKey(storageKey)
                 .contentId(stripCidPrefix(part.getHeader("Content-ID")))
                 .disposition(part.getDisposition())
                 .build();
     }
 
+    /** Reads an attachment only from the current user's owned attachment root. */
+    public byte[] read(String storageKey) throws IOException {
+        long userId = currentUser.requireUserId();
+        Path source = storage.resolveExisting(
+                userId, OwnedStorageResolver.Category.EMAIL_ATTACHMENTS, storageKey);
+        return Files.readAllBytes(source);
+    }
+
     /**
      * 计算附件最终落盘路径，处理重名：同目录下同名则追加 -uuid。
      */
-    private Path resolveTarget(String safeMessageId, String fileName) {
-        Path base = Paths.get(properties.getAttachmentDir(), safeMessageId);
-        Path candidate = base.resolve(fileName);
+    private String resolveStorageKey(long userId, String safeMessageId, String fileName) throws IOException {
+        String candidateKey = safeMessageId + "/" + fileName;
+        Path candidate = storage.resolveForCreate(
+                userId, OwnedStorageResolver.Category.EMAIL_ATTACHMENTS, candidateKey);
         if (!Files.exists(candidate)) {
-            return candidate;
+            return candidateKey;
         }
         int dot = fileName.lastIndexOf('.');
         String stem = dot < 0 ? fileName : fileName.substring(0, dot);
         String ext = dot < 0 ? "" : fileName.substring(dot);
-        return base.resolve(stem + "-" + UUID.randomUUID().toString().substring(0, 8) + ext);
+        return safeMessageId + "/" + stem + "-" + UUID.randomUUID().toString().substring(0, 8) + ext;
     }
 
     /**
