@@ -5,6 +5,7 @@ import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,8 +47,8 @@ public class GraphEmailRabbitConfiguration {
      */
     @Bean
     public Binding graphEmailBinding(
-            Queue graphEmailQueue,
-            DirectExchange graphEmailExchange,
+            @Qualifier("graphEmailQueue") Queue graphEmailQueue,
+            @Qualifier("graphEmailExchange") DirectExchange graphEmailExchange,
             GraphGatewayProperties properties) {
         return BindingBuilder.bind(graphEmailQueue)
                 .to(graphEmailExchange)
