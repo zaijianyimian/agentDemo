@@ -1,5 +1,6 @@
 package com.example.demo.chat.web;
 
+import com.example.demo.chat.application.ChatHistoryService;
 import com.example.demo.chat.dto.ChatResponse;
 import com.example.demo.infrastructure.graph.GraphGatewayClient;
 import com.example.demo.shared.context.CurrentUserContext;
@@ -23,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * 聊天网关控制器。
  *
- * <p>Java 仅负责鉴权、用户上下文和 HTTP/SSE 协议适配；所有 Agent、LLM、Memory、Tool
+ * <p>Java 负责鉴权、用户上下文、会话历史和 HTTP/SSE 协议适配；所有 Agent、LLM、Memory、Tool
  * 执行均由 Python Graph 服务负责。</p>
  */
 @RestController
@@ -31,7 +32,10 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 public class ChatController {
 
+    private static final String GRAPH_MODEL = "python-graph";
+
     private final GraphGatewayClient graphGatewayClient;
+    private final ChatHistoryService chatHistoryService;
     private final CurrentUserContext currentUserProvider;
     private final ObjectMapper objectMapper;
 
@@ -90,6 +94,8 @@ public class ChatController {
     /**
      * 带会话 ID 的非流式聊天。
      *
+     * <p>Java 保存业务聊天记录，Python Graph 只负责 Agent 推理和生成回复。</p>
+     *
      * @param message 用户消息。
      * @param sessionId 会话 ID。
      * @return Python Agent 最终响应。
@@ -98,8 +104,12 @@ public class ChatController {
     public String completeWithSession(
             @RequestParam("message") String message,
             @RequestParam("sessionId") Long sessionId) {
-        return graphGatewayClient.chat(
-                currentUserProvider.requireUserId(), String.valueOf(sessionId), message);
+        long userId = currentUserProvider.requireUserId();
+        chatHistoryService.addMessage(sessionId, "user", message, GRAPH_MODEL);
+
+        String content = graphGatewayClient.chat(userId, String.valueOf(sessionId), message);
+        chatHistoryService.addMessage(sessionId, "assistant", content, GRAPH_MODEL);
+        return content;
     }
 
     /**
