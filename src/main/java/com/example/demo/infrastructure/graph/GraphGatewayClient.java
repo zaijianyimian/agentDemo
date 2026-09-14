@@ -10,18 +10,15 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
- * Python Graph 内部 API 客户端。
+ * Python Graph 内部 HTTP/SSE 客户端。
  *
- * <p>本客户端是 Java 与 Python Agent 服务之间唯一的 HTTP/SSE 边界。Java 不连接 Python 使用的
- * PostgreSQL，也不感知其表结构；所有 AI 数据写入与查询均由 Python API 完成。</p>
+ * <p>交互式 Agent 请求通过本客户端访问 Python；新邮件不经过 HTTP，而由
+ * {@link GraphEmailRabbitConfiguration} 对应的 RabbitMQ 边界异步投递。</p>
  */
 @Component
 public class GraphGatewayClient {
@@ -42,27 +39,6 @@ public class GraphGatewayClient {
                 .baseUrl(stripTrailingSlash(properties.getBaseUrl()))
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .build();
-    }
-
-    /**
-     * 将新邮件提交给 Python。Python 应负责 PostgreSQL 幂等入库并发布 RabbitMQ 事件。
-     *
-     * @param emailMessage Java 邮箱监听器解析后的邮件。
-     * @param trigger 邮件触发来源。
-     * @return Python 返回的邮件接收结果。
-     */
-    public Mono<EmailDispatchResponse> dispatchEmail(long userId, Map<String, Object> payload) {
-        if (userId <= 0) {
-            return Mono.error(new IllegalArgumentException("邮件缺少有效 userId，拒绝提交给 Graph"));
-        }
-        return webClient.post()
-                .uri("/internal/emails/dispatch")
-                .headers(headers -> applyUserContextHeader(headers, userId))
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(payload)
-                .retrieve()
-                .bodyToMono(EmailDispatchResponse.class)
-                .timeout(Duration.ofSeconds(properties.getResponseTimeoutSeconds()));
     }
 
     /**
@@ -123,13 +99,6 @@ public class GraphGatewayClient {
             return "http://127.0.0.1:8001";
         }
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
-    }
-
-    /** Python 邮件接收接口响应。 */
-    public record EmailDispatchResponse(
-            @JsonProperty("email_id") Long emailId,
-            String status,
-            boolean duplicate) {
     }
 
     /** Java 到 Python 的聊天请求。 */
