@@ -14,7 +14,8 @@ import java.time.LocalDateTime;
 /**
  * 聊天会话实体。
  *
- * <p>{@code userId} 是多用户数据隔离字段，由 MyBatis Plus TenantLine 根据 JWT 自动写入和过滤。</p>
+ * <p>{@code id} 使用 UUID 字符串，便于跨 Java/Python 服务稳定传递会话标识；
+ * {@code userId} 是多用户数据隔离字段，由 MyBatis Plus TenantLine 根据 JWT 自动写入和过滤。</p>
  */
 @Data
 @Builder
@@ -23,8 +24,9 @@ import java.time.LocalDateTime;
 @TableName("chat_session")
 public class ChatSession {
 
-    @TableId(type = IdType.AUTO)
-    private Long id;
+    /** UUID 会话 ID，由应用层创建会话时生成。 */
+    @TableId(type = IdType.INPUT)
+    private String id;
 
     /** 会话所属用户 ID。 */
     private Long userId;
