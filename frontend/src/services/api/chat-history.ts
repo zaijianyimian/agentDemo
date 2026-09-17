@@ -17,31 +17,31 @@ export const chatHistoryService = {
   },
 
   // 获取会话详情
-  getSession: async (id: number): Promise<ApiResponse<ChatSession>> => {
+  getSession: async (id: string): Promise<ApiResponse<ChatSession>> => {
     const response = await api.get(`/chat/history/session/${id}`)
     return response.data
   },
 
   // 更新会话标题
-  updateSessionTitle: async (id: number, title: string): Promise<ApiResponse<ChatSession>> => {
+  updateSessionTitle: async (id: string, title: string): Promise<ApiResponse<ChatSession>> => {
     const response = await api.put(`/chat/history/session/${id}/title`, null, { params: { title } })
     return response.data
   },
 
   // 删除会话
-  deleteSession: async (id: number): Promise<ApiResponse<void>> => {
+  deleteSession: async (id: string): Promise<ApiResponse<void>> => {
     const response = await api.delete(`/chat/history/session/${id}`)
     return response.data
   },
 
   // 获取会话消息
-  getSessionMessages: async (sessionId: number): Promise<ApiResponse<ChatMessageEntity[]>> => {
+  getSessionMessages: async (sessionId: string): Promise<ApiResponse<ChatMessageEntity[]>> => {
     const response = await api.get(`/chat/history/session/${sessionId}/messages`)
     return response.data
   },
 
   // 添加消息
-  addMessage: async (sessionId: number, role: string, content: string, model?: string): Promise<ApiResponse<ChatMessageEntity>> => {
+  addMessage: async (sessionId: string, role: string, content: string, model?: string): Promise<ApiResponse<ChatMessageEntity>> => {
     const params: Record<string, string> = { role, content }
     if (model) params.model = model
     const response = await api.post(`/chat/history/session/${sessionId}/message`, null, { params })
@@ -49,7 +49,7 @@ export const chatHistoryService = {
   },
 
   // 清空会话消息
-  clearSessionMessages: async (sessionId: number): Promise<ApiResponse<void>> => {
+  clearSessionMessages: async (sessionId: string): Promise<ApiResponse<void>> => {
     const response = await api.delete(`/chat/history/session/${sessionId}/messages`)
     return response.data
   }
