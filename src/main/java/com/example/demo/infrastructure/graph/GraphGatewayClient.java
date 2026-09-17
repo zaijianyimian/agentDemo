@@ -45,7 +45,7 @@ public class GraphGatewayClient {
      * 调用 Python Graph 完成一次非流式 Agent 对话。
      *
      * @param userId 当前用户 ID。
-     * @param sessionId Java 会话 ID；无会话时可为空。
+     * @param sessionId UUID 会话 ID；旧兼容入口可为空。
      * @param message 用户消息。
      * @return Agent 最终文本。
      */
@@ -65,25 +65,10 @@ public class GraphGatewayClient {
     }
 
     /**
-     * 使用 Java 会话 ID 调用 Python Graph 完成一次非流式 Agent 对话。
-     *
-     * <p>该重载用于需要多轮记忆的正式会话，保证 Java {@code sessionId} 稳定传递为
-     * Python 请求体中的 {@code session_id}。</p>
-     *
-     * @param userId 当前用户 ID。
-     * @param sessionId Java 会话 ID。
-     * @param message 用户消息。
-     * @return Agent 最终文本。
-     */
-    public String chat(long userId, long sessionId, String message) {
-        return chat(userId, String.valueOf(sessionId), message);
-    }
-
-    /**
      * 调用 Python Graph 的 SSE Agent 对话接口。
      *
      * @param userId 当前用户 ID。
-     * @param sessionId Java 会话 ID；无会话时可为空。
+     * @param sessionId UUID 会话 ID；旧兼容入口可为空。
      * @param message 用户消息。
      * @return Agent 文本数据流，不包含 Python 的结束标记。
      */
@@ -103,18 +88,6 @@ public class GraphGatewayClient {
                         sink.next(data);
                     }
                 });
-    }
-
-    /**
-     * 使用 Java 会话 ID 调用 Python Graph 的 SSE Agent 对话接口。
-     *
-     * @param userId 当前用户 ID。
-     * @param sessionId Java 会话 ID。
-     * @param message 用户消息。
-     * @return Agent 文本数据流，不包含 Python 的结束标记。
-     */
-    public Flux<String> streamChat(long userId, long sessionId, String message) {
-        return streamChat(userId, String.valueOf(sessionId), message);
     }
 
     private void applyUserContextHeader(org.springframework.http.HttpHeaders headers, long userId) {
