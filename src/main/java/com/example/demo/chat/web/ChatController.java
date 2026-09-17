@@ -94,7 +94,8 @@ public class ChatController {
     /**
      * 带会话 ID 的非流式聊天。
      *
-     * <p>Java 保存业务聊天记录，Python Graph 只负责 Agent 推理和生成回复。</p>
+     * <p>Java 保存业务聊天记录，并把当前用户的 Java 会话 ID 原样传递给 Python Graph。
+     * Python 可将 {@code user_id + session_id} 映射为 LangGraph 的 {@code thread_id}，用于多轮记忆。</p>
      *
      * @param message 用户消息。
      * @param sessionId 会话 ID。
@@ -107,13 +108,15 @@ public class ChatController {
         long userId = currentUserProvider.requireUserId();
         chatHistoryService.addMessage(sessionId, "user", message, GRAPH_MODEL);
 
-        String content = graphGatewayClient.chat(userId, String.valueOf(sessionId), message);
+        String content = graphGatewayClient.chat(userId, sessionId, message);
         chatHistoryService.addMessage(sessionId, "assistant", content, GRAPH_MODEL);
         return content;
     }
 
     /**
      * 带会话 ID 的流式聊天。
+     *
+     * <p>转发前先读取会话，确保 sessionId 属于当前登录用户；验证通过后再把该 ID 传给 Python Graph。</p>
      *
      * @param message 用户消息。
      * @param sessionId 会话 ID。
@@ -123,12 +126,15 @@ public class ChatController {
     public Flux<ServerSentEvent<String>> chatStreamWithSession(
             @RequestParam("message") String message,
             @RequestParam("sessionId") Long sessionId) {
-        return toSseStream(graphGatewayClient.streamChat(
-                currentUserProvider.requireUserId(), String.valueOf(sessionId), message));
+        long userId = currentUserProvider.requireUserId();
+        chatHistoryService.getSession(sessionId);
+        return toSseStream(graphGatewayClient.streamChat(userId, sessionId, message));
     }
 
     /**
      * 带会话 ID 的 JSON 流式聊天。
+     *
+     * <p>转发前先读取会话，确保 sessionId 属于当前登录用户；验证通过后再把该 ID 传给 Python Graph。</p>
      *
      * @param message 用户消息。
      * @param sessionId 会话 ID。
@@ -138,8 +144,9 @@ public class ChatController {
     public Flux<ServerSentEvent<String>> chatStreamWithSessionJson(
             @RequestParam("message") String message,
             @RequestParam("sessionId") Long sessionId) {
-        return toJsonSseStream(graphGatewayClient.streamChat(
-                currentUserProvider.requireUserId(), String.valueOf(sessionId), message));
+        long userId = currentUserProvider.requireUserId();
+        chatHistoryService.getSession(sessionId);
+        return toJsonSseStream(graphGatewayClient.streamChat(userId, sessionId, message));
     }
 
     /**
