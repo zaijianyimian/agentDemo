@@ -561,12 +561,10 @@ const parseSseEvents = (rawEvent: string): string[] => {
   return data ? [data] : []
 }
 
-/** 通过 SSE 读取流式或 Agent 回复。 */
+/** 通过统一的会话 SSE 接口读取流式或 Agent 回复。 */
 const streamChat = async (query: string, messageObj: ChatMessage) => {
   abortController = new AbortController()
-  const apiPath = chatMode.value === 'mcp'
-    ? `/api/mcp/agent/chat/stream/${currentSession.value!.id}?message=${encodeURIComponent(query)}`
-    : `/api/chat/stream/session?message=${encodeURIComponent(query)}&sessionId=${currentSession.value!.id}`
+  const apiPath = `/api/chat/stream/session?message=${encodeURIComponent(query)}&sessionId=${currentSession.value!.id}`
 
   const response = await fetchWithAuth(apiPath, {
     signal: abortController.signal,
