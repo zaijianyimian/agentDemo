@@ -139,4 +139,87 @@ watch(() => route.meta.title, title => {
   height: 100vh;
   overflow: hidden;
 }
+
+/* ChatGPT 风格聊天输入区，仅覆盖聊天页面，不影响其他业务页。 */
+.agent-chat-page .composer-area {
+  padding: 10px 18px 16px !important;
+  border-top: 0 !important;
+  background: linear-gradient(to bottom, transparent, var(--bg-card) 28%) !important;
+}
+
+.agent-chat-page .composer-shell {
+  width: min(100%, 820px) !important;
+  max-width: 820px !important;
+  margin: 0 auto !important;
+  overflow: hidden;
+  border: 1px solid var(--workspace-border, var(--border-light)) !important;
+  border-radius: 24px !important;
+  background: var(--bg-card) !important;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08) !important;
+}
+
+[data-theme='dark'] .agent-chat-page .composer-shell {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24) !important;
+}
+
+.agent-chat-page .composer-shell.focused {
+  border-color: color-mix(in srgb, var(--primary-color) 42%, var(--workspace-border, var(--border-light))) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 8%, transparent),
+    0 8px 28px rgba(15, 23, 42, 0.08) !important;
+}
+
+.agent-chat-page .chat-textarea {
+  min-height: 46px !important;
+  max-height: 160px !important;
+  padding: 14px 18px 6px !important;
+  font-size: 0.88rem !important;
+  line-height: 1.55 !important;
+}
+
+.agent-chat-page .composer-toolbar {
+  padding: 4px 8px 8px 10px !important;
+}
+
+.agent-chat-page .mode-pills {
+  gap: 2px !important;
+}
+
+.agent-chat-page .mode-pill {
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+}
+
+.agent-chat-page .mode-pill:hover,
+.agent-chat-page .mode-pill.active {
+  background: var(--bg-input) !important;
+}
+
+.agent-chat-page .icon-action,
+.agent-chat-page .send-btn {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+}
+
+.agent-chat-page .composer-hint {
+  max-width: 820px !important;
+  margin-top: 6px !important;
+  font-size: 0.58rem !important;
+}
+
+@media (max-width: 767px) {
+  .agent-chat-page .composer-area {
+    padding: 8px 10px 10px !important;
+  }
+
+  .agent-chat-page .composer-shell {
+    border-radius: 20px !important;
+  }
+
+  .agent-chat-page .chat-textarea {
+    min-height: 42px !important;
+    padding: 12px 14px 5px !important;
+  }
+}
 </style>
