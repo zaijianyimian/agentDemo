@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 聊天消息实体
+ * 聊天消息实体。
  */
 @Data
 @Builder
@@ -26,34 +26,22 @@ public class ChatMessageEntity {
 
     private Long userId;
 
-    /**
-     * 会话ID
-     */
-    private Long sessionId;
+    /** 会话 UUID。 */
+    private String sessionId;
 
-    /**
-     * 角色: user / assistant
-     */
+    /** 角色: user / assistant。 */
     private String role;
 
-    /**
-     * 消息内容
-     */
+    /** 消息内容。 */
     private String content;
 
-    /**
-     * 使用的模型
-     */
+    /** 使用的模型。 */
     private String model;
 
-    /**
-     * token数量
-     */
+    /** token 数量。 */
     private Integer tokenCount;
 
-    /**
-     * 创建时间
-     */
+    /** 创建时间。 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
 }
