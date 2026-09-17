@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 聊天历史服务。
@@ -47,6 +48,7 @@ public class ChatHistoryService {
     public ChatSession createSession(String title) {
         long userId = currentUserProvider.requireUserId();
         ChatSession session = ChatSession.builder()
+                .id(UUID.randomUUID().toString())
                 .userId(userId)
                 .title(title != null ? title : "新会话")
                 .messageCount(0)
@@ -76,7 +78,7 @@ public class ChatHistoryService {
      * @return 当前用户消息列表。
      */
     public List<ChatMessageEntity> getAllMessages() {
-        List<Long> sessionIds = getAllSessions().stream().map(ChatSession::getId).toList();
+        List<String> sessionIds = getAllSessions().stream().map(ChatSession::getId).toList();
         if (sessionIds.isEmpty()) {
             return Collections.emptyList();
         }
@@ -89,11 +91,11 @@ public class ChatHistoryService {
     /**
      * 获取当前用户会话详情。
      *
-     * @param sessionId 会话 ID。
+     * @param sessionId 会话 UUID。
      * @return 当前用户拥有的会话。
      * @throws UserResourceNotFoundException 会话不存在或不属于当前用户。
      */
-    public ChatSession getSession(Long sessionId) {
+    public ChatSession getSession(String sessionId) {
         currentUserProvider.requireUserId();
         ChatSession session = chatSessionMapper.selectById(sessionId);
         if (session == null) {
@@ -105,12 +107,12 @@ public class ChatHistoryService {
     /**
      * 更新当前用户会话标题。
      *
-     * @param sessionId 会话 ID。
+     * @param sessionId 会话 UUID。
      * @param title 新标题。
      * @return 更新后的会话。
      */
     @Transactional
-    public ChatSession updateSessionTitle(Long sessionId, String title) {
+    public ChatSession updateSessionTitle(String sessionId, String title) {
         ChatSession session = getSession(sessionId);
         session.setTitle(title);
         session.setUpdateTime(LocalDateTime.now());
@@ -121,11 +123,11 @@ public class ChatHistoryService {
     /**
      * 删除当前用户会话及其消息。
      *
-     * @param sessionId 会话 ID。
+     * @param sessionId 会话 UUID。
      * @return 是否删除成功。
      */
     @Transactional
-    public boolean deleteSession(Long sessionId) {
+    public boolean deleteSession(String sessionId) {
         ChatSession session = getSession(sessionId);
         chatMessageMapper.delete(new LambdaQueryWrapper<ChatMessageEntity>()
                 .eq(ChatMessageEntity::getSessionId, sessionId));
@@ -137,7 +139,7 @@ public class ChatHistoryService {
     /**
      * 添加消息到当前用户会话。
      *
-     * @param sessionId 会话 ID。
+     * @param sessionId 会话 UUID。
      * @param role 消息角色。
      * @param content 消息内容。
      * @param model 模型标识。
@@ -145,7 +147,7 @@ public class ChatHistoryService {
      * @throws UserResourceNotFoundException 会话不存在或不属于当前用户时抛出。
      */
     @Transactional
-    public ChatMessageEntity addMessage(Long sessionId, String role, String content, String model) {
+    public ChatMessageEntity addMessage(String sessionId, String role, String content, String model) {
         ChatSession session = requireOwnedSession(sessionId);
         int estimatedTokenCount = estimateTokenCount(content);
         ChatMessageEntity message = ChatMessageEntity.builder()
@@ -176,10 +178,10 @@ public class ChatHistoryService {
     /**
      * 获取当前用户指定会话的消息。
      *
-     * @param sessionId 会话 ID。
+     * @param sessionId 会话 UUID。
      * @return 消息列表。
      */
-    public List<ChatMessageEntity> getSessionMessages(Long sessionId) {
+    public List<ChatMessageEntity> getSessionMessages(String sessionId) {
         requireOwnedSession(sessionId);
         return chatMessageMapper.selectList(new LambdaQueryWrapper<ChatMessageEntity>()
                 .eq(ChatMessageEntity::getSessionId, sessionId)
@@ -189,11 +191,11 @@ public class ChatHistoryService {
     /**
      * 清空当前用户指定会话的消息。
      *
-     * @param sessionId 会话 ID。
+     * @param sessionId 会话 UUID。
      * @return 是否成功。
      */
     @Transactional
-    public boolean clearSessionMessages(Long sessionId) {
+    public boolean clearSessionMessages(String sessionId) {
         ChatSession session = requireOwnedSession(sessionId);
         chatMessageMapper.delete(new LambdaQueryWrapper<ChatMessageEntity>()
                 .eq(ChatMessageEntity::getSessionId, sessionId));
@@ -203,7 +205,7 @@ public class ChatHistoryService {
         return true;
     }
 
-    private ChatSession requireOwnedSession(Long sessionId) {
+    private ChatSession requireOwnedSession(String sessionId) {
         return getSession(sessionId);
     }
 
