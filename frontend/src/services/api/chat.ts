@@ -15,7 +15,7 @@ export const chatService = {
     return response.data
   },
 
-  chatWithSession: async (message: string, sessionId: number, model?: number): Promise<string> => {
+  chatWithSession: async (message: string, sessionId: string, model?: number): Promise<string> => {
     const response = await api.get('/chat/complete/session', { params: { message, sessionId, model } })
     return response.data
   },
