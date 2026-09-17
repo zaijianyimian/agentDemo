@@ -426,7 +426,7 @@ export interface ChatMessage {
 
 // 聊天会话类型
 export interface ChatSession {
-  id: number
+  id: string
   title: string
   summary?: string
   messageCount: number
@@ -438,7 +438,7 @@ export interface ChatSession {
 // 聊天消息实体类型（数据库存储）
 export interface ChatMessageEntity {
   id: number
-  sessionId: number
+  sessionId: string
   role: 'user' | 'assistant'
   content: string
   model?: string
