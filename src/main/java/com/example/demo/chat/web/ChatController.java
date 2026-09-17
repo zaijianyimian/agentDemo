@@ -39,49 +39,23 @@ public class ChatController {
     private final CurrentUserContext currentUserProvider;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 非流式聊天。
-     *
-     * @param message 用户消息。
-     * @return Python Agent 最终响应。
-     */
     @GetMapping("/complete")
     public String complete(@RequestParam("message") String message) {
         return graphGatewayClient.chat(currentUserProvider.requireUserId(), null, message);
     }
 
-    /**
-     * 流式聊天。
-     *
-     * @param message 用户消息。
-     * @return SSE 响应流。
-     */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStream(@RequestParam("message") String message) {
         return toSseStream(graphGatewayClient.streamChat(
                 currentUserProvider.requireUserId(), null, message));
     }
 
-    /**
-     * JSON 格式流式聊天，保留旧前端接口兼容性。
-     *
-     * @param message 用户消息。
-     * @return JSON SSE 响应流。
-     */
     @GetMapping(value = "/stream/json", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStreamJson(@RequestParam("message") String message) {
         return toJsonSseStream(graphGatewayClient.streamChat(
                 currentUserProvider.requireUserId(), null, message));
     }
 
-    /**
-     * 结构化聊天兼容接口。
-     *
-     * <p>内容分析已经迁移到 Python，因此 Java 只返回 Agent 文本和完成标记。</p>
-     *
-     * @param message 用户消息。
-     * @return 结构化聊天响应。
-     */
     @GetMapping("/structured")
     public ChatResponse chatStructured(@RequestParam("message") String message) {
         String content = graphGatewayClient.chat(currentUserProvider.requireUserId(), null, message);
@@ -92,68 +66,55 @@ public class ChatController {
     }
 
     /**
-     * 带会话 ID 的非流式聊天。
-     *
-     * <p>Java 保存业务聊天记录，并把当前用户的 Java 会话 ID 原样传递给 Python Graph。
-     * Python 可将 {@code user_id + session_id} 映射为 LangGraph 的 {@code thread_id}，用于多轮记忆。</p>
+     * 带 UUID 会话 ID 的非流式聊天。
      *
      * @param message 用户消息。
-     * @param sessionId 会话 ID。
+     * @param sessionId UUID 会话 ID。
      * @return Python Agent 最终响应。
      */
     @GetMapping("/complete/session")
     public String completeWithSession(
             @RequestParam("message") String message,
-            @RequestParam("sessionId") Long sessionId) {
+            @RequestParam("sessionId") String sessionId) {
         long userId = currentUserProvider.requireUserId();
         chatHistoryService.addMessage(sessionId, "user", message, GRAPH_MODEL);
-
         String content = graphGatewayClient.chat(userId, sessionId, message);
         chatHistoryService.addMessage(sessionId, "assistant", content, GRAPH_MODEL);
         return content;
     }
 
     /**
-     * 带会话 ID 的流式聊天。
-     *
-     * <p>转发前先读取会话，确保 sessionId 属于当前登录用户；验证通过后再把该 ID 传给 Python Graph。</p>
+     * 带 UUID 会话 ID 的流式聊天。
      *
      * @param message 用户消息。
-     * @param sessionId 会话 ID。
+     * @param sessionId UUID 会话 ID。
      * @return SSE 响应流。
      */
     @GetMapping(value = "/stream/session", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStreamWithSession(
             @RequestParam("message") String message,
-            @RequestParam("sessionId") Long sessionId) {
+            @RequestParam("sessionId") String sessionId) {
         long userId = currentUserProvider.requireUserId();
         chatHistoryService.getSession(sessionId);
         return toSseStream(graphGatewayClient.streamChat(userId, sessionId, message));
     }
 
     /**
-     * 带会话 ID 的 JSON 流式聊天。
-     *
-     * <p>转发前先读取会话，确保 sessionId 属于当前登录用户；验证通过后再把该 ID 传给 Python Graph。</p>
+     * 带 UUID 会话 ID 的 JSON 流式聊天。
      *
      * @param message 用户消息。
-     * @param sessionId 会话 ID。
+     * @param sessionId UUID 会话 ID。
      * @return JSON SSE 响应流。
      */
     @GetMapping(value = "/stream/session/json", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatStreamWithSessionJson(
             @RequestParam("message") String message,
-            @RequestParam("sessionId") Long sessionId) {
+            @RequestParam("sessionId") String sessionId) {
         long userId = currentUserProvider.requireUserId();
         chatHistoryService.getSession(sessionId);
         return toJsonSseStream(graphGatewayClient.streamChat(userId, sessionId, message));
     }
 
-    /**
-     * SSE 传输层探针，不调用 Agent。
-     *
-     * @return 固定 SSE 数据流。
-     */
     @GetMapping("/stream/probe")
     public ResponseEntity<Flux<ServerSentEvent<String>>> streamProbe() {
         Flux<ServerSentEvent<String>> ticks = Flux.interval(Duration.ofMillis(300))
@@ -170,12 +131,6 @@ public class ChatController {
                 .body(stream);
     }
 
-    /**
-     * 旧测试接口兼容入口，实际调用 Python Graph 流式接口。
-     *
-     * @param message 用户消息。
-     * @return SSE 响应流。
-     */
     @GetMapping(value = "/stream/test", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> testStream(@RequestParam("message") String message) {
         return toSseStream(graphGatewayClient.streamChat(
