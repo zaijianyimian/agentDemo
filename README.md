@@ -21,10 +21,12 @@ Python Graph -- /api/auth/introspect --> Spring Boot 认证接口
 
 - `auth`：注册、登录、JWT、GitHub OAuth、人脸认证与用户生命周期。
 - `email`：邮箱配置、OAuth、IMAP/POP3/Gmail/Microsoft Graph 接入、邮件监听、去重、附件存储、发送与通知。
-- `schedule`：普通日程 CRUD、文件能力与事件推送。
+- `schedule`：普通日程 CRUD 与事件推送。
 - `task`：普通定时任务、提醒和执行记录。
 - `file`：文件上传、校验、内容提取和元数据管理，不执行 AI 分析。
 - `inbox`：Java 业务数据的统一收件箱聚合，不执行自主决策或语义搜索。
+- `dispatch`：外部 Agent 产生的执行请求与终态结果、推送配置、消费去重与 outbox。没有合格隔离
+  Worker 时任务以 `WORKER_UNAVAILABLE` 安全失败，Java 不启动本机进程或创建工作区。
 - `system`：系统设置、Java 关系型数据与 `data/`、`generated/` 文件备份。
 - `infrastructure`：安全、多租户、缓存、Web 配置及邮件事件投递。
 
@@ -154,6 +156,7 @@ Python 调用 Java `/api/auth/introspect` 校验浏览器 Bearer 令牌，聊天
 ```text
 src/main/java/com/example/demo/
 ├── auth/              # 认证与用户
+├── dispatch/          # 执行请求、推送配置、消费去重与 outbox
 ├── email/             # 邮箱接入与监听
 ├── file/              # 文件业务
 ├── inbox/             # 统一业务收件箱
@@ -212,4 +215,17 @@ PR 到 `improve` 会通过 `.github/workflows/refactor-check.yml` 自动执行�
 - **确定性的账户、邮箱、文件、日程、任务、权限与数据 CRUD → Java。**
 - Java 如果需要触发 Agent，应使用明确的事件或内部协议。
 
-历史 Agent 管理页目前显示迁移说明，待 Python 提供对应接口后再接入。
+## 当前前端缺口
+
+以下路由指向同一个 `views/LegacyFeature.vue` 迁移说明页，功能尚未接入：
+
+`/autonomy`、`/models`、`/knowledge`、`/knowledge-search`、`/search`、`/tools`、`/skills`、
+`/markdown-skills`、`/snippets`、`/reports`、`/chatimport`
+
+它们对应从 Java 剥离、Python 侧尚未重新暴露的 AI 能力。路由已存在，接口待补。
+
+`views/` 下另有 9 个同名旧视图（`AutonomyCenter.vue`、`Knowledge.vue`、`KnowledgeSearch.vue`、
+`Skills.vue`、`Tools.vue`、`Models.vue`、`Reports.vue`、`Snippets.vue`、`ChatImport.vue`）已无任何引用，
+属于迁移遗留。当前**有意保留**，作为上述路由未来恢复功能时的参考实现，避免重复开发；它们不会渲染，
+但仍参与 `vue-tsc` 类型检查与前端构建。
+
