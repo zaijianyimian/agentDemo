@@ -41,12 +41,9 @@ server:
 app:
   storage:
     root: ${OWNED_STORAGE_ROOT:./data/users}
-  # Chat/同步请求通过 HTTP/SSE；新邮件通过 RabbitMQ 进入 Python Graph。
+  # 新邮件通过 RabbitMQ 进入 Python Graph；浏览器聊天直达 Python。
   graph:
     enabled: ${GRAPH_ENABLED:true}
-    base-url: ${GRAPH_BASE_URL:http://127.0.0.1:8001}
-    connect-timeout-seconds: ${GRAPH_CONNECT_TIMEOUT_SECONDS:5}
-    response-timeout-seconds: ${GRAPH_RESPONSE_TIMEOUT_SECONDS:120}
     email-exchange: ${RABBITMQ_EXCHANGE:agent_email}
     email-queue: ${RABBITMQ_QUEUE_NAME:agent_email_queue}
     email-routing-key: ${RABBITMQ_ROUTING_KEY:agent_email}

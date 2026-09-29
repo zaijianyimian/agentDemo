@@ -281,14 +281,6 @@ export interface ReportArtifact {
   preview: string
 }
 
-export interface ChatActionResult {
-  target: string
-  message: string
-  entityId?: number
-  route?: string
-  payload?: Record<string, any>
-}
-
 export interface CommandPaletteItem {
   id: string
   label: string
@@ -338,26 +330,6 @@ export interface FaceStatusResponse {
   enabled: boolean
   vectorDimension?: number
   qualityScore?: number
-}
-
-export interface PersonalInsight {
-  generatedAt: string
-  enabledTasks: number
-  todaySchedules: number
-  pendingSchedules: number
-  snippetCount: number
-  messageCount: number
-  totalTokenUsage: number
-  avgTokensPerMessage: number
-}
-
-export interface TaskTemplate {
-  id: string
-  name: string
-  description: string
-  taskType: string
-  cronExpression: string
-  params: string
 }
 
 // 通知类型

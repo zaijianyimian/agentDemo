@@ -23,8 +23,7 @@ import java.lang.annotation.Target;
  * }
  * }</pre>
  *
- * 注意：当前实现仍以 {@code ScheduledTask.taskType}（SKILL/CHAT/REMINDER）作为主要调度入口，
- * 本注解作为扩展点保留，便于后续把更多能力接入统一的调度器。
+ * 当前 Java 调度器只执行普通 REMINDER 任务。
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

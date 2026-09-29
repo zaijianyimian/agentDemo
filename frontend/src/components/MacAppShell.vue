@@ -13,9 +13,6 @@
         :user-initial="userInitial"
         :user-email="authStore.user?.email || '-'"
         :user-role="authStore.user?.role || 'USER'"
-        :model-status="systemStatus.model"
-        :qdrant-status="systemStatus.qdrant"
-        :search-status="systemStatus.search"
         :notification-count="notificationCount"
         :logout-loading="logoutLoading"
         @search="openCommandPalette"
@@ -161,8 +158,6 @@ interface CommandItem {
   path: string
 }
 
-type ServiceStatus = 'active' | 'inactive' | 'error'
-
 const router = useRouter()
 const route = useRoute()
 const { width: windowWidth } = useWindowSize()
@@ -191,15 +186,6 @@ const currentCategoryLabel = computed(() =>
 const userDisplayName = computed(() => authStore.user?.displayName || authStore.user?.username || 'User')
 const userInitial = computed(() => userDisplayName.value.slice(0, 1).toUpperCase())
 
-const systemStatus = ref<{
-  model: ServiceStatus
-  qdrant: ServiceStatus
-  search: ServiceStatus
-}>({
-  model: 'inactive',
-  qdrant: 'inactive',
-  search: 'inactive'
-})
 const notificationCount = ref(0)
 let statusRefreshTimer: number | undefined
 
@@ -289,10 +275,7 @@ const toggleSidebar = () => {
 }
 
 const handleStatusClick = (type: string) => {
-  if (type === 'model') router.push('/models')
-  else if (type === 'qdrant') router.push('/settings')
-  else if (type === 'search') router.push('/search')
-  else if (type === 'notifications') router.push('/inbox')
+  if (type === 'notifications') router.push('/inbox')
 }
 
 const handleUserMenuSelect = async (key: string) => {

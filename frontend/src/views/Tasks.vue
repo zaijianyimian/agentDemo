@@ -3,7 +3,7 @@
     <UiPageHeader
       eyebrow="Agent Triggers"
       title="定时任务"
-      subtitle="管理由时间触发的技能、AI 对话和提醒任务。这里负责触发与执行，不把 Agent 设计成可视化 Workflow。"
+      subtitle="管理普通定时提醒任务。"
     >
       <template #actions>
         <n-button @click="loadTasks" :loading="loading">
@@ -20,7 +20,6 @@
     <div class="ui-stat-grid">
       <UiStat label="任务总数" :value="tasks.length" hint="全部计划任务" />
       <UiStat label="已启用" :value="enabledCount" hint="等待定时触发" />
-      <UiStat label="AI 任务" :value="aiTaskCount" hint="需要模型或 Agent 处理" />
       <UiStat label="执行失败" :value="failedExecutionCount" hint="累计失败次数" />
     </div>
 
@@ -54,8 +53,8 @@
             </button>
 
             <div class="task-actions">
-              <n-switch :value="task.enabled" size="small" @update:value="() => toggleTask(task)" />
-              <n-button size="small" tertiary @click="executeTask(task)">
+              <n-switch :value="task.enabled" :disabled="task.taskType !== 'REMINDER'" size="small" @update:value="() => toggleTask(task)" />
+              <n-button size="small" tertiary :disabled="task.taskType !== 'REMINDER'" @click="executeTask(task)">
                 <template #icon><n-icon><PlayIcon /></n-icon></template>
                 执行
               </n-button>
@@ -95,29 +94,11 @@
             </dl>
 
             <div class="detail-actions">
-              <n-button block type="primary" secondary @click="executeTask(currentTask)">立即执行</n-button>
+              <n-button block type="primary" secondary :disabled="currentTask.taskType !== 'REMINDER'" @click="executeTask(currentTask)">立即执行</n-button>
               <n-button block @click="showResultModal = true">查看最近结果</n-button>
             </div>
           </div>
           <div v-else class="side-empty">从左侧选择一个任务查看详情。</div>
-        </UiPanel>
-
-        <UiPanel title="快速模板" subtitle="只做任务预填，不引入 Workflow 编排层。">
-          <div class="template-list">
-            <button
-              v-for="template in templateCards"
-              :key="template.id"
-              type="button"
-              class="template-row"
-              @click="createByTemplate(template.id, template.name)"
-            >
-              <span class="template-icon"><n-icon><component :is="template.icon" /></n-icon></span>
-              <span>
-                <strong>{{ template.name }}</strong>
-                <small>{{ template.description }}</small>
-              </span>
-            </button>
-          </div>
         </UiPanel>
 
         <button v-if="lastDeletedTask" type="button" class="undo-banner" @click="undoDelete">
@@ -138,9 +119,6 @@
           </n-form-item-gi>
           <n-form-item-gi span="2" label="任务描述" path="description">
             <n-input v-model:value="form.description" type="textarea" placeholder="说明任务目标，而不是描述编排流程" />
-          </n-form-item-gi>
-          <n-form-item-gi v-if="form.taskType === 'SKILL'" span="2" label="技能代码" path="skillCode">
-            <n-input v-model:value="form.skillCode" placeholder="要执行的 Skill Code" />
           </n-form-item-gi>
           <n-form-item-gi span="2" label="Cron 表达式" path="cronExpression">
             <n-input v-model:value="form.cronExpression" placeholder="例如：0 0 8 * * ?">
@@ -210,14 +188,10 @@ import {
 import {
   AddOutline as AddIcon,
   ArrowBackOutline as UndoIcon,
-  BulbOutline as BulbIcon,
-  CalendarOutline as CalendarIcon,
-  CloudOutline as CloudIcon,
   CreateOutline as EditIcon,
   HelpOutline as HelpIcon,
   PlayOutline as PlayIcon,
   RefreshOutline as RefreshIcon,
-  SearchOutline as SearchIcon,
   TimerOutline as TimerIcon,
   TrashOutline as TrashIcon
 } from '@vicons/ionicons5'
@@ -225,7 +199,6 @@ import type { ScheduledTask } from '@/types'
 import EmptyStateWithGlow from '@/components/EmptyStateWithGlow.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { UiPage, UiPageHeader, UiPanel, UiStat } from '@/components/ui'
-import { personalService } from '@/services/api/personal'
 import { taskService } from '@/services/api/task'
 import { pushRecentAction } from '@/services/user-preferences'
 import { formatArrayTime as formatTime } from '@/utils/date-format'
@@ -240,16 +213,14 @@ const editingTask = ref<ScheduledTask | null>(null)
 const currentTask = ref<ScheduledTask | null>(null)
 const submitLoading = ref(false)
 const formRef = ref()
-const templates = ref<Array<{ id: string; name: string }>>([])
 const lastDeletedTask = ref<ScheduledTask | null>(null)
 
 const form = ref({
   name: '',
   description: '',
-  taskType: 'SKILL',
+  taskType: 'REMINDER',
   cronExpression: '',
   params: '',
-  skillCode: ''
 })
 
 const formRules = {
@@ -259,28 +230,13 @@ const formRules = {
 }
 
 const taskTypeOptions = [
-  { label: '技能执行', value: 'SKILL' },
-  { label: 'AI 对话', value: 'CHAT' },
   { label: '提醒', value: 'REMINDER' }
 ]
 
 const enabledCount = computed(() => tasks.value.filter(item => item.enabled).length)
-const aiTaskCount = computed(() => tasks.value.filter(item => item.taskType === 'CHAT').length)
 const failedExecutionCount = computed(() => tasks.value.reduce((total, item) => total + Number(item.failCount || 0), 0))
 
-const templateCards = computed(() => [
-  { id: 'daily-report', name: '日报生成', description: '每天固定时间生成工作摘要', icon: CalendarIcon },
-  { id: 'knowledge-check', name: '知识库巡检', description: '定时检查知识库状态', icon: SearchIcon },
-  { id: 'model-health', name: '模型健康检查', description: '检查模型连接与可用状态', icon: CloudIcon },
-  ...templates.value.map((template, index) => ({
-    id: template.id,
-    name: template.name,
-    description: '自定义任务模板',
-    icon: index % 2 === 0 ? BulbIcon : TimerIcon
-  }))
-])
-
-const taskTypeLabel = (type: string) => taskTypeOptions.find(option => option.value === type)?.label || type
+const taskTypeLabel = (type: string) => taskTypeOptions.find(option => option.value === type)?.label || '旧 AI 任务（已停用）'
 
 const successRate = (task: ScheduledTask) => {
   const total = Number(task.executeCount || 0)
@@ -309,27 +265,14 @@ const loadTasks = async () => {
   }
 }
 
-/** 加载用户保存的任务模板。 */
-const loadTemplates = async () => {
-  try {
-    const response = await personalService.listTaskTemplates()
-    if (response.success && response.data) {
-      templates.value = response.data.map(item => ({ id: item.id, name: item.name }))
-    }
-  } catch (error) {
-    console.error('加载任务模板失败:', error)
-  }
-}
-
 const openCreateModal = () => {
   editingTask.value = null
   form.value = {
     name: '',
     description: '',
-    taskType: 'SKILL',
+    taskType: 'REMINDER',
     cronExpression: '',
     params: '',
-    skillCode: ''
   }
   showCreateModal.value = true
 }
@@ -393,10 +336,9 @@ const editTask = (task: ScheduledTask) => {
   form.value = {
     name: task.name,
     description: task.description || '',
-    taskType: task.taskType,
+    taskType: 'REMINDER',
     cronExpression: task.cronExpression,
     params: task.params || '',
-    skillCode: task.skillCode || ''
   }
   showCreateModal.value = true
 }
@@ -408,7 +350,7 @@ const confirmDelete = (task: ScheduledTask) => {
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: async () => {
-      lastDeletedTask.value = { ...task }
+      lastDeletedTask.value = task.taskType === 'REMINDER' ? { ...task } : null
       const response = await taskService.delete(task.id)
       if (response.success) {
         pushRecentAction({ time: new Date().toLocaleString(), title: '删除任务', detail: task.name })
@@ -437,40 +379,8 @@ const undoDelete = async () => {
   }
 }
 
-/** 通过模板预填任务；自定义模板继续使用后端模板接口。 */
-const createByTemplate = async (templateId: string, templateName: string) => {
-  if (templateId === 'daily-report' || templateId === 'knowledge-check' || templateId === 'model-health') {
-    openCreateModal()
-    form.value = {
-      name: templateName,
-      description: '',
-      taskType: 'SKILL',
-      cronExpression: '0 0 8 * * ?',
-      params: '',
-      skillCode: templateId === 'daily-report'
-        ? 'DAILY_REPORT'
-        : templateId === 'knowledge-check'
-          ? 'KNOWLEDGE_CHECK'
-          : templateId === 'model-health'
-            ? 'MODEL_HEALTH'
-            : ''
-    }
-    return
-  }
-
-  const response = await personalService.createTaskFromTemplate(templateId)
-  if (response.success) {
-    pushRecentAction({ time: new Date().toLocaleString(), title: '应用任务模板', detail: templateName })
-    message.success(`模板任务已创建: ${templateName}`)
-    await loadTasks()
-  } else {
-    message.error(response.message || '模板创建失败')
-  }
-}
-
 onMounted(() => {
   loadTasks()
-  loadTemplates()
 })
 </script>
 

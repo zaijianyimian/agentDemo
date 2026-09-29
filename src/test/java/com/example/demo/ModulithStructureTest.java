@@ -1,7 +1,6 @@
 package com.example.demo;
 
 import com.example.demo.auth.application.AuthService;
-import com.example.demo.chat.application.ChatHistoryService;
 import com.example.demo.email.application.EmailListenerService;
 import com.example.demo.infrastructure.config.SecurityConfig;
 import com.example.demo.schedule.application.ScheduleEventService;
@@ -32,14 +31,13 @@ class ModulithStructureTest {
                 .collect(Collectors.toSet());
 
         assertThat(moduleNames)
-                .contains("auth", "chat", "email", "schedule", "task", "file",
-                        "inbox", "personal", "system", "shared", "infrastructure", "dispatch")
+                .contains("auth", "email", "schedule", "task", "file",
+                        "inbox", "system", "shared", "infrastructure", "dispatch")
+                .doesNotContain("chat", "personal")
                 .doesNotContain("app", "knowledge", "mcp", "skill", "memory", "autonomy");
 
         assertThat(modules.getModuleByName("auth"))
                 .hasValueSatisfying(module -> assertThat(module.contains(AuthService.class)).isTrue());
-        assertThat(modules.getModuleByName("chat"))
-                .hasValueSatisfying(module -> assertThat(module.contains(ChatHistoryService.class)).isTrue());
         assertThat(modules.getModuleByName("email"))
                 .hasValueSatisfying(module -> assertThat(module.contains(EmailListenerService.class)).isTrue());
         assertThat(modules.getModuleByName("schedule"))

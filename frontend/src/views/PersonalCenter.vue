@@ -4,32 +4,11 @@
       <div>
         <div class="page-eyebrow">Solo Mode</div>
         <h2>单用户增强中心</h2>
-        <p>集中管理当前账号的专注偏好、自动化模板与安全设置。</p>
-      </div>
-      <div class="hero-side">
-        <div class="hero-stat"><span>启用任务</span><strong>{{ insights?.enabledTasks ?? 0 }}</strong></div>
-        <div class="hero-stat"><span>今日日程</span><strong>{{ insights?.todaySchedules ?? 0 }}</strong></div>
-        <div class="hero-stat"><span>Token 总量</span><strong>{{ insights?.totalTokenUsage ?? 0 }}</strong></div>
+        <p>集中管理当前账号的专注偏好与安全设置。</p>
       </div>
     </section>
 
     <section class="section-grid">
-      <div class="surface-panel span-6 motion-card">
-        <div class="section-head">
-          <div><div class="page-eyebrow">Templates</div><h3>自动化模板中心</h3></div>
-        </div>
-        <div class="template-list">
-          <div v-for="item in templates" :key="item.id" class="template-card">
-            <div>
-              <strong>{{ item.name }}</strong>
-              <p>{{ item.description }}</p>
-              <small>{{ item.cronExpression }}</small>
-            </div>
-            <n-button size="small" type="primary" @click="applyTemplate(item.id)">一键启用</n-button>
-          </div>
-        </div>
-      </div>
-
       <div class="surface-panel span-6 motion-card">
         <div class="section-head">
           <div><div class="page-eyebrow">Mode</div><h3>专注与缓存</h3></div>
@@ -108,14 +87,13 @@
 
 <script setup lang="ts">
 /**
- * 个人中心页面：自动化模板、专注/缓存设置、知识库策略、人脸二次验证与备份恢复。
+ * 个人中心页面：专注/缓存设置、人脸二次验证与本地操作记录。
  */
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { NButton, NEmpty, NIcon, NSwitch, useMessage } from 'naive-ui'
 import { CameraOutline as CameraIcon } from '@vicons/ionicons5'
 import { authService } from '@/services/api/auth'
-import { personalService } from '@/services/api/personal'
-import type { FaceStatusResponse, PersonalInsight, TaskTemplate } from '@/types'
+import type { FaceStatusResponse } from '@/types'
 import {
   clearRecentActions,
   isFocusMode,
@@ -129,8 +107,6 @@ import {
 
 const message = useMessage()
 
-const insights = ref<PersonalInsight | null>(null)
-const templates = ref<TaskTemplate[]>([])
 const focusMode = ref(isFocusMode())
 const offlineCacheEnabled = ref(isOfflineCacheEnabled())
 const recentActions = ref<RecentActionItem[]>(readRecentActions())
@@ -147,18 +123,7 @@ const capturing = ref(false)
 let mediaStream: MediaStream | null = null
 
 const loadData = async () => {
-  const [insightRes, templateRes, faceStatusRes] = await Promise.all([
-    personalService.insights(),
-    personalService.listTaskTemplates(),
-    authService.faceStatus()
-  ])
-
-  if (insightRes.success && insightRes.data) {
-    insights.value = insightRes.data
-  }
-  if (templateRes.success && templateRes.data) {
-    templates.value = templateRes.data
-  }
+  const faceStatusRes = await authService.faceStatus()
   if (faceStatusRes.success && faceStatusRes.data) {
     faceStatus.value = faceStatusRes.data
     faceRequired.value = faceStatusRes.data.required
@@ -176,17 +141,6 @@ const appendAction = (title: string, detail?: string) => {
     detail
   })
   syncRecentActions()
-}
-
-/** 一键应用指定模板：克隆为用户任务并触发刷新。 */
-const applyTemplate = async (templateId: string) => {
-  const res = await personalService.createTaskFromTemplate(templateId)
-  if (res.success) {
-    message.success('模板任务已创建')
-    appendAction('启用任务模板', templateId)
-  } else {
-    message.error(res.message || '模板创建失败')
-  }
 }
 
 const onFocusModeToggle = (value: boolean) => {

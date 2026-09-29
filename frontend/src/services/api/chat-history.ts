@@ -1,56 +1,51 @@
-import type { ApiResponse, ChatSession, ChatMessageEntity } from '@/types'
-import { api } from './index'
+import type { ChatMessageEntity, ChatSession } from '@/types'
+import { fetchWithAuth } from '@/services/auth-fetch'
 
-// 聊天历史服务
-export const chatHistoryService = {
-  // 创建新会话
-  createSession: async (title?: string): Promise<ApiResponse<ChatSession>> => {
-    const params = title ? { title } : {}
-    const response = await api.post('/chat/history/session', null, { params })
-    return response.data
-  },
-
-  // 获取所有会话列表
-  getSessions: async (): Promise<ApiResponse<ChatSession[]>> => {
-    const response = await api.get('/chat/history/sessions')
-    return response.data
-  },
-
-  // 获取会话详情
-  getSession: async (id: string): Promise<ApiResponse<ChatSession>> => {
-    const response = await api.get(`/chat/history/session/${id}`)
-    return response.data
-  },
-
-  // 更新会话标题
-  updateSessionTitle: async (id: string, title: string): Promise<ApiResponse<ChatSession>> => {
-    const response = await api.put(`/chat/history/session/${id}/title`, null, { params: { title } })
-    return response.data
-  },
-
-  // 删除会话
-  deleteSession: async (id: string): Promise<ApiResponse<void>> => {
-    const response = await api.delete(`/chat/history/session/${id}`)
-    return response.data
-  },
-
-  // 获取会话消息
-  getSessionMessages: async (sessionId: string): Promise<ApiResponse<ChatMessageEntity[]>> => {
-    const response = await api.get(`/chat/history/session/${sessionId}/messages`)
-    return response.data
-  },
-
-  // 添加消息
-  addMessage: async (sessionId: string, role: string, content: string, model?: string): Promise<ApiResponse<ChatMessageEntity>> => {
-    const params: Record<string, string> = { role, content }
-    if (model) params.model = model
-    const response = await api.post(`/chat/history/session/${sessionId}/message`, null, { params })
-    return response.data
-  },
-
-  // 清空会话消息
-  clearSessionMessages: async (sessionId: string): Promise<ApiResponse<void>> => {
-    const response = await api.delete(`/chat/history/session/${sessionId}/messages`)
-    return response.data
+// Python 的 /api/chat 接口直接返回对象或数组，不使用 Java 的 ApiResponse 包装。
+const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+  const response = await fetchWithAuth(`/api/chat${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...init.headers }
+  })
+  if (!response.ok) {
+    let detail = `请求失败 (${response.status})`
+    try {
+      const body = await response.json()
+      if (typeof body.detail === 'string') detail = body.detail
+    } catch { /* 保留 HTTP 状态信息 */ }
+    throw new Error(detail)
   }
+  return response.status === 204 ? undefined as T : response.json() as Promise<T>
+}
+
+const toSession = (item: any): ChatSession => ({
+  id: item.session_id,
+  title: item.title,
+  messageCount: item.message_count,
+  lastMessageTime: item.last_message_at || undefined,
+  createTime: item.created_at,
+  updateTime: item.updated_at
+})
+
+const toMessage = (item: any): ChatMessageEntity => ({
+  id: item.message_id,
+  sessionId: item.session_id,
+  role: item.role,
+  content: item.content,
+  createTime: item.created_at
+})
+
+export const chatHistoryService = {
+  createSession: async (title?: string) =>
+    toSession(await request<unknown>('/sessions', { method: 'POST', body: JSON.stringify({ title: title || null }) })),
+  getSessions: async () =>
+    (await request<unknown[]>('/sessions')).map(toSession),
+  updateSessionTitle: async (id: string, title: string) =>
+    toSession(await request<unknown>(`/sessions/${id}/title`, { method: 'PUT', body: JSON.stringify({ title }) })),
+  deleteSession: async (id: string) =>
+    request<void>(`/sessions/${id}`, { method: 'DELETE' }),
+  getSessionMessages: async (id: string) =>
+    (await request<unknown[]>(`/sessions/${id}/messages`)).map(toMessage),
+  clearSessionMessages: async (id: string) =>
+    toSession(await request<unknown>(`/sessions/${id}/messages`, { method: 'DELETE' }))
 }

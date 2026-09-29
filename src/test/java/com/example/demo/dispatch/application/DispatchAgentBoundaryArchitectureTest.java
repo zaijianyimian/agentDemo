@@ -1,7 +1,6 @@
 package com.example.demo.dispatch.application;
 
 import com.example.demo.dispatch.domain.DispatchedTask;
-import com.example.demo.infrastructure.graph.GraphGatewayClient;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -35,11 +34,9 @@ class DispatchAgentBoundaryArchitectureTest {
     }
 
     @Test
-    void graphGatewayDoesNotExposeDispatchMemoryOrSelfExecution() {
-        Set<String> methods = methodNames(GraphGatewayClient.class);
-
-        assertFalse(methods.contains("recallMemory"));
-        assertFalse(methods.contains("completeDispatch"));
+    void graphChatGatewayStaysOutOfJava() {
+        assertThrows(ClassNotFoundException.class,
+                () -> Class.forName("com.example.demo.infrastructure.graph.GraphGatewayClient"));
     }
 
     @Test

@@ -34,8 +34,12 @@ class UnifiedInboxServiceTest {
                 ScheduleEvent.builder().id(1L).userId(7L).title("A schedule").eventTime(now).updateTime(now).build(),
                 ScheduleEvent.builder().id(2L).userId(8L).title("B schedule").eventTime(now).updateTime(now).build()));
         when(tasks.listByUpdateTimeDesc()).thenReturn(List.of(
-                ScheduledTask.builder().id(3L).userId(7L).name("A task").enabled(true).updateTime(now).build(),
-                ScheduledTask.builder().id(4L).userId(8L).name("B task").enabled(true).updateTime(now).build()));
+                ScheduledTask.builder().id(3L).userId(7L).name("A task").taskType("REMINDER")
+                        .enabled(true).updateTime(now).build(),
+                ScheduledTask.builder().id(4L).userId(8L).name("B task").taskType("REMINDER")
+                        .enabled(true).updateTime(now).build(),
+                ScheduledTask.builder().id(5L).userId(7L).name("Legacy AI task").taskType("CHAT")
+                        .enabled(true).updateTime(now).build()));
         when(emails.listAll()).thenReturn(List.of(
                 EmailConfig.builder().id(7L).userId(7L).email("a@example.com").enabled(true).updateTime(now).build(),
                 EmailConfig.builder().id(8L).userId(8L).email("b@example.com").enabled(true).updateTime(now).build()));
@@ -48,6 +52,7 @@ class UnifiedInboxServiceTest {
         assertThat(result.getItems()).extracting(item -> item.getTitle())
                 .containsExactlyInAnyOrder("A schedule", "A task", "a@example.com");
         assertThat(result.getItems()).noneMatch(item -> item.getTitle().startsWith("B"));
+        assertThat(result.getItems()).noneMatch(item -> item.getTitle().startsWith("Legacy"));
         assertThat(result.getCounts().get("enabledTasks")).isEqualTo(1L);
         assertThat(result.getCounts().get("activeMailboxes")).isEqualTo(1L);
     }

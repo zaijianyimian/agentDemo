@@ -12,21 +12,6 @@
     </button>
 
     <div class="topbar-actions">
-      <div class="service-statuses" aria-label="系统状态">
-        <button type="button" class="status-pill" @click="$emit('status', 'model')" title="模型状态">
-          <span :class="['status-dot', modelStatus]"></span>
-          <span class="status-label">Model</span>
-        </button>
-        <button type="button" class="status-pill" @click="$emit('status', 'qdrant')" title="Qdrant 状态">
-          <span :class="['status-dot', qdrantStatus]"></span>
-          <span class="status-label">Memory</span>
-        </button>
-        <button type="button" class="status-pill" @click="$emit('status', 'search')" title="搜索状态">
-          <span :class="['status-dot', searchStatus]"></span>
-          <span class="status-label">Search</span>
-        </button>
-      </div>
-
       <button class="notification-button" type="button" @click="$emit('status', 'notifications')" title="收件箱">
         <n-icon size="18"><NotificationsOutline /></n-icon>
         <span v-if="notificationCount > 0" class="notification-badge">{{ notificationCount > 99 ? '99+' : notificationCount }}</span>
@@ -63,8 +48,6 @@ import {
   SearchOutline
 } from '@vicons/ionicons5'
 
-type ServiceStatus = 'active' | 'inactive' | 'error'
-
 const props = withDefaults(defineProps<{
   title: string
   category: string
@@ -72,9 +55,6 @@ const props = withDefaults(defineProps<{
   userInitial: string
   userEmail?: string
   userRole?: string
-  modelStatus?: ServiceStatus
-  qdrantStatus?: ServiceStatus
-  searchStatus?: ServiceStatus
   notificationCount?: number
   logoutLoading?: boolean
 }>(), {

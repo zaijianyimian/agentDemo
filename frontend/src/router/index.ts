@@ -58,19 +58,19 @@ const routes = [
   {
     path: '/autonomy',
     name: 'Autonomy',
-    component: () => import('@/views/AutonomyCenter.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: '自治中心', icon: 'spark', description: '执行项目扫描、验证和补全草稿生成。' }
   },
   {
     path: '/reports',
     name: 'Reports',
-    component: () => import('@/views/Reports.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: '日报周报', icon: 'report', description: '生成日报、周报并查看个人历史报告。' }
   },
   {
     path: '/models',
     name: 'Models',
-    component: () => import('@/views/Models.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: '模型', icon: 'cube', description: '管理可用模型、默认模型和连接测试。' }
   },
   {
@@ -88,7 +88,7 @@ const routes = [
   {
     path: '/knowledge',
     name: 'Knowledge',
-    component: () => import('@/views/Knowledge.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: '知识库', icon: 'book', description: '创建知识库、上传文档并执行 RAG 检索。' }
   },
   {
@@ -106,7 +106,7 @@ const routes = [
   {
     path: '/snippets',
     name: 'Snippets',
-    component: () => import('@/views/Snippets.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: '代码片段', icon: 'code', description: '管理代码片段并调用生成、解释与转换能力。' }
   },
   {
@@ -130,25 +130,25 @@ const routes = [
   {
     path: '/search',
     name: 'Search',
-    component: () => import('@/views/Search.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: '网络搜索', icon: 'search', description: '搜索、总结、历史分析与兴趣追踪。' }
   },
   {
     path: '/tools',
     name: 'Tools',
-    component: () => import('@/views/Tools.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: 'MCP 工具', icon: 'tool', description: '管理 Agent 可调用工具、验证配置并执行测试。' }
   },
   {
     path: '/skills',
     name: 'Skills',
-    component: () => import('@/views/Skills.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: 'Skills', icon: 'skill', description: '维护 Agent 技能目录、分类、绑定关系与执行能力。' }
   },
   {
     path: '/markdown-skills',
     name: 'MarkdownSkills',
-    component: () => import('@/views/MarkdownSkills.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: 'Markdown Skills', icon: 'document', description: '管理 SKILL.md 能力：自动加载、LLM 调用和关键词匹配。' }
   },
   {
@@ -166,7 +166,7 @@ const routes = [
   {
     path: '/chatimport',
     name: 'ChatImport',
-    component: () => import('@/views/ChatImport.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: '聊天导入', icon: 'chatbubbles', description: '导入微信、QQ、Telegram 聊天记录并创建虚拟助手。' }
   },
   {
@@ -178,7 +178,7 @@ const routes = [
   {
     path: '/knowledge-search',
     name: 'KnowledgeSearch',
-    component: () => import('@/views/KnowledgeSearch.vue'),
+    component: () => import('@/views/LegacyFeature.vue'),
     meta: { title: '知识搜索', icon: 'search', description: '在知识库中语义搜索文档片段。' }
   },
   {

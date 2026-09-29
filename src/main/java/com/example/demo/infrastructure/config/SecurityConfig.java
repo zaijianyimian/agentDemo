@@ -57,11 +57,11 @@ public class SecurityConfig {
                                 "/api/auth/oauth/github/exchange",
                                 "/api/auth/password/reset/send-code",
                                 "/api/auth/password/reset",
-                                "/api/chat/stream/probe",
-                                // Actuator 端点（监控/健康检查用）。
-                                // 注意：/actuator/prometheus 不放开——含连接池/JVM/自定义 metrics，
-                                // 生产部署应通过反向代理限定 /actuator/prometheus 仅内网访问，
-                                // 或保留应用层认证（用 Prometheus pull + 服务端鉴权）。
+                                // 令牌内省：请求携带的令牌本身就是要被校验的对象，
+                                // 因此在 SecurityConfig 中放行，改由
+                                // TokenIntrospectionController 手动完成完整校验。
+                                // 该端点只返回 userId，不承担聊天业务或 Agent 网关职责。
+                                "/api/auth/introspect",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/actuator/info"

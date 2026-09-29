@@ -119,8 +119,8 @@ const primaryRoutes = [
 
 const moduleRoutes = [
   { category: 'productivity', path: '/schedule', label: '效率与日程', icon: 'calendar' },
-  { category: 'knowledge', path: '/knowledge', label: '知识与文件', icon: 'book' },
-  { category: 'agent', path: '/autonomy', label: 'Agent 能力', icon: 'sparkles' },
+  { category: 'knowledge', path: '/files', label: '文件', icon: 'book' },
+  { category: 'agent', path: '/dispatched', label: '执行结果', icon: 'sparkles' },
   { category: 'system', path: '/email', label: '系统服务', icon: 'construct' }
 ]
 

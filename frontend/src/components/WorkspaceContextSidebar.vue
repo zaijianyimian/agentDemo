@@ -122,9 +122,6 @@ const inboxItems: ContextItem[] = [
 const settingsItems: ContextItem[] = [
   { key: 'system', label: '外观与系统', description: '站点与主题', icon: 'settings', query: { section: 'system' } },
   { key: 'executor', label: '执行基础设施', description: '明确执行器能力', icon: 'construct', query: { section: 'executor' } },
-  { key: 'model', label: '模型', description: '模型参数', icon: 'cube', query: { section: 'model' } },
-  { key: 'qdrant', label: '知识与记忆', description: '向量检索连接', icon: 'cloud', query: { section: 'qdrant' } },
-  { key: 'search', label: '集成与搜索', description: '外部搜索服务', icon: 'search', query: { section: 'search' } },
   { key: 'schedule', label: '通知与日程', description: '提醒和摘要', icon: 'calendar', query: { section: 'schedule' } },
   { key: 'file', label: '文件', description: '上传与存储', icon: 'folder', query: { section: 'file' } },
   { key: 'backup', label: '数据归档', description: '受控备份入口', icon: 'archive', query: { section: 'backup' } }

@@ -173,7 +173,6 @@ import {
   CheckmarkCircleOutline as CheckIcon,
   FileTrayFullOutline as InboxIcon,
   MailOutline as MailIcon,
-  SparklesOutline as AgentIcon,
   TimeOutline as TaskIcon
 } from '@vicons/ionicons5'
 import type { InboxItem, InboxSummary } from '@/types'
@@ -258,14 +257,6 @@ const overviewCards = computed(() => [
     hint: '已聚合到收件箱的邮件内容',
     path: '/email',
     icon: MailIcon
-  },
-  {
-    key: 'agent',
-    label: 'Agent 发现',
-    value: Number(inbox.value.counts.autonomyFindings || 0),
-    hint: '最近自治扫描发现的问题',
-    path: '/autonomy',
-    icon: AgentIcon
   }
 ])
 

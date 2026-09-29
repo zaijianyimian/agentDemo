@@ -116,18 +116,18 @@ public class GlobalExceptionHandler {
             ResourceAccessException exception) {
         log.error("资源访问异常: {}", exception.getMessage());
 
-        String message = "AI服务访问超时";
+        String message = "服务访问超时";
         if (exception.getCause() instanceof SocketTimeoutException) {
-            message = "AI服务响应超时，请稍后重试";
+            message = "服务响应超时，请稍后重试";
         } else if (exception.getCause() instanceof SocketException) {
-            message = "AI服务连接异常，请稍后重试";
+            message = "服务连接异常，请稍后重试";
         }
 
         return failure(
                 HttpStatus.GATEWAY_TIMEOUT,
                 "TIMEOUT_ERROR",
                 message,
-                Map.of("suggestion", "稍后重试，并确认 API 密钥与上游 AI 服务状态"));
+                Map.of("suggestion", "稍后重试，并检查上游服务状态"));
     }
 
     /**
@@ -160,7 +160,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 处理运行时异常，并识别常见 AI 服务错误。
+     * 处理运行时异常。
      *
      * @param exception 运行时异常
      * @return 标准错误响应
@@ -168,28 +168,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Object>> handleRuntimeException(RuntimeException exception) {
         log.error("运行时异常: ", exception);
-
-        String message = exception.getMessage();
-        if (message != null) {
-            if (message.contains("API key") || message.contains("api-key")) {
-                return failure(
-                        HttpStatus.UNAUTHORIZED,
-                        "API_KEY_ERROR",
-                        "API密钥无效或已过期");
-            }
-            if (message.contains("rate limit") || message.contains("quota")) {
-                return failure(
-                        HttpStatus.TOO_MANY_REQUESTS,
-                        "RATE_LIMIT_ERROR",
-                        "API调用频率超限，请稍后重试");
-            }
-            if (message.contains("model") && message.contains("not found")) {
-                return failure(
-                        HttpStatus.BAD_REQUEST,
-                        "MODEL_ERROR",
-                        "AI模型不可用，请检查模型配置");
-            }
-        }
 
         return failure(
                 HttpStatus.INTERNAL_SERVER_ERROR,

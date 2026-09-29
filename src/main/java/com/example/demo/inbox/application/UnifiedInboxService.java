@@ -63,7 +63,8 @@ public class UnifiedInboxService {
         List<ScheduleEvent> schedules = scheduleEventService.listByEventTimeDesc().stream()
                 .filter(item -> Long.valueOf(ownerId).equals(item.getUserId())).toList();
         List<ScheduledTask> tasks = scheduledTaskService.listByUpdateTimeDesc().stream()
-                .filter(item -> Long.valueOf(ownerId).equals(item.getUserId())).toList();
+                .filter(item -> Long.valueOf(ownerId).equals(item.getUserId()))
+                .filter(item -> "REMINDER".equalsIgnoreCase(item.getTaskType())).toList();
         List<EmailConfig> emails = emailConfigService.listAll().stream()
                 .filter(item -> Long.valueOf(ownerId).equals(item.getUserId())).toList();
         Map<Long, Map<String, Object>> listenerStatus = emailListenerService.getListenerStatus();

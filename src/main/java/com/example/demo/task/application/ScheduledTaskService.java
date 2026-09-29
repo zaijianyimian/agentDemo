@@ -94,6 +94,7 @@ public class ScheduledTaskService {
     /** 切换任务启用状态。 */
     public ScheduledTask toggleTask(Long id) {
         ScheduledTask task = requireTask(id);
+        requireReminder(task);
         task.setEnabled(!Boolean.TRUE.equals(task.getEnabled()));
         task.setNextExecuteTime(Boolean.TRUE.equals(task.getEnabled())
                 ? calculateNextExecuteTime(task.getCronExpression()) : null);
@@ -113,6 +114,7 @@ public class ScheduledTaskService {
     /** 执行普通 Java 任务并记录日志。 */
     public String executeTask(Long id, String triggerType) {
         ScheduledTask task = requireTask(id);
+        requireReminder(task);
         JobLog jobLog = JobLog.builder()
                 .userId(task.getUserId())
                 .jobId(task.getId())
@@ -130,10 +132,6 @@ public class ScheduledTaskService {
         boolean success;
         String result;
         try {
-            if (!"REMINDER".equalsIgnoreCase(task.getTaskType())) {
-                throw new IllegalStateException(
-                        "任务类型 " + task.getTaskType() + " 已迁移到 Python Agent Engine");
-            }
             result = executeReminderTask(task);
             success = true;
         } catch (Exception error) {
@@ -230,6 +228,11 @@ public class ScheduledTaskService {
         if (task.getTaskType() == null || task.getTaskType().isBlank()) {
             task.setTaskType("REMINDER");
         }
+        if (!"REMINDER".equalsIgnoreCase(task.getTaskType())) {
+            throw new IllegalArgumentException("Java 仅支持 REMINDER 定时任务");
+        }
+        task.setTaskType("REMINDER");
+        task.setSkillCode(null);
         if (task.getCronExpression() == null || task.getCronExpression().isBlank()) {
             task.setCronExpression("0 0 9 * * ?");
         }
@@ -238,6 +241,12 @@ public class ScheduledTaskService {
             task.setCreateTime(now);
         }
         task.setUpdateTime(now);
+    }
+
+    private void requireReminder(ScheduledTask task) {
+        if (!"REMINDER".equalsIgnoreCase(task.getTaskType())) {
+            throw new IllegalArgumentException("旧 AI 任务已停用，请改为 REMINDER 或删除");
+        }
     }
 
     private void validateCron(String cron) {

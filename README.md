@@ -2,29 +2,15 @@
 
 一个采用 **Java 业务平台 + Python Agent Engine** 分层架构的智能邮件与个人工作台项目。
 
-Java 不再承载 Agent Runtime。Spring Boot 负责认证、多租户、邮箱接入、普通业务 CRUD、文件与任务能力，并通过 `GraphGatewayClient` 将聊天与邮件 Agent 请求转发给 Python Graph 服务；LLM、Agent、Memory、RAG、MCP、Skill、Tool 与自主决策统一由 Python 负责。
+Java 不再承载 Agent Runtime。Spring Boot 负责认证、多租户、邮箱接入、普通业务 CRUD、文件与任务能力，并通过 RabbitMQ 投递邮件事件；浏览器聊天请求直接送至 Python Graph 服务。LLM、Agent、Memory、RAG、MCP、Skill、Tool 与自主决策由 Python 负责。
 
 ## 当前架构
 
 ```text
-Browser / Frontend
-       |
-       v
-Spring Boot (Java)
-  - Auth / JWT / Multi-tenant
-  - Email listener / OAuth / IMAP / POP3 / Gmail / Graph
-  - Schedule / Task / File / System CRUD
-  - HTTP / SSE API
-       |
-       | GraphGatewayClient
-       v
-Python Agent Engine
-  - RoutingAgent
-  - EmailAgent / ChatAgent / ScheduleAgent
-  - LLM / Prompt
-  - Memory / RAG / Embedding
-  - MCP / Skill / Tool
-  - Agent state / execution / conversation
+Browser / Frontend -- business API --> Spring Boot (Java)
+Browser / Frontend -- /api/chat/* --> Python Graph Chat API
+Spring Boot 邮件监听 -- RabbitMQ --> Python EmailAgent
+Python Graph -- /api/auth/introspect --> Spring Boot 认证接口
 ```
 
 核心原则：**Java 提供业务能力和安全边界，Python 负责智能决策与 Agent 执行。** Java 不直接连接 Python Agent 使用的向量库，也不实现本地 LLM/MCP/Memory 运行时。
@@ -35,14 +21,12 @@ Python Agent Engine
 
 - `auth`：注册、登录、JWT、GitHub OAuth、人脸认证与用户生命周期。
 - `email`：邮箱配置、OAuth、IMAP/POP3/Gmail/Microsoft Graph 接入、邮件监听、去重、附件存储、发送与通知。
-- `chat`：HTTP/SSE Graph 网关以及兼容的普通会话业务接口；不执行本地 LLM/Agent。
 - `schedule`：普通日程 CRUD、文件能力与事件推送。
 - `task`：普通定时任务、提醒和执行记录。
 - `file`：文件上传、校验、内容提取和元数据管理，不执行 AI 分析。
 - `inbox`：Java 业务数据的统一收件箱聚合，不执行自主决策或语义搜索。
-- `personal`：普通个人生产力业务能力。
 - `system`：系统设置、Java 关系型数据与 `data/`、`generated/` 文件备份。
-- `infrastructure`：安全、多租户、缓存、Web 配置及 Java → Python Graph 网关。
+- `infrastructure`：安全、多租户、缓存、Web 配置及邮件事件投递。
 
 以下能力已经从 Java Runtime 剥离：
 
@@ -86,7 +70,7 @@ EmailReceivedEvent
 GraphEmailDispatchListener
       |
       v
-GraphGatewayClient
+RabbitMQ
       |
       v
 Python EmailAgent
@@ -100,17 +84,13 @@ Java 负责可靠接入邮箱和确定用户身份；Python 负责邮件理解�
 Frontend
    |
    v
-ChatController (Java)
+Reverse proxy (/api/chat/*)
    |
    v
-GraphGatewayClient
-   |
-   +---- HTTP complete ----> Python ChatAgent
-   |
-   +---- SSE stream -------> Python ChatAgent
+Python Graph Chat API
 ```
 
-`ChatController` 只负责鉴权、用户上下文和 HTTP/SSE 协议适配，不在 Java 中执行模型、Memory、Tool 或 MCP。
+Python 调用 Java `/api/auth/introspect` 校验浏览器 Bearer 令牌，聊天会话与消息保存在 PostgreSQL。
 
 ## 数据所有权
 
@@ -146,7 +126,6 @@ GraphGatewayClient
 - Spring Modulith
 - MyBatis-Plus
 - MySQL
-- WebFlux / SSE（仅用于 Graph 网关）
 - Caffeine
 - Jakarta Mail / Gmail API / Microsoft Graph 接入
 - PDFBox / Apache POI
@@ -175,17 +154,15 @@ GraphGatewayClient
 ```text
 src/main/java/com/example/demo/
 ├── auth/              # 认证与用户
-├── chat/              # Graph 聊天网关 + 普通会话业务
 ├── email/             # 邮箱接入与监听
 ├── file/              # 文件业务
 ├── inbox/             # 统一业务收件箱
 ├── infrastructure/
 │   ├── config/
-│   ├── graph/         # GraphGatewayClient
+│   ├── graph/         # 邮件事件 RabbitMQ 配置
 │   ├── properties/
 │   ├── security/
 │   └── web/
-├── personal/          # 个人生产力业务
 ├── schedule/          # 日程业务
 ├── shared/            # 共享 DTO / 基础能力
 ├── system/            # 设置与备份
@@ -194,16 +171,19 @@ src/main/java/com/example/demo/
 
 ## 配置 Python Graph
 
-Java 通过 `app.graph` 配置连接 Python：
+Java 通过 `app.graph` 配置把新邮件投递给 Python；浏览器聊天请求由反向代理直接送至 Python：
 
 ```yaml
 app:
   graph:
     enabled: true
-    base-url: http://127.0.0.1:8001
+    email-exchange: agent_email
+    email-queue: agent_email_queue
+    email-routing-key: agent_email
 ```
 
-内部调用会携带 `X-User-Id` 用户上下文，不再发送共享 Token。部署时应通过内网、网关访问控制或 mTLS 限制内部接口的可访问范围。
+浏览器聊天使用 Java 签发的 Bearer 令牌，由 Python 调用 `/api/auth/introspect` 校验。
+Python 的部署与反向代理配置见配套 `graph` 仓库的 `docs/ARCHITECTURE.md`。
 
 ## 本地检查
 
@@ -230,6 +210,6 @@ PR 到 `improve` 会通过 `.github/workflows/refactor-check.yml` 自动执行�
 
 - **需要 LLM 推理、路由、记忆、工具选择、RAG、MCP 的能力 → Python Agent Engine。**
 - **确定性的账户、邮箱、文件、日程、任务、权限与数据 CRUD → Java。**
-- Java 如果需要触发 Agent，应扩展 `GraphGatewayClient`/内部协议，而不是重新引入 Java LLM Runtime。
+- Java 如果需要触发 Agent，应使用明确的事件或内部协议。
 
-前端仍可能保留部分历史 Agent 管理页面或 API 封装；它们后续应改为面向 Python Agent API，而不应促使 Java 恢复已经剥离的 Agent 模块。
+历史 Agent 管理页目前显示迁移说明，待 Python 提供对应接口后再接入。

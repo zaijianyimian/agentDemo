@@ -3,7 +3,7 @@
     <UiPageHeader
       eyebrow="Unified Inbox"
       title="统一收件箱"
-      subtitle="把邮件、任务、日程和 Agent 发现统一收拢，优先处理需要行动的事项。"
+      subtitle="把邮件、任务和日程统一收拢，优先处理需要行动的事项。"
     >
       <template #actions>
         <n-tag size="small" :bordered="false">{{ lastUpdated }}</n-tag>
@@ -54,7 +54,6 @@
           <div class="batch-actions">
             <n-button size="small" tertiary @click="batchCompleteSchedules">完成日程</n-button>
             <n-button size="small" tertiary @click="batchExecuteTasks">执行任务</n-button>
-            <n-button size="small" tertiary @click="batchRescanAutonomy">重新扫描</n-button>
             <n-button size="small" quaternary @click="selectedKeys = []">清空</n-button>
           </div>
         </div>
@@ -180,11 +179,9 @@ import {
   CheckmarkCircleOutline as CheckIcon,
   FileTrayFullOutline as InboxIcon,
   MailOutline as MailIcon,
-  SparklesOutline as AutonomyIcon,
   TimeOutline as TaskIcon
 } from '@vicons/ionicons5'
 import type { InboxItem, InboxSummary } from '@/types'
-import { autonomyService } from '@/services/api/autonomy'
 import { inboxService } from '@/services/api/inbox'
 import { scheduleService } from '@/services/api/schedule'
 import { taskService } from '@/services/api/task'
@@ -194,7 +191,7 @@ import EmptyStateWithGlow from '@/components/EmptyStateWithGlow.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { UiPage, UiPageHeader } from '@/components/ui'
 
-type InboxFilter = 'all' | 'pending' | 'mail' | 'schedule' | 'task' | 'autonomy'
+type InboxFilter = 'all' | 'pending' | 'mail' | 'schedule' | 'task'
 
 interface ItemAction {
   label: string
@@ -219,8 +216,7 @@ const inbox = ref<InboxSummary>({
 const categoryMap: Record<string, { label: string; icon: any }> = {
   schedule: { label: '日程', icon: CalendarIcon },
   task: { label: '任务', icon: TaskIcon },
-  mail: { label: '邮件', icon: MailIcon },
-  autonomy: { label: 'Agent', icon: AutonomyIcon }
+  mail: { label: '邮件', icon: MailIcon }
 }
 
 const filters: Array<{ key: InboxFilter; label: string; icon: any }> = [
@@ -228,11 +224,10 @@ const filters: Array<{ key: InboxFilter; label: string; icon: any }> = [
   { key: 'pending', label: '待处理', icon: CheckIcon },
   { key: 'mail', label: '邮件', icon: MailIcon },
   { key: 'schedule', label: '日程', icon: CalendarIcon },
-  { key: 'task', label: '任务', icon: TaskIcon },
-  { key: 'autonomy', label: 'Agent', icon: AutonomyIcon }
+  { key: 'task', label: '任务', icon: TaskIcon }
 ]
 
-const inboxFilterKeys: InboxFilter[] = ['all', 'pending', 'mail', 'schedule', 'task', 'autonomy']
+const inboxFilterKeys: InboxFilter[] = ['all', 'pending', 'mail', 'schedule', 'task']
 
 watch(
   () => route.query.filter,
@@ -255,28 +250,28 @@ const isCompleted = (status?: string) => {
   return ['completed', 'complete', 'done', 'success', 'finished', '已完成'].includes(normalized)
 }
 
-const pendingCount = computed(() => inbox.value.items.filter(item => !isCompleted(item.status)).length)
+const visibleItems = computed(() => inbox.value.items.filter(item => item.category !== 'autonomy'))
+const pendingCount = computed(() => visibleItems.value.filter(item => !isCompleted(item.status)).length)
 const filteredItems = computed(() => {
-  if (activeFilter.value === 'all') return inbox.value.items
-  if (activeFilter.value === 'pending') return inbox.value.items.filter(item => !isCompleted(item.status))
-  return inbox.value.items.filter(item => item.category === activeFilter.value)
+  if (activeFilter.value === 'all') return visibleItems.value
+  if (activeFilter.value === 'pending') return visibleItems.value.filter(item => !isCompleted(item.status))
+  return visibleItems.value.filter(item => item.category === activeFilter.value)
 })
-const selectedItems = computed(() => inbox.value.items.filter(item => selectedKeys.value.includes(itemKey(item))))
+const selectedItems = computed(() => visibleItems.value.filter(item => selectedKeys.value.includes(itemKey(item))))
 const activeFilterLabel = computed(() => filters.find(item => item.key === activeFilter.value)?.label || '全部事项')
 
 const metricCards = computed(() => [
   { key: 'pending', label: '待处理', value: pendingCount.value, hint: '尚未完成的聚合事项', icon: InboxIcon, filter: 'pending' as InboxFilter },
   { key: 'schedule', label: '今日日程', value: Number(inbox.value.counts.todaySchedules || 0), hint: '今天需要跟进的安排', icon: CalendarIcon, filter: 'schedule' as InboxFilter },
-  { key: 'task', label: '启用任务', value: Number(inbox.value.counts.enabledTasks || 0), hint: '当前可执行任务', icon: TaskIcon, filter: 'task' as InboxFilter },
-  { key: 'agent', label: 'Agent 发现', value: Number(inbox.value.counts.autonomyFindings || 0), hint: '最近自治扫描发现项', icon: AutonomyIcon, filter: 'autonomy' as InboxFilter }
+  { key: 'task', label: '启用任务', value: Number(inbox.value.counts.enabledTasks || 0), hint: '当前可执行任务', icon: TaskIcon, filter: 'task' as InboxFilter }
 ])
 
 const lastUpdated = computed(() => inbox.value.generatedAt ? `更新于 ${formatTime(inbox.value.generatedAt)}` : '尚未刷新')
 
 const filterCount = (filter: InboxFilter) => {
-  if (filter === 'all') return inbox.value.items.length
+  if (filter === 'all') return visibleItems.value.length
   if (filter === 'pending') return pendingCount.value
-  return inbox.value.items.filter(item => item.category === filter).length
+  return visibleItems.value.filter(item => item.category === filter).length
 }
 
 const categoryLabel = (category: string) => categoryMap[category]?.label || 'Workspace'
@@ -330,9 +325,6 @@ const itemActions = (item: InboxItem): ItemAction[] => {
   if (item.category === 'schedule' && id && !isCompleted(item.status)) {
     return [{ label: '标记完成', primary: true, run: () => completeSchedule(Number(id)) }, { label: '打开', run: () => goTo(item.route) }]
   }
-  if (item.category === 'autonomy') {
-    return [{ label: '重新扫描', primary: true, run: runAutonomyScan }, { label: '查看', run: () => goTo(item.route) }]
-  }
   return [{ label: '打开', primary: item.category === 'mail', run: () => goTo(item.route) }]
 }
 
@@ -346,12 +338,6 @@ const executeTask = async (id: number) => {
 const completeSchedule = async (id: number) => {
   await scheduleService.complete(id)
   message.success('日程已标记完成')
-  await loadInbox()
-}
-
-const runAutonomyScan = async () => {
-  await autonomyService.scan()
-  message.success('已重新扫描项目')
   await loadInbox()
 }
 
@@ -372,16 +358,6 @@ const batchExecuteTasks = async () => {
   }
   selectedKeys.value = []
   message.success('已批量执行所选任务')
-  await loadInbox()
-}
-
-/** 根据选中的 Agent 发现项重新执行一次自治扫描。 */
-const batchRescanAutonomy = async () => {
-  const count = selectedItems.value.filter(item => item.category === 'autonomy').length
-  if (count === 0) return
-  await autonomyService.scan()
-  selectedKeys.value = []
-  message.success(`已根据 ${count} 条 Agent 发现重新扫描项目`)
   await loadInbox()
 }
 

@@ -14,7 +14,7 @@
         </button>
       </div>
 
-      <button class="new-chat-btn" type="button" @click="createNewSession">
+      <button class="new-chat-btn" type="button" :disabled="loading" @click="createNewSession">
         <n-icon size="18"><AddIcon /></n-icon>
         <span v-if="!isListCollapsed">新对话</span>
       </button>
@@ -24,6 +24,7 @@
           v-for="session in sessions"
           :key="session.id"
           type="button"
+          :disabled="loading"
           :class="['session-item', { active: currentSession?.id === session.id }]"
           @click="switchSession(session)"
         >
@@ -32,7 +33,7 @@
             <strong>{{ session.title }}</strong>
             <small>{{ formatSessionTime(session.lastMessageTime) }}</small>
           </span>
-          <n-dropdown trigger="click" :options="sessionMenuOptions" @select="handleSessionMenu($event, session)">
+          <n-dropdown trigger="click" :disabled="loading" :options="sessionMenuOptions" @select="handleSessionMenu($event, session)">
             <span class="session-menu-btn" role="button" tabindex="0" @click.stop>
               <n-icon size="15"><MoreIcon /></n-icon>
             </span>
@@ -56,7 +57,6 @@
           <span class="mode-status" :class="chatMode">
             {{ chatModeLabel }}
           </span>
-          <ModelSelector :is-mobile="isMobile" @select="handleModelSelect" />
         </div>
       </header>
 
@@ -67,7 +67,7 @@
           </div>
           <span class="page-eyebrow">Agent Ready</span>
           <h1>告诉 Agent 你想完成什么</h1>
-          <p>可以直接描述目标。Agent 模式会进入工具与能力调度入口，普通模式则直接完成模型对话。</p>
+          <p>可以直接描述目标，选择流式或普通方式接收 Agent 的回答。</p>
           <div class="starter-grid">
             <button v-for="starter in starters" :key="starter" type="button" @click="useStarter(starter)">
               {{ starter }}
@@ -104,15 +104,6 @@
             <div v-if="msg.role === 'assistant' && msg.content" class="message-actions">
               <button type="button" title="复制" @click="copyMessage(msg.content)">
                 <n-icon><CopyIcon /></n-icon><span>复制</span>
-              </button>
-              <button type="button" title="转任务" @click="captureMessage('task', msg)">
-                <n-icon><CheckmarkIcon /></n-icon><span>任务</span>
-              </button>
-              <button type="button" title="转日程" @click="captureMessage('schedule', msg)">
-                <n-icon><CalendarIcon /></n-icon><span>日程</span>
-              </button>
-              <button type="button" title="存记忆" @click="captureMessage('memory', msg)">
-                <n-icon><BookmarksIcon /></n-icon><span>记忆</span>
               </button>
             </div>
           </div>
@@ -160,7 +151,7 @@
             </div>
           </div>
         </div>
-        <small class="composer-hint">Agent 可能调用模型、知识库或 MCP 工具，请在执行前确认关键操作。</small>
+        <small class="composer-hint">对话会保存到当前账号的聊天记录中。</small>
       </footer>
     </section>
 
@@ -178,7 +169,7 @@
         </div>
         <div>
           <span>模型</span>
-          <strong>{{ selectedModel?.name || selectedModel?.modelName || '默认模型' }}</strong>
+          <strong>后端默认模型</strong>
         </div>
         <div>
           <span>会话</span>
@@ -198,7 +189,7 @@
 
       <div class="execution-note">
         <n-icon><InformationIcon /></n-icon>
-        <span>当前后端 SSE 只返回回答正文，因此这里展示请求阶段；后续若增加结构化 Tool Event，可直接扩展为工具级时间线。</span>
+        <span>当前 SSE 返回回答正文，这里展示请求阶段。</span>
       </div>
 
       <div v-if="lastExecutionAt" class="execution-time">
@@ -220,12 +211,10 @@
 /**
  * Agent 对话工作台。
  *
- * 保留原有会话历史、普通/流式/Agent 三种请求方式，并把页面重构为“会话列表 + 对话 +
- * 执行状态”三栏布局。执行状态只反映前端能够确认的真实请求阶段。
+ * 会话与消息由 Python 管理，页面展示“会话列表 + 对话 + 执行状态”。
  */
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
-import { useWindowSize } from '@vueuse/core'
 import {
   NButton,
   NDropdown,
@@ -236,10 +225,7 @@ import {
 } from 'naive-ui'
 import {
   AddOutline as AddIcon,
-  BookmarksOutline as BookmarksIcon,
-  CalendarOutline as CalendarIcon,
   ChatbubbleOutline as ChatbubbleIcon,
-  CheckmarkCircleOutline as CheckmarkIcon,
   ChevronBackOutline as ChevronBackIcon,
   ChevronForwardOutline as ChevronForwardIcon,
   CopyOutline as CopyIcon,
@@ -249,16 +235,14 @@ import {
   SendOutline as SendIcon,
   StopCircleOutline as StopIcon
 } from '@vicons/ionicons5'
-import type { AiModelConfig, ChatMessage, ChatSession } from '@/types'
-import { chatActionService } from '@/services/api/chat-action'
+import type { ChatMessage, ChatSession } from '@/types'
 import { chatHistoryService } from '@/services/api/chat-history'
 import { fetchWithAuth } from '@/services/auth-fetch'
 import { renderMarkdown, stripThinkContent } from '@/utils/markdown'
 import { formatSessionTime, formatTime } from '@/utils/date-format'
 import { useAuthStore } from '@/stores/auth'
-import ModelSelector from '@/components/ModelSelector.vue'
 
-type ChatMode = 'stream' | 'normal' | 'mcp'
+type ChatMode = 'stream' | 'normal'
 type ExecutionStatus = 'idle' | 'running' | 'done' | 'error'
 
 interface ExecutionStep {
@@ -269,8 +253,7 @@ interface ExecutionStep {
 
 const chatModes: Array<{ label: string; value: ChatMode }> = [
   { label: '流式', value: 'stream' },
-  { label: '普通', value: 'normal' },
-  { label: 'Agent', value: 'mcp' }
+  { label: '普通', value: 'normal' }
 ]
 
 const starters = [
@@ -288,10 +271,9 @@ const sessionMenuOptions = [
 
 const message = useMessage()
 const authStore = useAuthStore()
-const { width: windowWidth } = useWindowSize()
 const inputText = ref('')
 const isInputFocused = ref(false)
-const chatMode = ref<ChatMode>('mcp')
+const chatMode = ref<ChatMode>('stream')
 const loading = ref(false)
 const messages = ref<ChatMessage[]>([])
 const sessions = ref<ChatSession[]>([])
@@ -300,7 +282,6 @@ const messageList = ref<HTMLElement | null>(null)
 const sessionListRef = ref<HTMLElement | null>(null)
 const inputTextarea = ref<HTMLTextAreaElement | null>(null)
 const isListCollapsed = ref(false)
-const selectedModel = ref<AiModelConfig | null>(null)
 const showEditModal = ref(false)
 const editTitle = ref('')
 const isVoiceActive = ref(false)
@@ -309,13 +290,11 @@ const lastExecutionAt = ref('')
 let abortController: AbortController | null = null
 let speechRecognition: any = null
 
-const isMobile = computed(() => windowWidth.value < 768)
 const userInitial = computed(() => {
   const name = authStore.user?.displayName || authStore.user?.username || 'U'
   return name.slice(0, 1).toUpperCase()
 })
 const chatModeLabel = computed(() => {
-  if (chatMode.value === 'mcp') return 'Agent'
   if (chatMode.value === 'normal') return '普通对话'
   return '流式对话'
 })
@@ -324,34 +303,30 @@ const executionSteps = computed<ExecutionStep[]>(() => {
   if (executionState.value === 'idle') {
     return [
       { label: '等待请求', description: '输入目标并发送后开始执行。', status: 'idle' },
-      { label: '请求调度', description: chatMode.value === 'mcp' ? '进入 Agent 调度入口。' : '进入模型对话入口。', status: 'idle' },
+      { label: '请求调度', description: '进入 Agent 对话入口。', status: 'idle' },
       { label: '返回结果', description: '接收并展示最终回答。', status: 'idle' }
     ]
   }
   if (executionState.value === 'running') {
     return [
       { label: '接收请求', description: '用户目标已进入当前会话。', status: 'done' },
-      { label: chatMode.value === 'mcp' ? 'Agent 执行' : '模型生成', description: '后端正在处理请求并返回响应。', status: 'running' },
+      { label: 'Agent 执行', description: '后端正在处理请求并返回响应。', status: 'running' },
       { label: '返回结果', description: '等待本次响应结束。', status: 'idle' }
     ]
   }
   if (executionState.value === 'done') {
     return [
       { label: '接收请求', description: '用户目标已进入当前会话。', status: 'done' },
-      { label: chatMode.value === 'mcp' ? 'Agent 执行' : '模型生成', description: '后端请求已完成。', status: 'done' },
+      { label: 'Agent 执行', description: '后端请求已完成。', status: 'done' },
       { label: '返回结果', description: '回答已展示在对话区域。', status: 'done' }
     ]
   }
   return [
     { label: '接收请求', description: '用户目标已进入当前会话。', status: 'done' },
-    { label: chatMode.value === 'mcp' ? 'Agent 执行' : '模型生成', description: '执行过程中发生错误。', status: 'error' },
+    { label: 'Agent 执行', description: '执行过程中发生错误。', status: 'error' },
     { label: '返回结果', description: '本次请求未正常完成。', status: 'error' }
   ]
 })
-
-const handleModelSelect = (model: AiModelConfig) => {
-  selectedModel.value = model
-}
 
 const toggleSidebar = () => {
   isListCollapsed.value = !isListCollapsed.value
@@ -376,22 +351,20 @@ const autoResize = () => {
 /** 从后端加载当前用户的会话列表。 */
 const loadSessions = async () => {
   try {
-    const response = await chatHistoryService.getSessions()
-    if (response.success && response.data) sessions.value = response.data
+    sessions.value = await chatHistoryService.getSessions()
   } catch (error) {
     console.error('加载会话失败', error)
+    message.error('加载会话失败')
   }
 }
 
 /** 创建一个新会话并切换过去。 */
 const createNewSession = async () => {
   try {
-    const response = await chatHistoryService.createSession()
-    if (response.success && response.data) {
-      sessions.value.unshift(response.data)
-      await switchSession(response.data)
-      message.success('已创建新会话')
-    }
+    const session = await chatHistoryService.createSession()
+    sessions.value.unshift(session)
+    await switchSession(session)
+    message.success('已创建新会话')
   } catch {
     message.error('创建会话失败')
   }
@@ -412,9 +385,9 @@ const switchSession = async (session: ChatSession) => {
   messages.value = []
   executionState.value = 'idle'
   try {
-    const response = await chatHistoryService.getSessionMessages(session.id)
-    if (response.success && response.data) {
-      messages.value = response.data.map(item => ({
+    const items = await chatHistoryService.getSessionMessages(session.id)
+    if (currentSession.value?.id === session.id) {
+      messages.value = items.map(item => ({
         id: item.id.toString(),
         role: item.role,
         content: item.content,
@@ -426,6 +399,7 @@ const switchSession = async (session: ChatSession) => {
     }
   } catch (error) {
     console.error('加载消息失败', error)
+    message.error('加载消息失败')
   }
 }
 
@@ -439,8 +413,7 @@ const handleSessionMenu = async (key: string, session: ChatSession) => {
       return
     }
     if (key === 'clear') {
-      await chatHistoryService.clearSessionMessages(session.id)
-      session.messageCount = 0
+      Object.assign(session, await chatHistoryService.clearSessionMessages(session.id))
       if (currentSession.value?.id === session.id) messages.value = []
       message.success('已清空消息')
       return
@@ -463,13 +436,11 @@ const handleSessionMenu = async (key: string, session: ChatSession) => {
 const saveSessionTitle = async () => {
   if (!currentSession.value || !editTitle.value.trim()) return
   try {
-    const response = await chatHistoryService.updateSessionTitle(currentSession.value.id, editTitle.value.trim())
-    if (response.success) {
-      currentSession.value.title = editTitle.value.trim()
-      const target = sessions.value.find(item => item.id === currentSession.value?.id)
-      if (target) target.title = editTitle.value.trim()
-      message.success('标题已更新')
-    }
+    const updated = await chatHistoryService.updateSessionTitle(currentSession.value.id, editTitle.value.trim())
+    Object.assign(currentSession.value, updated)
+    const target = sessions.value.find(item => item.id === updated.id)
+    if (target) Object.assign(target, updated)
+    message.success('标题已更新')
   } catch {
     message.error('保存失败')
   } finally {
@@ -477,20 +448,16 @@ const saveSessionTitle = async () => {
   }
 }
 
-/** 发送用户消息，并按当前模式调用普通、流式或 Agent 接口。 */
+/** 发送用户消息，并按当前模式调用 Python 普通或流式接口。 */
 const sendMessage = async () => {
   const queryText = inputText.value.trim()
   if (!queryText || loading.value) return
 
   if (!currentSession.value) {
     try {
-      const response = await chatHistoryService.createSession()
-      if (!response.success || !response.data) {
-        message.error('无法创建会话')
-        return
-      }
-      sessions.value.unshift(response.data)
-      currentSession.value = response.data
+      const session = await chatHistoryService.createSession()
+      sessions.value.unshift(session)
+      currentSession.value = session
     } catch {
       message.error('创建会话失败')
       return
@@ -526,24 +493,40 @@ const sendMessage = async () => {
     } else {
       await streamChat(queryText, assistantMessage)
     }
-    if (currentSession.value) {
-      currentSession.value.messageCount += 2
-      currentSession.value.lastMessageTime = new Date().toISOString()
-    }
     executionState.value = 'done'
   } catch (error: any) {
-    if (error?.name !== 'AbortError') {
+    if (error?.name === 'AbortError') {
+      executionState.value = 'idle'
+    } else {
       assistantMessage.content = '抱歉，本次请求执行失败，请稍后重试。'
       message.error(error?.message || '发送失败，请重试')
       executionState.value = 'error'
     }
   } finally {
     loading.value = false
+    abortController = null
     assistantMessage.isStreaming = false
     lastExecutionAt.value = new Date().toISOString()
     await nextTick()
     scrollToBottom()
+    if (currentSession.value) await refreshCurrentSession().catch(() => {})
   }
+}
+
+const refreshCurrentSession = async () => {
+  const session = currentSession.value
+  if (!session) return
+  const [updated, items] = await Promise.all([
+    chatHistoryService.getSessions(),
+    chatHistoryService.getSessionMessages(session.id)
+  ])
+  sessions.value = updated
+  if (currentSession.value?.id !== session.id) return
+  currentSession.value = updated.find(item => item.id === session.id) || session
+  messages.value = items.map(item => ({
+    id: String(item.id), role: item.role, content: item.content,
+    timestamp: item.createTime, isStreaming: false
+  }))
 }
 
 /** 解析 SSE 事件中的 data 内容，忽略事件元信息和结束标记。 */
@@ -551,7 +534,9 @@ const parseSseEvents = (rawEvent: string): string[] => {
   const dataLines: string[] = []
   for (const line of rawEvent.replace(/\r/g, '').split('\n')) {
     if (line.startsWith('data:')) {
-      const data = line.slice(5).trimStart()
+      const rawData = line.slice(5)
+      // SSE 只移除一个分隔空格，保留模型片段自身的前导空格。
+      const data = rawData.startsWith(' ') ? rawData.slice(1) : rawData
       if (data !== '[DONE]') dataLines.push(data)
     } else if (line && !line.startsWith(':') && !line.startsWith('event:') && !line.startsWith('id:') && !line.startsWith('retry:')) {
       dataLines.push(line)
@@ -561,14 +546,16 @@ const parseSseEvents = (rawEvent: string): string[] => {
   return data ? [data] : []
 }
 
-/** 通过统一的会话 SSE 接口读取流式或 Agent 回复。 */
+/** 从 Python 读取流式 Agent 回复；必须收到 [DONE] 才视为成功。 */
 const streamChat = async (query: string, messageObj: ChatMessage) => {
   abortController = new AbortController()
-  const apiPath = `/api/chat/stream/session?message=${encodeURIComponent(query)}&sessionId=${currentSession.value!.id}`
+  const apiPath = '/api/chat/turn/stream'
 
   const response = await fetchWithAuth(apiPath, {
+    method: 'POST',
     signal: abortController.signal,
-    headers: { Accept: 'text/event-stream', 'Cache-Control': 'no-cache' }
+    headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+    body: JSON.stringify({ session_id: currentSession.value!.id, message: query })
   })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
@@ -578,6 +565,7 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
   const decoder = new TextDecoder()
   let buffer = ''
   let rawContent = ''
+  let completed = false
 
   const appendVisibleChunk = async (chunk: string) => {
     rawContent += chunk
@@ -602,7 +590,7 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
     for (const event of events) {
       if (!event.trim()) continue
       if (/(?:^|\n)event:\s*done\s*(?:\n|$)/i.test(event) || /(?:^|\n)data:\s*\[DONE\]\s*(?:\n|$)/i.test(event)) {
-        await reader.cancel()
+        completed = true
         buffer = ''
         break readStream
       }
@@ -610,24 +598,29 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
     }
   }
 
-  if (buffer.trim()) {
+  if (buffer.trim() && !completed) {
     for (const chunk of parseSseEvents(buffer)) await appendVisibleChunk(chunk)
   }
+  if (!completed) throw new Error('响应流提前结束')
 }
 
 /** 调用普通非流式聊天接口。 */
 const normalChat = async (query: string, messageObj: ChatMessage) => {
-  const apiPath = `/api/chat/complete/session?message=${encodeURIComponent(query)}&sessionId=${currentSession.value!.id}`
-  const response = await fetchWithAuth(apiPath)
+  abortController = new AbortController()
+  const response = await fetchWithAuth('/api/chat/turn', {
+    method: 'POST',
+    signal: abortController.signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: currentSession.value!.id, message: query })
+  })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  messageObj.content = await response.text()
+  const payload = await response.json()
+  messageObj.content = payload.content
 }
 
 /** 中止当前流式响应。 */
 const stopStreaming = () => {
   abortController?.abort()
-  abortController = null
-  loading.value = false
   executionState.value = 'idle'
   const lastMessage = messages.value[messages.value.length - 1]
   if (lastMessage?.isStreaming) {
@@ -642,28 +635,6 @@ const copyMessage = async (content: string) => {
     message.success('已复制')
   } catch {
     message.error('复制失败')
-  }
-}
-
-/** 将 Agent 回答转换为任务、日程或长期记忆。 */
-const captureMessage = async (target: 'task' | 'schedule' | 'memory', chatMessage: ChatMessage) => {
-  try {
-    const payload = {
-      sessionId: currentSession.value?.id,
-      content: chatMessage.content,
-      role: chatMessage.role,
-      titleHint: currentSession.value?.title
-    }
-    const action = target === 'task'
-      ? chatActionService.createTask
-      : target === 'schedule'
-        ? chatActionService.createSchedule
-        : chatActionService.storeMemory
-    const response = await action(payload)
-    if (response.success) message.success(response.data?.message || '处理成功')
-    else message.error(response.message || '处理失败')
-  } catch {
-    message.error('转换失败')
   }
 }
 
