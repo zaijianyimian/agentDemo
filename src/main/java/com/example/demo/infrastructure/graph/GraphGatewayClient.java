@@ -84,7 +84,7 @@ public class GraphGatewayClient {
                 })
                 .handle((event, sink) -> {
                     String data = event.data();
-                    if (data != null && !data.isBlank() && !"[DONE]".equals(data)) {
+                    if (data != null && !data.isEmpty() && !"[DONE]".equals(data)) {
                         sink.next(data);
                     }
                 });
@@ -108,8 +108,15 @@ public class GraphGatewayClient {
             String message) {
     }
 
-    /** Python 非流式聊天响应。 */
+    /**
+     * Python 非流式聊天响应。
+     *
+     * @param content ChatAgent 生成的最终用户可见文本。
+     * @param sessionId 回显请求会话 ID；一次性请求为 {@code null}。
+     * @param executionId 本次执行标识。
+     */
     public record GraphChatResponse(String content,
+                                    @JsonProperty("session_id") String sessionId,
                                     @JsonProperty("execution_id") String executionId) {
     }
 }

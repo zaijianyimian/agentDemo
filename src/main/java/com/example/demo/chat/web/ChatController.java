@@ -4,6 +4,10 @@ import com.example.demo.chat.application.ChatHistoryService;
 import com.example.demo.chat.dto.ChatResponse;
 import com.example.demo.infrastructure.graph.GraphGatewayClient;
 import com.example.demo.shared.context.CurrentUserContext;
+import com.example.demo.shared.context.ExecutionContext;
+import com.example.demo.shared.context.ExecutionContextScope;
+import com.example.demo.shared.context.ExecutionPolicy;
+import com.example.demo.shared.context.UserContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -96,7 +101,8 @@ public class ChatController {
             @RequestParam("sessionId") String sessionId) {
         long userId = currentUserProvider.requireUserId();
         chatHistoryService.getSession(sessionId);
-        return toSseStream(graphGatewayClient.streamChat(userId, sessionId, message));
+        return toSseStreamWithHistory(graphGatewayClient.streamChat(userId, sessionId, message),
+                sessionId, message, streamExecution(userId));
     }
 
     /**
@@ -112,7 +118,8 @@ public class ChatController {
             @RequestParam("sessionId") String sessionId) {
         long userId = currentUserProvider.requireUserId();
         chatHistoryService.getSession(sessionId);
-        return toJsonSseStream(graphGatewayClient.streamChat(userId, sessionId, message));
+        return toJsonSseStreamWithHistory(graphGatewayClient.streamChat(userId, sessionId, message),
+                sessionId, message, streamExecution(userId));
     }
 
     @GetMapping("/stream/probe")
@@ -164,6 +171,97 @@ public class ChatController {
                 .startWith(ServerSentEvent.<String>builder().comment("connected").build())
                 .concatWith(completed)
                 .concatWithValues(doneEvent());
+    }
+
+    /**
+     * 带聊天历史落库的文本 SSE 转换。
+     *
+     * <p>用户消息在流被订阅时写入，助手消息只在上游正常完成后写入。上游报错或客户端
+     * 主动中断时 {@link Mono#fromSupplier} 不会被订阅，因此不会把半截回复当成成功消息落库。</p>
+     *
+     * @param contentStream Python Graph 文本片段流。
+     * @param sessionId 会话 UUID。
+     * @param userMessage 用户本轮输入。
+     * @return 前端 SSE 响应流。
+     */
+    private Flux<ServerSentEvent<String>> toSseStreamWithHistory(Flux<String> contentStream,
+                                                                 String sessionId,
+                                                                 String userMessage,
+                                                                 ExecutionContext execution) {
+        return Flux.defer(() -> {
+            StringBuilder accumulator = new StringBuilder();
+            Flux<ServerSentEvent<String>> events = contentStream
+                .publishOn(Schedulers.boundedElastic())
+                .doOnNext(accumulator::append)
+                .map(chunk -> ServerSentEvent.<String>builder().data(chunk).build())
+                .startWith(ServerSentEvent.<String>builder().comment("connected").build());
+            return events
+                .doFirst(() -> recordUserMessage(execution, sessionId, userMessage))
+                .concatWith(Mono.fromSupplier(() -> {
+                    recordAssistantMessage(execution, sessionId, accumulator.toString());
+                    return doneEvent();
+                }));
+        });
+    }
+
+    /**
+     * 带聊天历史落库的 JSON SSE 转换，落库时机与 {@link #toSseStreamWithHistory} 一致。
+     *
+     * @param contentStream Python Graph 文本片段流。
+     * @param sessionId 会话 UUID。
+     * @param userMessage 用户本轮输入。
+     * @return 前端 JSON SSE 响应流。
+     */
+    private Flux<ServerSentEvent<String>> toJsonSseStreamWithHistory(Flux<String> contentStream,
+                                                                    String sessionId,
+                                                                    String userMessage,
+                                                                    ExecutionContext execution) {
+        return Flux.defer(() -> {
+            StringBuilder accumulator = new StringBuilder();
+            Flux<ServerSentEvent<String>> events = contentStream
+                .publishOn(Schedulers.boundedElastic())
+                .doOnNext(accumulator::append)
+                .map(chunk -> ServerSentEvent.<String>builder()
+                        .data(writeJson(ChatResponse.contentChunk(chunk)))
+                        .build())
+                .startWith(ServerSentEvent.<String>builder().comment("connected").build());
+            return events
+                .doFirst(() -> recordUserMessage(execution, sessionId, userMessage))
+                .concatWith(Mono.fromSupplier(() -> {
+                    recordAssistantMessage(execution, sessionId, accumulator.toString());
+                    return ServerSentEvent.<String>builder()
+                            .event("complete")
+                            .data(writeJson(ChatResponse.builder()
+                                    .content(accumulator.toString())
+                                    .isComplete(true)
+                                    .build()))
+                            .build();
+                }))
+                .concatWithValues(doneEvent());
+        });
+    }
+
+    private ExecutionContext streamExecution(long userId) {
+        return ExecutionContext.start(new UserContext(userId), "http:chat-stream",
+                ExecutionContext.Actor.USER, ExecutionPolicy.readOnly());
+    }
+
+    private void recordUserMessage(ExecutionContext execution, String sessionId, String userMessage) {
+        if (userMessage == null || userMessage.isBlank()) {
+            return;
+        }
+        try (var ignored = ExecutionContextScope.open(execution)) {
+            chatHistoryService.addMessage(sessionId, "user", userMessage, GRAPH_MODEL);
+        }
+    }
+
+    private void recordAssistantMessage(ExecutionContext execution, String sessionId, String assistantMessage) {
+        if (assistantMessage == null || assistantMessage.isBlank()) {
+            return;
+        }
+        try (var ignored = ExecutionContextScope.open(execution)) {
+            chatHistoryService.addMessage(sessionId, "assistant", assistantMessage, GRAPH_MODEL);
+        }
     }
 
     private String writeJson(Object value) {

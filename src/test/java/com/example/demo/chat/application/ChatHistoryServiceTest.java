@@ -27,13 +27,13 @@ class ChatHistoryServiceTest {
     @Test
     void knownForeignSessionIsNotFoundBeforeAnyMessageReadOrWrite() {
         when(currentUser.requireUserId()).thenReturn(7L);
-        when(sessions.selectById(81L)).thenReturn(null);
+        when(sessions.selectById("81")).thenReturn(null);
 
-        assertThatThrownBy(() -> service.getSessionMessages(81L))
+        assertThatThrownBy(() -> service.getSessionMessages("81"))
                 .isInstanceOf(UserResourceNotFoundException.class);
-        assertThatThrownBy(() -> service.addMessage(81L, "user", "secret", null))
+        assertThatThrownBy(() -> service.addMessage("81", "user", "secret", null))
                 .isInstanceOf(UserResourceNotFoundException.class);
-        assertThatThrownBy(() -> service.deleteSession(81L))
+        assertThatThrownBy(() -> service.deleteSession("81"))
                 .isInstanceOf(UserResourceNotFoundException.class);
 
         verifyNoInteractions(messages);
@@ -43,14 +43,14 @@ class ChatHistoryServiceTest {
     @Test
     void messageOwnerIsCopiedFromTheOwnedSession() {
         when(currentUser.requireUserId()).thenReturn(7L);
-        ChatSession session = ChatSession.builder().id(11L).userId(7L).messageCount(0).build();
-        when(sessions.selectById(11L)).thenReturn(session);
+        ChatSession session = ChatSession.builder().id("11").userId(7L).messageCount(0).build();
+        when(sessions.selectById("11")).thenReturn(session);
 
-        service.addMessage(11L, "user", "hello", "worker");
+        service.addMessage("11", "user", "hello", "worker");
 
         ArgumentCaptor<ChatMessageEntity> inserted = ArgumentCaptor.forClass(ChatMessageEntity.class);
         verify(messages).insert(inserted.capture());
         assertThat(inserted.getValue().getUserId()).isEqualTo(7L);
-        assertThat(inserted.getValue().getSessionId()).isEqualTo(11L);
+        assertThat(inserted.getValue().getSessionId()).isEqualTo("11");
     }
 }
