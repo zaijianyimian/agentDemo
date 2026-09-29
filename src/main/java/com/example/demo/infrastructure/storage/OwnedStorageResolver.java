@@ -86,8 +86,16 @@ public class OwnedStorageResolver {
         if (storageKey == null || storageKey.isBlank() || storageKey.contains("\\")) {
             throw new IllegalArgumentException("Storage key must be a non-empty portable relative path");
         }
+        // 必须同时拒绝「绝对路径」与「根相对路径」。
+        // Windows 的 Path.isAbsolute() 对 "/tmp/x" 返回 false（缺少盘符，只有根），
+        // 只依赖 isAbsolute() 会让这条检查在 Windows 上整体失效，
+        // 使「非法 storage key」与「越权访问」两种拒绝语义随操作系统漂移。
+        // 这里先按原始字符串拦掉前导 '/',再按 Path 语义做一次平台无关的兜底判断。
+        if (storageKey.startsWith("/")) {
+            throw new IllegalArgumentException("Absolute storage keys are forbidden");
+        }
         Path relative = Path.of(storageKey);
-        if (relative.isAbsolute()) {
+        if (relative.isAbsolute() || relative.getRoot() != null) {
             throw new IllegalArgumentException("Absolute storage keys are forbidden");
         }
         for (Path component : relative) {

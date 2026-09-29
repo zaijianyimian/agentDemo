@@ -54,6 +54,7 @@ class OwnedStorageResolverTest {
 
     @Test
     void rejectsSymlinkedParentsBeforeWritingOutsideOwnerRoot() throws Exception {
+        SymlinkTestSupport.assumeSymlinkSupported(temporaryDirectory);
         AtomicLong owner = new AtomicLong(101L);
         OwnedStorageResolver resolver = resolver(owner);
         resolver.resolveForCreate(101L, OwnedStorageResolver.Category.DOCUMENTS, "safe.txt");

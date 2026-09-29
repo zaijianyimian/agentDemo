@@ -66,6 +66,7 @@ class LegacyOwnedFileMigrationServiceTest {
 
     @Test
     void rejectsSymlinkedLegacySourceWithoutTouchingAnotherOwnersFiles() throws Exception {
+        SymlinkTestSupport.assumeSymlinkSupported(temporaryDirectory);
         Path legacyBase = Files.createDirectories(temporaryDirectory.resolve("legacy-base"));
         Path outside = temporaryDirectory.resolve("outside-secret.txt");
         Files.writeString(outside, "secret");
