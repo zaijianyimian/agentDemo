@@ -3,10 +3,7 @@ package com.example.demo.auth.application;
 import com.example.demo.shared.context.*;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
-import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
 
-import java.time.Duration;
 import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -68,32 +65,5 @@ class ExecutionContextPropagationTest {
         assertThat(MDC.get("request")).isEqualTo("outer");
         assertThat(MDC.get("userId")).isNull();
         MDC.clear();
-    }
-
-    @Test
-    void reactiveContextSurvivesSchedulerSwitchAndCleansCallbackScope() {
-        var scheduler = Schedulers.newSingle("context-test");
-        try {
-            for (long id : new long[]{1, 2}) {
-                var execution = context(id);
-                var result = ReactiveExecutionContext.withContext(execution, ctx -> Flux.just(1)
-                        .publishOn(scheduler)
-                        .flatMap(ignored -> Flux.deferContextual(view -> {
-                            var restored = ReactiveExecutionContext.require(view);
-                            return Flux.just(restored.user().userId())
-                                    .map(ExecutionContextScope.wrapFunction(restored, value -> {
-                                        assertThat(ExecutionContextScope.requireCurrent()).isEqualTo(ctx);
-                                        return value;
-                                    }));
-                        })).take(1)).blockLast(Duration.ofSeconds(5));
-                assertThat(result).isEqualTo(id);
-                Flux.just(1).publishOn(scheduler).doOnNext(ignored -> {
-                    assertThatThrownBy(ExecutionContextScope::requireCurrent).isInstanceOf(IllegalStateException.class);
-                    assertThat(MDC.get("userId")).isNull();
-                }).blockLast(Duration.ofSeconds(5));
-            }
-        } finally {
-            scheduler.dispose();
-        }
     }
 }

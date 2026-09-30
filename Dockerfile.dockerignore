@@ -1,0 +1,17 @@
+**/.git
+**/.idea
+**/.agents
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+**/dist
+**/.gradle
+**/build
+**/.env
+**/.env.*
+**/application.yaml
+**/application.yml
+**/data
+**/generated
+**/logs

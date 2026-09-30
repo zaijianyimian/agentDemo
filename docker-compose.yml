@@ -1,0 +1,190 @@
+# 本地完整部署编排：Java 业务后端 + Python Agent Engine + 前端 + 依赖中间件。
+#
+# 关键约定：
+# 1. 容器之间一律用服务名通信（backend / graph / frontend / mysql / postgres /
+#    rabbitmq），不能写 127.0.0.1——那指向容器自身。
+# 2. Java 与 Python 共享 GRAPH_INTERNAL_TOKEN，Python 才能调用 Java 的
+#    /internal/schedule 写入日程。缺省时 Java 侧 fail-closed 拒绝内部调用。
+# 3. nginx 的 $api_upstream 已指向服务名 backend / graph。
+#
+# 启动前置：把 .env.example 复制为 .env 并填入真实值。
+#   cp .env.example .env
+# 首次启动：docker compose up -d --build
+# 首次建库仅执行显式挂载的初始化 SQL；已有数据卷需按文档执行增量迁移。
+# 不自动运行目录中的历史重建/删除脚本。
+
+name: agentdemo
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-agent}
+      MYSQL_USER: ${MYSQL_USERNAME:-agent}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./src/main/resources/sql/schema_init.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./docker/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [agentdemo]
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agent}
+      POSTGRES_USER: ${POSTGRES_USER:-agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # 迁移脚本只在数据目录为空时执行，用于首次建表。
+      - ../graph/migrations/000_bootstrap.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ../graph/migrations/20260913_add_email_event_id.sql:/docker-entrypoint-initdb.d/02_event_id.sql:ro
+      - ../graph/migrations/20260929_add_chat_session_message.sql:/docker-entrypoint-initdb.d/03_chat.sql:ro
+      - ../graph/migrations/20260930_chat_turn_idempotency.sql:/docker-entrypoint-initdb.d/04_turns.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agent} -d ${POSTGRES_DB:-agent}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks: [agentdemo]
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-agent}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VIRTUAL_HOST:-/}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      # 管理界面只绑定本机，避免暴露到公网。
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [agentdemo]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: agentDemo/Dockerfile
+      target: backend
+    restart: unless-stopped
+    env_file: ["${APP_ENV_FILE:-.env}"]
+    environment:
+      SERVER_PORT: "8000"
+      TZ: Asia/Shanghai
+      # 容器内用服务名，不可用 127.0.0.1。
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-agent}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowPublicKeyRetrieval=true&useSSL=false
+      RABBITMQ_HOST: rabbitmq
+      GRAPH_INTERNAL_TOKEN: ${GRAPH_INTERNAL_TOKEN:?set GRAPH_INTERNAL_TOKEN in .env}
+    volumes:
+      - app-data:/app/data
+      - app-generated:/app/generated
+      - app-logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/actuator/health/liveness"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    networks: [agentdemo]
+
+  graph:
+    build:
+      context: ..
+      dockerfile: agentDemo/Dockerfile
+      target: graph
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      # PostgreSQL：容器内使用服务名。
+      DB_URL: postgresql+asyncpg://${POSTGRES_USER:-agent}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-agent}
+      CHECKPOINTER_BACKEND: postgres
+      CHECKPOINTER_PG_DSN: postgresql://${POSTGRES_USER:-agent}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-agent}
+      RABBITMQ_URL: amqp://${RABBITMQ_USERNAME:-agent}:${RABBITMQ_PASSWORD}@rabbitmq:5672${RABBITMQ_VIRTUAL_HOST:-/}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-agent_email}
+      RABBITMQ_ROUTING_KEY: ${RABBITMQ_ROUTING_KEY:-agent_email}
+      RABBITMQ_QUEUE_NAME: ${RABBITMQ_QUEUE_NAME:-agent_email_queue}
+      # 浏览器令牌内省：走 Java 服务名，不走 nginx。
+      AUTH_JAVA_BASE_URL: http://backend:8000
+      # 日程唯一数据源是 Java，Python 通过内部接口写入。
+      SCHEDULE_JAVA_BASE_URL: http://backend:8000
+      SCHEDULE_INTERNAL_PATH: /internal/schedule
+      INTERNAL_TOKEN: ${GRAPH_INTERNAL_TOKEN:?set GRAPH_INTERNAL_TOKEN in .env}
+      CHAT_API_KEY: ${CHAT_API_KEY:-${OPENAI_API_KEY:-}}
+      CHAT_BASE_URL: ${CHAT_BASE_URL:-${OPENAI_API_BASE:-https://api.openai.com/v1}}
+      CHAT_MODEL: ${CHAT_MODEL:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        # 日程创建依赖 Java 内部接口就绪。
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [agentdemo]
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: agentDemo/Dockerfile
+      target: frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+      graph:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [agentdemo]
+
+volumes:
+  mysql-data:
+  postgres-data:
+  rabbitmq-data:
+  app-data:
+  app-generated:
+  app-logs:
+
+networks:
+  agentdemo:
+    driver: bridge

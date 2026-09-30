@@ -53,7 +53,7 @@ SOURCE /absolute/path/to/src/main/resources/sql/migrant.sql;
 ## 5. 部署与 A/B 验收
 
 1. 部署新 Java/Vue 版本，保持 producer 暂停。
-2. 使用原用户 A 和新测试用户 B 验证邮箱、listener state、session/message、文档、笔记、日程、任务、日志、dispatch 和 PushConfig。
+2. 使用原用户 A 和新测试用户 B 验证邮箱、listener state、文档、日程、任务、dispatch、PushConfig 和 job_log。聊天会话与消息表已随 Java 聊天运行时下线，归属改由 Python 侧 PostgreSQL 保证，不在本 runbook 验收范围内。
 3. 无认证请求必须返回 401；A 使用 B 的已知 ID 必须返回 404，且无文件、网络、JDBC 或进程副作用。
 4. A/B 同时建立 SSE，事件只到 owner；令牌失效后旧订阅不再收信。
 5. 验证 RabbitMQ 重复/伪造消息、定时线程复用和 outbox 断线恢复均保留 owner。

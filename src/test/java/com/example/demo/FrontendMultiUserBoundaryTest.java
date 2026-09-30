@@ -52,7 +52,7 @@ class FrontendMultiUserBoundaryTest {
                 types.indexOf("// 日程事件类型"));
         String scheduleBlock = types.substring(types.indexOf("export interface ScheduleEvent"),
                 types.indexOf("// 邮件配置类型"));
-        String attachments = source("services/api/email-attachment.ts");
+        String attachments = source("views/EmailDetail.vue");
 
         assertThat(documentBlock).contains("storageKey").doesNotContain("filePath");
         assertThat(scheduleBlock).contains("storageKey").doesNotContain("filePath");

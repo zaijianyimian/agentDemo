@@ -219,9 +219,10 @@ router.beforeEach(async to => {
     return buildLoginRedirectUrl(to.fullPath)
   }
 
-  if (hasToken && !authStore.user && !authStore.initialized) {
+  if (hasToken && !authStore.user && (!authStore.initialized || authStore.degraded)) {
     await authStore.hydrate()
-    if (!authStore.user && !isPublic) {
+    // degraded 表示后端在会话恢复时不可达：令牌仍然有效，不应把用户踢回登录页。
+    if (!authStore.user && !isPublic && !authStore.degraded) {
       return buildLoginRedirectUrl(to.fullPath)
     }
   }

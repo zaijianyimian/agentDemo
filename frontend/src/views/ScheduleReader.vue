@@ -149,14 +149,26 @@ const loadFiles = async () => {
   }
 }
 
+// 文件内容请求序号：切换文件时自增，使仍在途中的旧请求失效
+let fileRequestId = 0
+
 const selectFile = async (fileName: string) => {
+  const requestId = ++fileRequestId
   selectedFile.value = fileName
+  // 立刻清空，避免新标题下仍然显示上一个文件的内容
+  fileContent.value = null
   try {
     const res = await scheduleService.getFileByName(fileName)
+    // 丢弃过期响应：期间用户已切换到别的文件
+    if (requestId !== fileRequestId || selectedFile.value !== fileName) return
     if (res.success && res.data) {
       fileContent.value = res.data.content || null
+    } else {
+      fileContent.value = null
+      message.error(res.message || '加载文件内容失败')
     }
   } catch {
+    if (requestId !== fileRequestId || selectedFile.value !== fileName) return
     message.error('加载文件内容失败')
     fileContent.value = null
   }

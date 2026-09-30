@@ -45,7 +45,7 @@
             :key="notification.id"
             class="notification-item"
             :class="{ 'is-unread': !notification.isRead }"
-            @click="markAsRead(notification)"
+            @click="openNotification(notification)"
           >
             <div class="notification-item__indicator" :class="notification.priority.toLowerCase()"></div>
             <div class="notification-item__icon">
@@ -63,7 +63,7 @@
               </div>
             </div>
             <div class="notification-item__actions">
-              <n-button size="small" tertiary @click.stop="markAsRead(notification)">
+              <n-button size="small" tertiary @click.stop="toggleReadState(notification)">
                 {{ notification.isRead ? '标记未读' : '标记已读' }}
               </n-button>
             </div>
@@ -303,8 +303,13 @@ async function loadListenerStatus() {
   }
 }
 
-function markAsRead(notification: NotificationDTO) {
+// 显式的已读/未读按钮使用，只切换状态不改路由
+function toggleReadState(notification: NotificationDTO) {
   notification.isRead = !notification.isRead
+}
+
+// 整行点击只负责打开详情，不改写已读状态（已读切换由右侧按钮显式触发）
+function openNotification(notification: NotificationDTO) {
   // 邮件类型通知点击直接跳详情页（如果后端推送了 messageId）
   if (notification.type === 'EMAIL' && notification.sourceId) {
     router.push(`/email/detail/${encodeURIComponent(notification.sourceId)}`)

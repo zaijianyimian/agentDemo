@@ -7,7 +7,9 @@
           <div class="app-root" :data-theme="actualTheme">
             <router-view v-if="isStandalonePage" />
             <MacAppShell v-else :key="authStore.sessionGeneration">
-              <router-view :key="`${route.fullPath}:${authStore.sessionGeneration}`" />
+              <!-- key 只绑定 path（而非 fullPath）：query/锚点导航不应销毁重建页面，
+                   否则侧边栏锚点、Inbox 筛选等纯查询串跳转会把当前视图整个重建。 -->
+              <router-view :key="`${route.path}:${authStore.sessionGeneration}`" />
             </MacAppShell>
           </div>
         </n-notification-provider>
@@ -39,12 +41,7 @@ const authStore = useAuthStore()
 const isAuthPage = computed(() => route.path === '/login' || route.path === '/oauth/github/callback')
 const isStandalonePage = computed(() => isAuthPage.value || Boolean(route.meta.standalone))
 
-const actualTheme = computed(() => {
-  if (themeStore.mode === 'auto') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
-  return themeStore.mode
-})
+const actualTheme = computed(() => themeStore.resolvedTheme)
 
 // Agent Workspace 使用克制的橙色作为强调色，业务页面统一复用 Naive UI 主题变量。
 const themeOverrides = computed<GlobalThemeOverrides>(() => {

@@ -16,6 +16,12 @@
         <div class="markdown-body" v-html="renderedContent"></div>
       </div>
 
+      <div v-else-if="errorMessage" class="share-error">
+        <n-icon size="48"><AlertIcon /></n-icon>
+        <p>{{ errorMessage }}</p>
+        <span>请稍后重试，或联系分享者确认日程链接是否有效。</span>
+      </div>
+
       <div v-else class="share-empty">
         <n-icon size="48"><CalendarIcon /></n-icon>
         <p>该日暂无日程安排</p>
@@ -35,7 +41,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { NIcon, NSpin } from 'naive-ui'
-import { CalendarOutline as CalendarIcon } from '@vicons/ionicons5'
+import { AlertCircleOutline as AlertIcon, CalendarOutline as CalendarIcon } from '@vicons/ionicons5'
 import { scheduleService } from '@/services/api/schedule'
 import { renderMarkdown } from '@/utils/markdown'
 
@@ -43,6 +49,7 @@ const route = useRoute()
 const date = route.params.date as string
 const content = ref<string | null>(null)
 const loading = ref(true)
+const errorMessage = ref('')
 
 const renderedContent = computed(() => {
   return content.value ? renderMarkdown(content.value) : ''
@@ -51,11 +58,14 @@ const renderedContent = computed(() => {
 onMounted(async () => {
   try {
     const res = await scheduleService.getSharedSchedule(date)
-    if (res.success && res.data && res.data.found) {
+    if (!res.success) {
+      errorMessage.value = res.message || '日程加载失败，请稍后重试'
+    } else if (res.data && res.data.found) {
       content.value = res.data.content
     }
-  } catch {
-    // share page fails silently
+  } catch (error) {
+    console.error('加载分享日程失败:', error)
+    errorMessage.value = '日程加载失败，请检查网络后重试'
   } finally {
     loading.value = false
   }
@@ -160,6 +170,20 @@ onMounted(async () => {
 }
 
 .share-empty p { font-size: 16px; margin: 0; }
+
+.share-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  gap: 12px;
+  color: var(--text-secondary, #78350f);
+  text-align: center;
+}
+
+.share-error p { font-size: 18px; margin: 0; font-weight: 600; color: #dc2626; }
+.share-error span { font-size: 14px; margin: 0; }
 
 .share-footer {
   text-align: center;

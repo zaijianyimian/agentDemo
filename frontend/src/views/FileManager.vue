@@ -303,6 +303,9 @@ const deleteFile = async (file: Document) => {
     if (res.success) {
       message.success('删除成功')
       loadFiles()
+    } else {
+      // 失败时保持列表不变，明确提示原因，避免用户以为已删除
+      message.error(res.message || '删除失败')
     }
   } catch (error) {
     message.error('删除失败')

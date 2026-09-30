@@ -47,6 +47,11 @@ app:
     email-exchange: ${RABBITMQ_EXCHANGE:agent_email}
     email-queue: ${RABBITMQ_QUEUE_NAME:agent_email_queue}
     email-routing-key: ${RABBITMQ_ROUTING_KEY:agent_email}
+    # 内部调用共享密钥：Python 调 Java 日程接口时用于签名。
+    # 未配置时 /internal/** 一律拒绝（fail-closed），不会静默放行。
+    # 必须 >= 32 字符，只能由环境变量提供，不得提交真实值。
+    internal-token: ${GRAPH_INTERNAL_TOKEN:}
+    internal-token-tolerance-seconds: ${GRAPH_INTERNAL_TOKEN_TOLERANCE_SECONDS:300}
 
   email:
     listener:
@@ -69,8 +74,6 @@ app:
   schedule:
     enabled: ${SCHEDULE_ENABLED:true}
     user-email: ${SCHEDULE_USER_EMAIL:your_mail@example.com}
-    morning-reminder-cron: ${SCHEDULE_MORNING_REMINDER_CRON:"0 0 8 * * ?"}
-    file-sort-cron: ${SCHEDULE_FILE_SORT_CRON:"0 0 19 * * ?"}
 
   task:
     scheduler:

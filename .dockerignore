@@ -8,6 +8,14 @@ build
 frontend/node_modules
 frontend/dist
 
+# Python 服务有自己的依赖目录，不要带进构建上下文。
+graph/.venv
+graph/__pycache__
+graph/**/__pycache__
+graph/.pytest_cache
+graph/.env
+graph/.agents
+
 data
 generated
 logs

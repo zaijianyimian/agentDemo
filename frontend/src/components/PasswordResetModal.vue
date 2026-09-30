@@ -153,7 +153,7 @@
 
 <script setup lang="ts">
 // 密码重置弹窗组件：邮箱接收验证码后重置密码的三步流程（含倒计时与校验）
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { authService } from '@/services/api/auth'
 import { useMessage } from 'naive-ui'
 
@@ -202,6 +202,10 @@ watch(() => props.visible, (val) => {
       window.clearInterval(timer)
       timer = null
     }
+  } else if (timer) {
+    // 弹窗关闭时停止倒计时，避免定时器空转
+    window.clearInterval(timer)
+    timer = null
   }
 })
 
@@ -275,6 +279,14 @@ const handleSuccess = () => {
   emit('success')
   emit('close')
 }
+
+onUnmounted(() => {
+  // 组件卸载时清理倒计时定时器
+  if (timer) {
+    window.clearInterval(timer)
+    timer = null
+  }
+})
 </script>
 
 <style scoped>

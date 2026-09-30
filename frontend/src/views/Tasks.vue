@@ -350,15 +350,21 @@ const confirmDelete = (task: ScheduledTask) => {
     positiveText: '删除',
     negativeText: '取消',
     onPositiveClick: async () => {
-      lastDeletedTask.value = task.taskType === 'REMINDER' ? { ...task } : null
-      const response = await taskService.delete(task.id)
-      if (response.success) {
-        pushRecentAction({ time: new Date().toLocaleString(), title: '删除任务', detail: task.name })
-        currentTask.value = null
-        message.success('删除成功')
-        await loadTasks()
-      } else {
-        message.error(response.message || '删除失败')
+      try {
+        const response = await taskService.delete(task.id)
+        if (response.success) {
+          // 仅在删除确认成功后才记录撤销信息，避免撤销时插入一条重复任务
+          lastDeletedTask.value = task.taskType === 'REMINDER' ? { ...task } : null
+          pushRecentAction({ time: new Date().toLocaleString(), title: '删除任务', detail: task.name })
+          currentTask.value = null
+          message.success('删除成功')
+          await loadTasks()
+        } else {
+          message.error(response.message || '删除失败')
+        }
+      } catch (error) {
+        console.error('删除任务失败:', error)
+        message.error('删除失败')
       }
     }
   })

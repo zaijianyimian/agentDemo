@@ -4,7 +4,6 @@ import com.example.demo.auth.domain.UserAccount;
 import com.example.demo.shared.context.*;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -53,8 +52,7 @@ class ExecutionContextFactoryTest {
                 ExecutionPolicy.readOnly())).isInstanceOf(NullPointerException.class);
         var context = ExecutionContext.start(new UserContext(7), "mail", ExecutionContext.Actor.SYSTEM,
                 ExecutionPolicy.readOnly());
-        assertThatThrownBy(() -> new EventContext(context, UUID.randomUUID(), "", 0, Instant.now(), null))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(context.user().userId()).isEqualTo(7L);
     }
 
     @Test

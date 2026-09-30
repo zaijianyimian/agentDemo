@@ -29,18 +29,38 @@ public class ScheduleEvent {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long userId;
 
+    /**
+     * 业务幂等键。
+     *
+     * <p>由可信执行上下文（用户 + 会话轮次/邮件事件 + 单次工具调用）派生，
+     * 不接受模型生成，也不按标题与时间去重。为空表示人工创建的历史数据。</p>
+     */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String idempotencyKey;
+
     private String title;
     private String description;
 
     @JsonFormat(pattern = "yyyy-MM-dd['T'][' ']HH:mm:ss")
     private LocalDateTime eventTime;
 
+    /** 日程结束时间。历史数据与一次性日程可能为空。 */
+    @JsonFormat(pattern = "yyyy-MM-dd['T'][' ']HH:mm:ss")
+    private LocalDateTime endTime;
+
+    /** 业务声明的 IANA 时区名，例如 Asia/Shanghai。 */
+    private String timezone;
+
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate eventDate;
 
     private String location;
     private Long sourceEmailId;
+    /** 跨服务稳定的来源邮件事件 UUID，不与 Python 的 email_id 混用。 */
+    private String sourceEmailEventId;
     private String sourceEmail;
+    /** 来源：MANUAL / CHAT / EMAIL，由业务链路决定。 */
+    private String sourceType;
     private String reminderStatus;
     private String summaryStatus;
     private Boolean reminderEnabled;

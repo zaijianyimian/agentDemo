@@ -35,7 +35,7 @@ public class MybatisPlusConfig implements MetaObjectHandler {
             "schedule_event",
             "scheduled_task",
             "job_log",
-            "code_snippet",
+            "code_snippet", // 遗留表：当前无消费者，待随表一并清理
             "document",
             "dispatched_task",
             "dispatch_result_outbox",

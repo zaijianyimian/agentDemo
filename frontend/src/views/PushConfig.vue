@@ -72,6 +72,9 @@ async function load() {
     } else {
       message.error(resp.message || '加载失败')
     }
+  } catch (error) {
+    console.error('加载推送配置失败:', error)
+    message.error('加载推送配置失败，请检查网络后重试')
   } finally {
     loading.value = false
   }
@@ -87,6 +90,9 @@ async function save() {
     } else {
       message.error(resp.message || '保存失败')
     }
+  } catch (error) {
+    console.error('保存推送配置失败:', error)
+    message.error('保存失败，请检查网络后重试')
   } finally {
     saving.value = false
   }

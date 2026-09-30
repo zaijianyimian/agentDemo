@@ -1,90 +1,44 @@
 ---
 name: schedule-event-helper
-description: 日程助手。当用户表达"安排 / 提醒 / 排个会 / 每天做某事 / 这周有什么事"等意图时使用。可创建单次日程、每日重复日程、带邮件提醒的日程、查询 / 修改 / 完成 / 取消 / 删除日程。
+description: 已废弃。日程 Agent 能力已迁移到 Python Graph 的 schedule-management Skill，本文件仅保留为迁移记录，不再被任何代码加载。
 license: MIT
-compatibility: 适用于本系统的 schedule_event 表，所有操作走 ScheduleCommandService 唯一入口。
+compatibility: 不再适用。日程 Agent 决策由 Python 侧 graph/app/agent/chat/skills/schedule-management/SKILL.md 承担。
 metadata:
   author: agent-demo
-  version: "1.0"
+  version: "2.0"
+  status: deprecated
+  superseded-by: graph/app/agent/chat/skills/schedule-management/SKILL.md
   tags:
     - 日程
-    - 提醒
-    - 安排
-    - 会议
+    - 已废弃
     - schedule
 ---
 
-# 日程助手使用规范
+# 日程助手（已废弃）
 
-## 一、三类创建入口怎么选
+## 状态
 
-| 用户表达模式 | 用哪个 Tool | 例子 |
-|--------------|-------------|------|
-| "明天下午3点开会" | `create_schedule` | 单次事件 |
-| "明早8点提醒我提交周报" | `create_reminder` | 邮件提醒 |
-| "接下来一周每天7点起床" | `create_daily_schedule` | 重复事件 |
-| "这周五晚上7点和老王吃饭" | `create_schedule` | 单次 |
-| "下个月每天晚上阅读30分钟" | `create_daily_schedule` | 重复 |
+本 Skill 属于 Java 侧的 Skill Runtime，已随 AI 能力迁移整体下线。
+仓库中没有任何代码或配置会加载本文件。
 
-**判断原则**：用户没说"每天/每周/每月"就用单次；说了就用 daily（目前只支持每日）。
+## 为什么不直接删除
 
-## 二、时间格式规范
+保留它是为了记录迁移前后的差异，避免后续误以为日程能力仍由 Java 提供。
 
-所有时间参数统一 ISO-8601：
-- 推荐：`2026-07-15T15:00:00`
-- 也支持：`2026-07-15 15:00`、`2026-07-15 15:00:00`
-- 日期参数：`2026-07-15`
-- 仅时间（每日日程的 timeOfDay）：`07:00`（24 小时制）
+## 迁移去向
 
-**相对时间要换算**：用户说"明天下午3点" → 当天日期 + 15:00:00。
+| 能力 | 迁移前 | 迁移后 |
+|------|--------|--------|
+| 日程创建（自然语言） | Java `ScheduleCommandService` + Agent Tool | Python `create_schedule` Tool，归属由运行上下文注入 |
+| 日程 CRUD | Java `ScheduleCommandService` | Java `ScheduleEventService`（由 `ScheduleController` 暴露） |
+| 日程 Agent 决策 | Java Skill Runtime | Python ChatAgent + `schedule-management` Skill |
 
-## 三、删除 vs 取消
+## 当前真实入口
 
-- `cancel_schedule(id)` —— 取消，**保留记录**，状态变 cancelled，可追溯
-- `delete_schedule(id)` —— **物理删除，不可恢复**
+- **Agent 侧日程创建**：`graph/app/tools/schedule_tool.py` 的 `create_schedule`，
+  规格见 `graph/openspec/specs/chat-schedule-creation/spec.md`。
+- **Java 侧确定性 CRUD**：`com.example.demo.schedule.application.ScheduleEventService`，
+  HTTP 入口 `ScheduleController`（`/api/schedule/**`）。
 
-**默认优先取消**，用户明确说"删掉"才删除。
-
-## 四、改时间的副作用
-
-修改日程时间后：
-- event_date 自动跟着 eventTime 更新
-- 该日期的 Markdown 文件自动重写
-- 如果改了日期，原日期的 file 不再包含该日程
-
-## 五、每日日程的边界
-
-- 最大 365 天（防止 LLM 误调生成海量数据）
-- 起始 ≤ 结束
-- 每条独立写入，可单独 complete / cancel
-
-## 六、邮件提醒机制（重要）
-
-`create_reminder` 创建的日程会出现在次日 08:00 的早间提醒邮件里（由 `ScheduleSummaryService` 统一发送）。
-所以"提醒"不是即时推送，是次日汇总。如果用户要即时通知，应改用 `ScheduleTaskTools` 里的 `create_scheduled_task(..., taskType=REMINDER, ...)` 配合 cron `0 X H ?` 实现。
-
-## 七、操作流程模板
-
-```
-用户："明天下午3点提醒我去接孩子"
-↓
-1. 解析时间：明天 = 2026-07-15，下午3点 = 15:00:00
-2. 判断：用户说"提醒" → 用 create_reminder
-3. 调 create_reminder(title="接孩子", eventTime="2026-07-15T15:00:00", content="学校门口")
-4. 返回："已创建提醒日程 id=42 ..."
-```
-
-## 八、错误处理
-
-- 时间格式不对 → 提示用户用 ISO-8601
-- id 不存在 → 返回"日程不存在: id=N"
-- 范围超出 365 天 → 拒绝并提示缩短
-- 用户没明确说"删除" → 默认用 cancel 而不是 delete
-
-## 九、输出风格
-
-完成创建/修改后用简短自然语言回复，例如：
-- "已帮你安排好明天下午3点接孩子的提醒 ✓"
-- "未来7天共3条日程：周二产品评审、周三晚和老王吃饭、周五团建"
-
-不要把内部 id 直接堆给用户，除非用户主动问。
+> 历史版本的本文件曾声明「所有操作走 `ScheduleCommandService` 唯一入口」。
+> 该类已确认零调用并被删除，**不要再按此描述编写代码或提示词**。

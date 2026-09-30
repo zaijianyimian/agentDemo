@@ -62,6 +62,9 @@ public class SecurityConfig {
                                 // TokenIntrospectionController 手动完成完整校验。
                                 // 该端点只返回 userId，不承担聊天业务或 Agent 网关职责。
                                 "/api/auth/introspect",
+                                // 内部服务间调用：由 InternalCallAuthenticator 校验共享密钥
+                                // 签名，不使用浏览器令牌，也不能退化为 X-User-Id 直连。
+                                "/internal/**",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/actuator/info"
@@ -74,14 +77,8 @@ public class SecurityConfig {
                         .hasAuthority("SCOPE_platform.admin")
                         .requestMatchers(
                                 "/api/backup/**",
-                                "/api/autonomy/**",
                                 "/api/settings/data/**",
-                                "/api/settings/system/**",
-                                "/api/mcp/tools/sync/**",
-                                "/api/skill/sync/**",
-                                "/api/skill/reload",
-                                "/api/skill/reload-*",
-                                "/api/skill/reload/**"
+                                "/api/settings/system/**"
                         ).hasAuthority("SCOPE_platform.admin")
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()

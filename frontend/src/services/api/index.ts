@@ -79,6 +79,28 @@ api.interceptors.request.use(config => {
 
 let refreshingPromise: Promise<string> | null = null
 
+// 标记「后端明确判定令牌失效」，与断网/超时/5xx 这类瞬时故障区分开。
+const AUTH_INVALID_FLAG = '__authInvalid'
+
+const isDefinitiveAuthFailure = (error: any): boolean => {
+  if (error?.[AUTH_INVALID_FLAG]) return true
+  const status = error?.response?.status
+  return status === 401 || status === 403
+}
+
+const authInvalidError = (message: string): Error => {
+  const error: any = new Error(message)
+  error[AUTH_INVALID_FLAG] = true
+  return error
+}
+
+const redirectToLogin = () => {
+  if (window.location.pathname === '/login') return
+  window.location.href = buildLoginRedirectUrl(
+    window.location.pathname + window.location.search
+  )
+}
+
 type ApiErrorPayload = ApiResponse<unknown> & {
   code?: string
   error?: string
@@ -141,13 +163,14 @@ api.interceptors.response.use(
               .then(resp => {
                 const payload = resp.data as ApiResponse<AuthTokenResponse>
                 if (!payload?.success || !payload.data) {
-                  throw new Error(payload?.message || '刷新令牌失败')
+                  // 刷新接口返回 200 但业务失败：等同于令牌失效。
+                  throw authInvalidError(payload?.message || '刷新令牌失败')
                 }
 
                 const accessToken = payload.data.accessToken
                 const refreshTokenNext = payload.data.refreshToken
                 if (!accessToken || !refreshTokenNext) {
-                  throw new Error('刷新令牌失败')
+                  throw authInvalidError('刷新令牌失败')
                 }
 
                 setTokens(accessToken, refreshTokenNext)
@@ -162,23 +185,20 @@ api.interceptors.response.use(
           originalRequest.headers = originalRequest.headers || {}
           originalRequest.headers.Authorization = `Bearer ${latestAccessToken}`
           return api(originalRequest)
-        } catch (_error) {
-          clearTokens()
-          advanceSessionGeneration()
-          if (window.location.pathname !== '/login') {
-            window.location.href = buildLoginRedirectUrl(
-              window.location.pathname + window.location.search
-            )
+        } catch (refreshError) {
+          // 只有后端明确判定令牌失效才清除本地会话；断网/超时/5xx 保留 refresh token，
+          // 让调用方按普通错误提示用户重试，而不是强制登出。
+          if (isDefinitiveAuthFailure(refreshError)) {
+            clearTokens()
+            advanceSessionGeneration()
+            redirectToLogin()
           }
         }
       } else {
+        // 本地已无 refresh token：确实无法续期，回到登录页。
         clearTokens()
         advanceSessionGeneration()
-        if (window.location.pathname !== '/login') {
-          window.location.href = buildLoginRedirectUrl(
-            window.location.pathname + window.location.search
-          )
-        }
+        redirectToLogin()
       }
     }
 

@@ -237,6 +237,7 @@ import {
 } from '@vicons/ionicons5'
 import type { ChatMessage, ChatSession } from '@/types'
 import { chatHistoryService } from '@/services/api/chat-history'
+import { takeAiChatDraft } from '@/services/ai-chat-draft'
 import { fetchWithAuth } from '@/services/auth-fetch'
 import { renderMarkdown, stripThinkContent } from '@/utils/markdown'
 import { formatSessionTime, formatTime } from '@/utils/date-format'
@@ -284,10 +285,18 @@ const inputTextarea = ref<HTMLTextAreaElement | null>(null)
 const isListCollapsed = ref(false)
 const showEditModal = ref(false)
 const editTitle = ref('')
+// 正在改标题的会话。必须与 currentSession 解耦：改标题不应把当前会话
+// 切换成另一个（否则消息列表仍显示旧会话，下一次发送会写错会话）。
+const titleEditingSession = ref<ChatSession | null>(null)
 const isVoiceActive = ref(false)
 const executionState = ref<ExecutionStatus>('idle')
 const lastExecutionAt = ref('')
 let abortController: AbortController | null = null
+
+// 本地消息 id：Date.now() 在相邻两次发送（或页面内快速操作）时可能重复，
+// 而 id 用作 v-for 的 key，重复会导致 Vue 复用错误的节点。
+let localMessageIdSeed = 0
+const nextLocalMessageId = (): string => `${Date.now()}-${++localMessageIdSeed}`
 let speechRecognition: any = null
 
 const userInitial = computed(() => {
@@ -407,19 +416,22 @@ const switchSession = async (session: ChatSession) => {
 const handleSessionMenu = async (key: string, session: ChatSession) => {
   try {
     if (key === 'edit') {
-      currentSession.value = session
+      // 只记录待编辑的会话，不改动 currentSession，避免与消息列表脱节。
+      titleEditingSession.value = session
       editTitle.value = session.title
       showEditModal.value = true
       return
     }
     if (key === 'clear') {
       Object.assign(session, await chatHistoryService.clearSessionMessages(session.id))
+      sessionStorage.removeItem(pendingTurnKey(session.id))
       if (currentSession.value?.id === session.id) messages.value = []
       message.success('已清空消息')
       return
     }
     if (key === 'delete') {
       await chatHistoryService.deleteSession(session.id)
+      sessionStorage.removeItem(pendingTurnKey(session.id))
       sessions.value = sessions.value.filter(item => item.id !== session.id)
       if (currentSession.value?.id === session.id) {
         currentSession.value = null
@@ -432,20 +444,49 @@ const handleSessionMenu = async (key: string, session: ChatSession) => {
   }
 }
 
-/** 保存当前会话标题。 */
+/** 保存会话标题（可针对非当前会话）。 */
 const saveSessionTitle = async () => {
-  if (!currentSession.value || !editTitle.value.trim()) return
+  const target = titleEditingSession.value
+  if (!target || !editTitle.value.trim()) return
   try {
-    const updated = await chatHistoryService.updateSessionTitle(currentSession.value.id, editTitle.value.trim())
-    Object.assign(currentSession.value, updated)
-    const target = sessions.value.find(item => item.id === updated.id)
-    if (target) Object.assign(target, updated)
+    const updated = await chatHistoryService.updateSessionTitle(target.id, editTitle.value.trim())
+    Object.assign(target, updated)
+    const listed = sessions.value.find(item => item.id === updated.id)
+    if (listed) Object.assign(listed, updated)
+    if (currentSession.value?.id === target.id) {
+      Object.assign(currentSession.value, updated)
+    }
     message.success('标题已更新')
   } catch {
     message.error('保存失败')
   } finally {
     showEditModal.value = false
+    titleEditingSession.value = null
   }
+}
+
+/** 生成一次发送动作的稳定标识。 */
+const createClientRequestId = (): string => {
+  const globalCrypto = window.crypto as Crypto | undefined
+  if (globalCrypto?.randomUUID) {
+    return globalCrypto.randomUUID()
+  }
+  // 保持合法 UUID 格式；客户端请求 ID 不是认证凭据。
+  const bytes = new Uint8Array(16)
+  if (globalCrypto?.getRandomValues) globalCrypto.getRandomValues(bytes)
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+const pendingTurnKey = (sessionId: string) =>
+  `agent-demo:user:${authStore.user?.id}:chat:${sessionId}:pending-turn`
+
+const getPendingTurn = (sessionId: string): { id: string; message: string } | null => {
+  try { return JSON.parse(sessionStorage.getItem(pendingTurnKey(sessionId)) || 'null') }
+  catch { return null }
 }
 
 /** 发送用户消息，并按当前模式调用 Python 普通或流式接口。 */
@@ -464,8 +505,16 @@ const sendMessage = async () => {
     }
   }
 
+  const sendingSessionId = currentSession.value!.id
+  const pending = getPendingTurn(sendingSessionId)
+  if (pending && pending.message !== queryText) {
+    inputText.value = pending.message
+    message.warning('上一条请求尚未确认完成，请重新发送该消息以恢复，或先清空会话。')
+    return
+  }
+
   const userMessage: ChatMessage = {
-    id: Date.now().toString(),
+    id: nextLocalMessageId(),
     role: 'user',
     content: queryText,
     timestamp: new Date().toISOString()
@@ -476,8 +525,13 @@ const sendMessage = async () => {
   executionState.value = 'running'
   if (inputTextarea.value) inputTextarea.value.style.height = 'auto'
 
+  // 本次发送的稳定标识：同一次发送的重试复用同一个值，
+  // 让后端派生的业务幂等键（例如创建日程）在重试时保持一致。
+  const clientRequestId = pending?.id || createClientRequestId()
+  sessionStorage.setItem(pendingTurnKey(sendingSessionId), JSON.stringify({ id: clientRequestId, message: queryText }))
+
   const assistantMessage: ChatMessage = {
-    id: (Date.now() + 1).toString(),
+    id: nextLocalMessageId(),
     role: 'assistant',
     content: '',
     timestamp: new Date().toISOString(),
@@ -487,18 +541,28 @@ const sendMessage = async () => {
   await nextTick()
   scrollToBottom()
 
+  let turnFailed = false
   try {
     if (chatMode.value === 'normal') {
-      await normalChat(queryText, assistantMessage)
+      await normalChat(queryText, assistantMessage, clientRequestId)
     } else {
-      await streamChat(queryText, assistantMessage)
+      await streamChat(queryText, assistantMessage, clientRequestId)
     }
     executionState.value = 'done'
+    sessionStorage.removeItem(pendingTurnKey(sendingSessionId))
   } catch (error: any) {
+    inputText.value = queryText
+    turnFailed = true
     if (error?.name === 'AbortError') {
       executionState.value = 'idle'
     } else {
-      assistantMessage.content = '抱歉，本次请求执行失败，请稍后重试。'
+      turnFailed = true
+      // 已经渲染出来的内容不能被错误文案覆盖：用户已经读到的回复应当保留。
+      if (assistantMessage.content) {
+        assistantMessage.content += '\n\n> 本次响应未完整结束，以上为已接收到的内容。'
+      } else {
+        assistantMessage.content = '抱歉，本次请求执行失败，请稍后重试。'
+      }
       message.error(error?.message || '发送失败，请重试')
       executionState.value = 'error'
     }
@@ -509,7 +573,11 @@ const sendMessage = async () => {
     lastExecutionAt.value = new Date().toISOString()
     await nextTick()
     scrollToBottom()
-    if (currentSession.value) await refreshCurrentSession().catch(() => {})
+    // 失败的回合不回拉服务端列表：后端可能没有记录该回合，
+    // 覆盖会把用户刚看到的问题和错误提示一起抹掉。
+    if (currentSession.value && !turnFailed) {
+      await refreshCurrentSession().catch(() => {})
+    }
   }
 }
 
@@ -529,6 +597,11 @@ const refreshCurrentSession = async () => {
   }))
 }
 
+/** 判断一个原始 SSE 事件是否为结束标记（兼容 data: 与 event: 两种写法）。 */
+const isDoneEvent = (rawEvent: string): boolean =>
+  /(?:^|\n)event:\s*done\s*(?:\n|$)/i.test(rawEvent) ||
+  /(?:^|\n)data:\s*\[DONE\]\s*(?:\n|$)/i.test(rawEvent)
+
 /** 解析 SSE 事件中的 data 内容，忽略事件元信息和结束标记。 */
 const parseSseEvents = (rawEvent: string): string[] => {
   const dataLines: string[] = []
@@ -546,8 +619,13 @@ const parseSseEvents = (rawEvent: string): string[] => {
   return data ? [data] : []
 }
 
-/** 从 Python 读取流式 Agent 回复；必须收到 [DONE] 才视为成功。 */
-const streamChat = async (query: string, messageObj: ChatMessage) => {
+/**
+ * 从 Python 读取流式 Agent 回复。
+ *
+ * 只有收到 [DONE] 才确认服务端已完整写入回复。EOF/断开保留可见片段和
+ * 请求标识，供重试恢复；尾部残留帧同样识别 [DONE]。
+ */
+const streamChat = async (query: string, messageObj: ChatMessage, clientRequestId: string) => {
   abortController = new AbortController()
   const apiPath = '/api/chat/turn/stream'
 
@@ -555,7 +633,11 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
     method: 'POST',
     signal: abortController.signal,
     headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-    body: JSON.stringify({ session_id: currentSession.value!.id, message: query })
+    body: JSON.stringify({
+      session_id: currentSession.value!.id,
+      message: query,
+      client_request_id: clientRequestId
+    })
   })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
@@ -580,6 +662,7 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
     const { done, value } = await reader.read()
     if (done) {
       buffer += decoder.decode()
+      // 上游正常关闭连接：尾部可能还残留未成帧的数据。
       break
     }
 
@@ -589,7 +672,7 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
 
     for (const event of events) {
       if (!event.trim()) continue
-      if (/(?:^|\n)event:\s*done\s*(?:\n|$)/i.test(event) || /(?:^|\n)data:\s*\[DONE\]\s*(?:\n|$)/i.test(event)) {
+      if (isDoneEvent(event)) {
         completed = true
         buffer = ''
         break readStream
@@ -598,20 +681,35 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
     }
   }
 
+  // 尾部残留同样要识别结束标记：否则最后一帧 [DONE] 会被当成普通内容丢掉，
+  // 并且因为没有置 completed 而被误判为「响应流提前结束」。
   if (buffer.trim() && !completed) {
-    for (const chunk of parseSseEvents(buffer)) await appendVisibleChunk(chunk)
+    if (isDoneEvent(buffer)) {
+      completed = true
+    } else {
+      for (const chunk of parseSseEvents(buffer)) await appendVisibleChunk(chunk)
+    }
   }
-  if (!completed) throw new Error('响应流提前结束')
+
+  if (!completed) {
+    // Only DONE proves the server committed the complete reply. Keep the request
+    // identity on EOF so replay can recover a result whose response was lost.
+    throw new Error('响应流提前结束，请重试以恢复本次请求')
+  }
 }
 
 /** 调用普通非流式聊天接口。 */
-const normalChat = async (query: string, messageObj: ChatMessage) => {
+const normalChat = async (query: string, messageObj: ChatMessage, clientRequestId: string) => {
   abortController = new AbortController()
   const response = await fetchWithAuth('/api/chat/turn', {
     method: 'POST',
     signal: abortController.signal,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id: currentSession.value!.id, message: query })
+    body: JSON.stringify({
+      session_id: currentSession.value!.id,
+      message: query,
+      client_request_id: clientRequestId
+    })
   })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   const payload = await response.json()
@@ -702,6 +800,14 @@ onMounted(async () => {
   await loadSessions()
   if (sessions.value.length > 0) {
     await switchSession(sessions.value[0])
+  }
+  // 读取日程页转交的描述：只预填输入框，不自动发送，
+  // 避免用户还没确认就把内容发出去。
+  const draft = takeAiChatDraft()
+  if (draft) {
+    inputText.value = draft
+    await nextTick()
+    inputTextarea.value?.focus()
   }
 })
 

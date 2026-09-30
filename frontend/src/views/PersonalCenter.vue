@@ -121,6 +121,8 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const cameraActive = ref(false)
 const capturing = ref(false)
 let mediaStream: MediaStream | null = null
+// 采集令牌：用于识别用户取消/离开后才返回的授权结果
+let cameraRequestId = 0
 
 const loadData = async () => {
   const faceStatusRes = await authService.faceStatus()
@@ -185,6 +187,9 @@ const onFaceFileSelect = async (event: Event) => {
 
 // 摄像头功能
 const startCamera = async () => {
+  // 记录本次采集的令牌号
+  const requestId = ++cameraRequestId
+
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     message.error('您的浏览器不支持摄像头功能，请使用现代浏览器（Chrome/Firefox/Edge）')
     return
@@ -198,9 +203,15 @@ const startCamera = async () => {
   }
 
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
+    const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
     })
+    // 授权返回时已取消或组件已卸载：立即释放轨道，避免摄像头指示灯常亮
+    if (cameraRequestId !== requestId) {
+      stream.getTracks().forEach(track => track.stop())
+      return
+    }
+    mediaStream = stream
     cameraActive.value = true
     await nextTick()
 
@@ -246,6 +257,8 @@ const startCamera = async () => {
 }
 
 const stopCamera = () => {
+  // 先作废在途的采集请求，使其返回的流立即释放
+  cameraRequestId++
   if (mediaStream) {
     mediaStream.getTracks().forEach(track => track.stop())
     mediaStream = null

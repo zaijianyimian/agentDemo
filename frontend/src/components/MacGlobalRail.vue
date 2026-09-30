@@ -160,8 +160,8 @@ const iconMap: Record<string, any> = {
 
 const getIconComponent = (iconName: string) => iconMap[iconName] || GridOutline
 
+// 快速访问点击只负责跳转；访问计数统一由 MacAppShell 的路由监听处理，避免重复计数
 const handleQuickAccessClick = (item: QuickAccessItem) => {
-  macNavStore.trackAccess(item.name, item.path, item.label, item.icon)
   router.push(item.path)
 }
 
@@ -172,7 +172,6 @@ const handleCategoryClick = (categoryId: string) => {
   // Navigate to first route in the category for immediate activation
   const firstRoute = macNavStore.getFirstRouteOfCategory(categoryId)
   if (firstRoute) {
-    macNavStore.trackAccess(firstRoute.name, firstRoute.path, firstRoute.label, firstRoute.icon)
     router.push(firstRoute.path)
   }
 }

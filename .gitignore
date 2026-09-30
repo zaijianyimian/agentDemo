@@ -45,6 +45,8 @@ src/main/resources/sql/search_history.sql
 src/main/resources/sql/system_settings.sql
 src/main/resources/sql/migration_*.sql
 !src/main/resources/sql/migration_increments.sql
+# 交付的迁移脚本必须可提交：AI 日程接入与幂等键迁移。
+!src/main/resources/sql/migration_schedule_ai_source.sql
 
 ### STS ###
 .apt_generated
@@ -133,8 +135,10 @@ agentdemo.tar.gz
 /agent*.tar.gz
 /agent*.tgz
 docker/*.tar.gz
-docker-compose.yml
+# 本地/临时编排可忽略；交付的完整拓扑编排必须可提交。
+!docker-compose.yml
 docker-compose.yaml
+docker-compose.override.yml
 ### OpenSpec 工作产物(本地变更提案与归档,不入库)###
 /.agents/
 /.codex/

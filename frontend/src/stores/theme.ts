@@ -15,6 +15,16 @@ export type ThemeMode = 'dark' | 'light' | 'auto'
 export const useThemeStore = defineStore('theme', () => {
   const mode = ref<ThemeMode>((localStorage.getItem('theme') as ThemeMode) || 'dark')
 
+  // 监听系统主题变化（用于 auto 模式）。
+  // 注意：Pinia store 没有卸载阶段，监听器会常驻进程——这是预期的（主题感知跨页面）。
+  const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)')
+
+  // 实际生效的最终主题。它是响应式的：auto 模式下系统主题变化会更新它，
+  // 依赖它的组件（naive-ui themeOverrides、.app-root 的 data-theme）才能同步刷新。
+  const resolvedTheme = ref<'dark' | 'light'>(
+    systemThemeQuery.matches ? 'dark' : 'light'
+  )
+
   const toggleTheme = () => {
     mode.value = mode.value === 'dark' ? 'light' : 'dark'
     localStorage.setItem('theme', mode.value)
@@ -35,10 +45,12 @@ export const useThemeStore = defineStore('theme', () => {
     let actualTheme: 'dark' | 'light'
     if (mode.value === 'auto') {
       // 自动模式：根据系统偏好设置
-      actualTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      actualTheme = systemThemeQuery.matches ? 'dark' : 'light'
     } else {
       actualTheme = mode.value
     }
+
+    resolvedTheme.value = actualTheme
 
     // Add transition class for smooth theme change
     document.documentElement.classList.add('theme-transition')
@@ -51,14 +63,11 @@ export const useThemeStore = defineStore('theme', () => {
     }, 400)
   }
 
-  // 监听系统主题变化（用于 auto 模式）。
-// 注意：Pinia store 没有卸载阶段，监听器会常驻进程——这是预期的（主题感知跨页面）。
-const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)')
-systemThemeQuery.addEventListener('change', () => {
-  if (mode.value === 'auto') {
-    applyTheme()
-  }
-})
+  systemThemeQuery.addEventListener('change', () => {
+    if (mode.value === 'auto') {
+      applyTheme()
+    }
+  })
 
   watch(mode, () => {
     applyTheme()
@@ -66,6 +75,7 @@ systemThemeQuery.addEventListener('change', () => {
 
   return {
     mode,
+    resolvedTheme,
     toggleTheme,
     setTheme
   }

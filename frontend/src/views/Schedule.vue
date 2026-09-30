@@ -163,7 +163,7 @@
     <!-- AI添加日程弹窗 -->
     <n-modal v-model:show="showAiAddModal" preset="card" title="AI添加日程" style="width: 500px">
       <div class="ai-add-hint">
-        用自然语言描述您的日程，AI会自动提取时间、地点等信息
+        用自然语言描述您的日程，AI 会解析时间与地点并创建日程。创建的日程会出现在下方列表。
       </div>
       <n-input
         v-model:value="aiInput"
@@ -172,11 +172,14 @@
         placeholder="例如：明天下午3点在会议室A开会讨论项目进度"
         :disabled="aiLoading"
       />
+      <n-alert type="info" :bordered="false" style="margin-top: 12px">
+        自然语言创建日程由 AI 助手（聊天）完成，本页面不再直接解析。
+      </n-alert>
       <template #footer>
         <n-space justify="end">
           <n-button @click="showAiAddModal = false">取消</n-button>
           <n-button type="primary" :loading="aiLoading" @click="aiAddSchedule">
-            AI创建
+            前往 AI 助手创建
           </n-button>
         </n-space>
       </template>
@@ -189,6 +192,7 @@
  * 日程管理页面：列表/日历双视图，AI 自然语言解析创建，支持完成与删除。
  */
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   NButton,
   NIcon,
@@ -209,6 +213,7 @@ import {
   NCalendar,
   NRadioButton,
   NRadioGroup,
+  NAlert,
   useMessage
 } from 'naive-ui'
 import {
@@ -224,7 +229,9 @@ import type { ScheduleEvent } from '@/types'
 import dayjs from 'dayjs'
 import { formatDateTime as formatTime } from '@/utils/date-format'
 import { UiPage, UiPageHeader, UiPanel, UiStat } from '@/components/ui'
+import { stashAiChatDraft } from '@/services/ai-chat-draft'
 
+const router = useRouter()
 const message = useMessage()
 const viewMode = ref('list')
 const schedules = ref<ScheduleEvent[]>([])
@@ -254,9 +261,9 @@ const tomorrowSchedules = computed(() => {
   return schedules.value.filter(s => s.eventDate === tomorrow)
 })
 
-// 过滤后的日程
+// 过滤后的日程（排序副本，不修改共享的 schedules 数组）
 const filteredSchedules = computed(() => {
-  return schedules.value.sort((a, b) =>
+  return [...schedules.value].sort((a, b) =>
     new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime()
   )
 })
@@ -276,14 +283,30 @@ const handleAction = async (key: string, event: ScheduleEvent) => {
       showDetailModal.value = true
       break
     case 'complete':
-      await scheduleService.complete(event.id)
-      message.success('已标记完成')
-      loadSchedules()
+      try {
+        const res = await scheduleService.complete(event.id)
+        if (res.success) {
+          message.success('已标记完成')
+          loadSchedules()
+        } else {
+          message.error(res.message || '标记完成失败')
+        }
+      } catch (error) {
+        message.error('标记完成失败')
+      }
       break
     case 'delete':
-      await scheduleService.delete(event.id)
-      message.success('删除成功')
-      loadSchedules()
+      try {
+        const res = await scheduleService.delete(event.id)
+        if (res.success) {
+          message.success('删除成功')
+          loadSchedules()
+        } else {
+          message.error(res.message || '删除失败')
+        }
+      } catch (error) {
+        message.error('删除失败')
+      }
       break
   }
 }
@@ -291,10 +314,18 @@ const handleAction = async (key: string, event: ScheduleEvent) => {
 /** 在详情弹窗中标记当前日程完成。 */
 const completeCurrentEvent = async () => {
   if (!currentEvent.value) return
-  await scheduleService.complete(currentEvent.value.id)
-  message.success('已标记完成')
-  showDetailModal.value = false
-  loadSchedules()
+  try {
+    const res = await scheduleService.complete(currentEvent.value.id)
+    if (res.success) {
+      message.success('已标记完成')
+      showDetailModal.value = false
+      loadSchedules()
+    } else {
+      message.error(res.message || '标记完成失败')
+    }
+  } catch (error) {
+    message.error('标记完成失败')
+  }
 }
 
 /** 从后端拉取日程列表。 */
@@ -315,16 +346,20 @@ const addEvent = async () => {
   }
 
   try {
-    await scheduleService.create({
+    const res = await scheduleService.create({
       title: newEvent.value.title,
       description: newEvent.value.description,
       eventTime: newEvent.value.eventTime ? dayjs(newEvent.value.eventTime).format('YYYY-MM-DD HH:mm:ss') : undefined,
       eventDate: newEvent.value.eventTime ? dayjs(newEvent.value.eventTime).format('YYYY-MM-DD') : undefined,
       location: newEvent.value.location
     })
-    message.success('添加成功')
-    showAddModal.value = false
-    loadSchedules()
+    if (res.success) {
+      message.success('添加成功')
+      showAddModal.value = false
+      loadSchedules()
+    } else {
+      message.error(res.message || '添加失败')
+    }
   } catch (error) {
     message.error('添加失败')
   }
@@ -342,33 +377,28 @@ const showEventDetail = (event: ScheduleEvent) => {
   showDetailModal.value = true
 }
 
-/** 调用 AI 接口从自然语言描述中解析并保存日程。 */
+/**
+ * 把自然语言描述带到 AI 助手的聊天页。
+ *
+ * 日程的自然语言解析已迁移到 Python Agent Engine，Java 侧不再提供
+ * /api/schedule/parse-and-save。这里不再调用一个不存在的接口，
+ * 而是把描述预填到聊天页，由 Agent 完成创建，创建结果会回到本页列表。
+ */
 const aiAddSchedule = async () => {
   if (!aiInput.value.trim()) {
     message.warning('请输入日程描述')
     return
   }
 
-  aiLoading.value = true
+  showAiAddModal.value = false
+  const draft = aiInput.value.trim()
+  aiInput.value = ''
   try {
-    const res = await scheduleService.parseAndSave({
-      subject: aiInput.value,
-      from: 'user',
-      content: aiInput.value
-    })
-
-    if (res.success && res.data) {
-      message.success(`已创建日程: ${res.data.title}`)
-      showAiAddModal.value = false
-      aiInput.value = ''
-      loadSchedules()
-    } else {
-      message.error(res.message || '无法从描述中提取日程信息')
-    }
+    stashAiChatDraft(draft)
+    message.info('已带入 AI 助手，发送后即可创建日程')
+    await router.push({ path: '/chat' })
   } catch (error) {
-    message.error('无法从描述中提取日程信息')
-  } finally {
-    aiLoading.value = false
+    message.error('无法打开 AI 助手，请直接前往聊天页面')
   }
 }
 

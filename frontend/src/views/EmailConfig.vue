@@ -95,7 +95,10 @@
 
     <!-- 邮箱模板 -->
     <n-card title="常用邮箱服务器" class="template-card" :bordered="false">
-      <n-data-table :columns="templateColumns" :data="emailTemplates" size="small" />
+      <n-alert v-if="templateError" type="error" :show-icon="true">
+        {{ templateError }}
+      </n-alert>
+      <n-data-table v-else :columns="templateColumns" :data="emailTemplates" size="small" />
     </n-card>
 
     <!-- 添加/编辑弹窗 -->
@@ -268,6 +271,7 @@ import {
   NEmpty,
   NResult,
   NText,
+  NAlert,
   useMessage
 } from 'naive-ui'
 import {
@@ -694,13 +698,19 @@ const checkNewConfigNetwork = async () => {
   }
 }
 
+const templateError = ref('')
+
 const loadTemplates = async () => {
+  templateError.value = ''
   try {
     const res = await emailService.getTemplates()
     const payload = Array.isArray(res) ? res : (Array.isArray((res as any)?.data) ? (res as any).data : [])
     emailTemplates.value = payload
-  } catch {
+  } catch (error) {
+    console.error('加载邮箱服务器模板失败:', error)
     emailTemplates.value = []
+    templateError.value = '模板加载失败，请检查网络后重试'
+    message.error(templateError.value)
   }
 }
 

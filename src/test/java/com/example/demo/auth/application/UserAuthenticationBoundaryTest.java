@@ -127,14 +127,14 @@ class UserAuthenticationBoundaryTest {
     @Test
     void ordinaryUserCannotReachPlatformHandlers() throws Exception {
         String access = token("access", "agent-demo", 3, 300);
+        // 注：/api/autonomy、/api/mcp、/api/skill 及其鉴权规则已随 AI 能力迁移整体下线，
+        // 不再有对应 Controller，故不再纳入本用例。
         for (String path : new String[]{"/api/backup/create", "/api/backup/download",
-                "/api/autonomy/scan", "/api/settings/data/import", "/api/mcp/tools/sync",
-                "/api/skill/sync", "/api/skill/reload", "/api/skill/reload-findskills"}) {
+                "/api/settings/data/import"}) {
             mvc.perform(post(path).header("Authorization", "Bearer " + access))
                     .andExpect(status().isForbidden());
         }
-        for (String path : new String[]{"/api/backup/list", "/api/settings/data/export",
-                "/api/autonomy/artifacts", "/api/mcp/tools/sync/status", "/api/skill/sync/status"}) {
+        for (String path : new String[]{"/api/backup/list", "/api/settings/data/export"}) {
             mvc.perform(get(path).header("Authorization", "Bearer " + access))
                     .andExpect(status().isForbidden());
         }

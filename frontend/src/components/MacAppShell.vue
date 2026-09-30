@@ -362,6 +362,8 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
   }
 }
 
+// 快速访问计数的唯一入口：这里按路由名变化记录一次，
+// 各导航组件（MacGlobalRail 等）只负责跳转，不再单独调用 trackAccess，避免重复计数
 watch(() => route.name, name => {
   if (!name) return
   const routeInfo = navStore.getRouteByName(name as string)

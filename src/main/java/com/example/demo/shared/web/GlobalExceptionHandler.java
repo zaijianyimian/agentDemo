@@ -40,6 +40,22 @@ public class GlobalExceptionHandler {
         return failure(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "资源不存在");
     }
 
+    /**
+     * 处理携带稳定错误码的受控异常。
+     *
+     * <p>对外只返回稳定 code 与面向调用方的说明，堆栈与内部细节留在日志。</p>
+     */
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiResponse<Object>> handleApiException(ApiException exception) {
+        if (exception.getStatus() >= 500) {
+            log.error("受控异常: code={} message={}", exception.getCode(), exception.getMessage());
+        } else {
+            log.warn("受控异常: code={} message={}", exception.getCode(), exception.getMessage());
+        }
+        return ResponseEntity.status(exception.getStatus())
+                .body(ApiResponse.failure(exception.getCode(), exception.getMessage()));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Object>> handleAccessDenied(AccessDeniedException exception) {
         return failure(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "无权限访问该资源");

@@ -31,12 +31,7 @@ public class CacheConfig implements CachingConfigurer {
     public static final String SETTINGS_ALL = "settingsAll";
     public static final String SETTINGS_BY_CATEGORY = "settingsByCategory";
     public static final String SETTINGS_BY_KEY = "settingsByKey";
-    public static final String NOTE_LIST = "noteList";
-    public static final String NOTE_DETAIL = "noteDetail";
-    public static final String SNIPPET_LIST = "snippetList";
-    public static final String TASK_LIST = "taskList";
     public static final String INBOX_SUMMARY = "inboxSummary";
-    public static final String EMAIL_CONFIG_LIST = "emailConfigList";
 
     private final CurrentUserContext currentUserProvider;
 
@@ -57,12 +52,7 @@ public class CacheConfig implements CachingConfigurer {
                 SETTINGS_ALL,
                 SETTINGS_BY_CATEGORY,
                 SETTINGS_BY_KEY,
-                NOTE_LIST,
-                NOTE_DETAIL,
-                SNIPPET_LIST,
-                TASK_LIST,
-                INBOX_SUMMARY,
-                EMAIL_CONFIG_LIST
+                INBOX_SUMMARY
         ));
         cacheManager.setAllowNullValues(false);
         cacheManager.setCaffeine(Caffeine.newBuilder()

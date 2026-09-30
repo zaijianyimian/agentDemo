@@ -1,11 +1,33 @@
--- Java Agent Runtime 剥离后的 dispatched_task 结构迁移。
--- 执行前请备份 MySQL；脚本只调整 Java dispatch 持久化字段，不访问 Python PostgreSQL。
+-- =============================================================================
+-- Java Agent Runtime 剥离后的结构收敛（一次性迁移脚本）
+-- =============================================================================
+-- 用途：把仍停留在「Java 侧持有 Agent Runtime」形态的存量数据库，收敛到
+--       当前 schema_init.sql / dispatch 模块期望的结构。
+--
+-- 是否需要执行：
+--   * 由当前 schema_init.sql 全新建库的实例：无需执行，结构已是目标形态。
+--   * 由旧版本升级而来、尚未执行过本脚本的实例：必须执行一次。
+--
+-- 破坏性操作（执行前务必备份 MySQL）：
+--   * DROP TABLE ai_model_config
+--   * DROP TABLE email_attachment_analysis
+--   * DELETE system_settings 中全部 Agent 类目配置行
+--   * 将仍处于 PENDING/RUNNING 且缺少 execution_instruction 的历史任务置为 FAILED
+--   * dispatched_task.executor / execution_instruction 收紧为 NOT NULL
+--
+-- 幂等性：除两条 DELETE 外的所有 DDL 均由 information_schema 判定后动态执行，
+--         重复运行安全。脚本只调整 Java dispatch 持久化字段，不访问 Python PostgreSQL。
+--
+-- 相关文档：docs/GRAPH_PYTHON_ADAPTER.md（Java / Python 职责边界）
+-- =============================================================================
 
 SET @db_name := DATABASE();
 
 -- Java 不再持有模型、Memory、RAG、Qdrant 等 Agent Runtime 配置。
+-- 类目清单必须与 SystemSettingsController.AGENT_CATEGORIES 保持一致，
+-- 漏项会导致残留行在备份/恢复中被永久携带，同时在设置 API 上永远不可见。
 DELETE FROM `system_settings`
-WHERE `category` IN ('model', 'qdrant', 'memory', 'embedding', 'mcp', 'skill', 'autonomy');
+WHERE `category` IN ('model', 'qdrant', 'search', 'memory', 'mcp', 'skill', 'autonomy', 'embedding');
 
 DROP TABLE IF EXISTS `ai_model_config`;
 DROP TABLE IF EXISTS `email_attachment_analysis`;

@@ -116,6 +116,37 @@ public class ScheduleController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * 读取指定日期的日程分享内容。
+     *
+     * <p>这是 {@code /schedule-share/:date} 公开页面依赖的读取入口。返回体固定包含
+     * {@code found} 与 {@code content}，让页面能区分“没有该日日程”和“读取失败”，
+     * 而不是一律 404。</p>
+     *
+     * @param date 目标日期
+     * @return 分享内容
+     */
+    @GetMapping("/share/{date}")
+    public ResponseEntity<Map<String, Object>> getSharedSchedule(@PathVariable String date) {
+        LocalDate localDate;
+        try {
+            localDate = LocalDate.parse(date);
+        } catch (RuntimeException error) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "date", date,
+                    "found", false,
+                    "content", ""));
+        }
+
+        String content = scheduleFileService.readScheduleFile(localDate);
+        Map<String, Object> result = new HashMap<>();
+        result.put("date", date);
+        result.put("fileName", "schedule-" + date + ".md");
+        result.put("found", content != null && !content.isBlank());
+        result.put("content", valueOrEmpty(content));
+        return ResponseEntity.ok(result);
+    }
+
     /** 按文件名读取日程文件。 */
     @GetMapping("/file/{fileName}")
     public ResponseEntity<Map<String, Object>> getScheduleFileByName(@PathVariable String fileName) {
@@ -230,6 +261,12 @@ public class ScheduleController {
         if (event.getReminderEnabled() == null) {
             event.setReminderEnabled(true);
         }
+        // 浏览器创建即人工创建；AI 链路的来源由内部端点决定，不接受请求自报。
+        if (event.getSourceType() == null || event.getSourceType().isBlank()) {
+            event.setSourceType("MANUAL");
+        }
+        // 人工创建不携带跨服务幂等键，避免与 AI 链路的键空间混用。
+        event.setIdempotencyKey(null);
     }
 
     private ApiResponse<ScheduleEvent> updateStatus(Long id, String status, String message) {

@@ -68,8 +68,6 @@ INSERT INTO user_account(id,username,email,password_hash,enabled) VALUES
   (8,'other-user','other@example.test','fixture',1);
 INSERT INTO email_config(id,email,host,enabled) VALUES (11,'mail@example.test','imap.example.test',1);
 INSERT INTO email_listener_state(id,config_id,provider,listen_mode) VALUES (21,11,'GENERIC_IMAP','POLLING');
-INSERT INTO chat_session(id,title) VALUES (31,'legacy');
-INSERT INTO chat_message(id,session_id,role,content) VALUES (41,31,'user','hello');
 INSERT INTO schedule_event(id,title,event_date) VALUES (51,'meeting','2026-09-13');
 INSERT INTO scheduled_task(id,name,task_type,cron_expression) VALUES (61,'fixture','REMINDER','0 0 * * * ?');
 INSERT INTO document(id,file_name,status) VALUES (81,'fixture.txt','pending');
@@ -97,8 +95,6 @@ invalid_owned_rows=$(mysql_root -N -B legacy_rehearsal -e "
 SELECT
   (SELECT COUNT(*) FROM email_config WHERE user_id IS NULL OR user_id<>7) +
   (SELECT COUNT(*) FROM email_listener_state WHERE user_id IS NULL OR user_id<>7) +
-  (SELECT COUNT(*) FROM chat_session WHERE user_id IS NULL OR user_id<>7) +
-  (SELECT COUNT(*) FROM chat_message WHERE user_id IS NULL OR user_id<>7) +
   (SELECT COUNT(*) FROM schedule_event WHERE user_id IS NULL OR user_id<>7) +
   (SELECT COUNT(*) FROM scheduled_task WHERE user_id IS NULL OR user_id<>7) +
   (SELECT COUNT(*) FROM document WHERE user_id IS NULL OR user_id<>7) +

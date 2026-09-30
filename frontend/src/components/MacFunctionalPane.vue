@@ -179,7 +179,8 @@ const getIconComponentSafe = (iconName: string | undefined): any => {
 }
 
 const handleRouteClick = (navRoute: NavRoute) => {
-  macNavStore.trackAccess(navRoute.name, navRoute.path, navRoute.label, navRoute.icon)
+  // 访问计数统一由 MacAppShell 的路由 watcher 负责（每次 route.name 变化都会触发），
+  // 这里不再重复调用 trackAccess，否则同一次导航会被计两次。
   router.push(navRoute.path)
   emit('routeSelect', navRoute)
 }

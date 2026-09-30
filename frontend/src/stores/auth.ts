@@ -11,11 +11,13 @@ import { advanceSessionGeneration, currentSessionGeneration } from '@/services/s
  * State 形状：
  *  - user: AuthUserProfile | null - 当前登录用户档案
  *  - initialized: boolean - 是否已完成首次会话恢复（hydrate）
+ *  - degraded: boolean - 后端在会话恢复时不可达：保留令牌、允许进入应用，等待重试
  *  - isAuthenticated: computed - 是否持有有效 token 且 user 已加载
  */
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUserProfile | null>(null)
   const initialized = ref(false)
+  const degraded = ref(false)
   const sessionGeneration = ref(currentSessionGeneration())
 
   const isAuthenticated = computed(() => !!authTokenStorage.getAccessToken() && !!user.value)
@@ -27,6 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
     sessionGeneration.value = advanceSessionGeneration()
     authTokenStorage.setTokens(payload.accessToken, payload.refreshToken)
     user.value = payload.user
+    // 拿到后端确认的登录态即视为恢复正常，不再处于降级状态。
+    degraded.value = false
   }
 
   /**
@@ -36,14 +40,25 @@ export const useAuthStore = defineStore('auth', () => {
     sessionGeneration.value = advanceSessionGeneration()
     authTokenStorage.clearTokens()
     user.value = null
+    degraded.value = false
   }
 
   /**
-   * 应用启动时恢复登录态：若本地有 token 则调用 /me 拉取用户信息，
-   * 失败或无 token 时回退为未登录态。同一会话内只执行一次。
+   * 仅当后端明确判定令牌失效（401/403）时才算鉴权失败。
+   * 断网、超时、5xx 属于瞬时故障，必须保留本地令牌，否则一次抖动就会让用户重新登录。
+   */
+  const isAuthFailure = (error: any): boolean => {
+    const status = error?.response?.status
+    return status === 401 || status === 403
+  }
+
+  /**
+   * 应用启动时恢复登录态：若本地有 token 则调用 /me 拉取用户信息。
+   * 鉴权失败时清除会话；后端不可达时保留令牌并标记 degraded，允许用户继续进入应用，
+   * 后续导航会重试恢复。后端恢复后自动回到正常状态。
    */
   const hydrate = async () => {
-    if (initialized.value) return
+    if (initialized.value && !degraded.value) return
     initialized.value = true
     const token = authTokenStorage.getAccessToken()
     if (!token) {
@@ -54,11 +69,17 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await authService.me()
       if (res.success && res.data) {
         user.value = res.data
+        degraded.value = false
       } else {
         clearSession()
       }
-    } catch {
-      clearSession()
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        clearSession()
+      } else {
+        // 瞬时故障：保留令牌与 degraded 标记，等待下一次导航重试。
+        degraded.value = true
+      }
     }
   }
 
@@ -129,6 +150,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     initialized,
+    degraded,
     sessionGeneration,
     isAuthenticated,
     hydrate,

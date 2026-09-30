@@ -336,28 +336,56 @@ const executeTask = async (id: number) => {
 }
 
 const completeSchedule = async (id: number) => {
-  await scheduleService.complete(id)
-  message.success('日程已标记完成')
+  try {
+    const response = await scheduleService.complete(id)
+    if (response.success) {
+      message.success('日程已标记完成')
+    } else {
+      message.error(response.message || '标记完成失败')
+    }
+  } catch {
+    message.error('标记完成失败')
+  }
   await loadInbox()
 }
 
-/** 批量完成选中日程。 */
+/** 批量完成选中日程；逐条校验结果，失败时如实报告失败数量。 */
 const batchCompleteSchedules = async () => {
+  let failed = 0
   for (const item of selectedItems.value.filter(item => item.category === 'schedule' && item.meta?.id)) {
-    await scheduleService.complete(Number(item.meta?.id))
+    try {
+      const response = await scheduleService.complete(Number(item.meta?.id))
+      if (!response.success) failed += 1
+    } catch {
+      failed += 1
+    }
   }
   selectedKeys.value = []
-  message.success('已批量完成所选日程')
+  if (failed > 0) {
+    message.error(`批量完成失败 ${failed} 项`)
+  } else {
+    message.success('已批量完成所选日程')
+  }
   await loadInbox()
 }
 
-/** 批量执行选中任务。 */
+/** 批量执行选中任务；逐条校验结果，失败时如实报告失败数量。 */
 const batchExecuteTasks = async () => {
+  let failed = 0
   for (const item of selectedItems.value.filter(item => item.category === 'task' && item.meta?.id)) {
-    await taskService.execute(Number(item.meta?.id))
+    try {
+      const response = await taskService.execute(Number(item.meta?.id))
+      if (!response.success) failed += 1
+    } catch {
+      failed += 1
+    }
   }
   selectedKeys.value = []
-  message.success('已批量执行所选任务')
+  if (failed > 0) {
+    message.error(`批量执行失败 ${failed} 项`)
+  } else {
+    message.success('已批量执行所选任务')
+  }
   await loadInbox()
 }
 

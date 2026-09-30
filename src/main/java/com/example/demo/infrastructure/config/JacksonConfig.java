@@ -12,14 +12,14 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Jackson 配置类 - 处理 LocalDateTime 序列化和 UTF-8 编码
- * 注意: ObjectMapper Bean 已在 AiConfiguration 中定义
+ * 注意: ObjectMapper Bean 由 Spring Boot Jackson 自动配置提供
  */
 @Configuration
 public class JacksonConfig {
 
     /**
-     * Jackson2ObjectMapperBuilderCustomizer 用于 Spring Boot 自动配置
-     * 作为 AiConfiguration 中 ObjectMapper 的补充配置
+     * Jackson2ObjectMapperBuilderCustomizer 用于 Spring Boot 自动配置，
+     * 在自动配置的 ObjectMapper 之上补充时间模块与日期序列化策略。
      */
     @Bean
     public Jackson2ObjectMapperBuilderCustomizer jsonCustomizer() {

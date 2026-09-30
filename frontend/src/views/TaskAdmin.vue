@@ -410,6 +410,9 @@ const loadTasks = async () => {
   }
 }
 
+// 日志请求序号：只有最后一次请求的结果允许写入 logs，避免慢响应覆盖新选择
+let logsRequestId = 0
+
 const selectTask = async (task: ScheduledTask) => {
   currentTask.value = task
   await loadLogs()
@@ -417,18 +420,26 @@ const selectTask = async (task: ScheduledTask) => {
 
 const loadLogs = async () => {
   if (!currentTask.value) return
+  const requestId = ++logsRequestId
+  const taskId = currentTask.value.id
   logLoading.value = true
   try {
-    const res = await taskService.logs(currentTask.value.id, 1, logPageSize.value)
+    const res = await taskService.logs(taskId, 1, logPageSize.value)
+    // 丢弃过期响应：期间已发起新的日志请求，或用户已切换到别的任务
+    if (requestId !== logsRequestId || currentTask.value?.id !== taskId) return
     if (res.success) {
       logs.value = res.data?.records || []
       logTotal.value = res.data?.total || 0
     }
   } catch (e) {
+    if (requestId !== logsRequestId || currentTask.value?.id !== taskId) return
     console.error('加载日志失败:', e)
     message.error('加载日志失败')
   } finally {
-    logLoading.value = false
+    // 过期请求不要关掉新请求的 loading
+    if (requestId === logsRequestId) {
+      logLoading.value = false
+    }
   }
 }
 

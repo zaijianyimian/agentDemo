@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'ort.dpdns.org.mingtops'
-version = '0.0.1-SNAPSHOT'
+version = '0.4.0-rc.1'
 description = 'demo'
 
 java {
@@ -57,9 +57,6 @@ dependencies {
 
     // 邮件监听
     implementation 'com.sun.mail:jakarta.mail:2.0.1'
-
-    // YAML 解析
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2'
 
     // 文档内容提取
     implementation 'org.apache.pdfbox:pdfbox:2.0.29'

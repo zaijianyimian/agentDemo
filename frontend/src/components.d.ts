@@ -30,7 +30,6 @@ declare module 'vue' {
     NFormItem: typeof import('naive-ui')['NFormItem']
     NInput: typeof import('naive-ui')['NInput']
     NInputNumber: typeof import('naive-ui')['NInputNumber']
-    NModal: typeof import('naive-ui')['NModal']
     NPageHeader: typeof import('naive-ui')['NPageHeader']
     NSelect: typeof import('naive-ui')['NSelect']
     NSpace: typeof import('naive-ui')['NSpace']

@@ -56,3 +56,8 @@ jobs:
 
       - name: Compile backend and tests
         run: ./gradlew compileJava compileTestJava --no-daemon
+
+      - name: Run backend tests
+        # 架构测试（Modulith 模块边界、多用户归属、Java/Python 边界）
+        # 是捕获迁移回归的主要闸门，必须随 PR 执行。
+        run: ./gradlew test --no-daemon

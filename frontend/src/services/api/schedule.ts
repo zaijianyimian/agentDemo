@@ -63,15 +63,10 @@ export const scheduleService = {
     return response.data
   },
 
-  parseEmail: async (payload: { subject: string; from: string; content: string }): Promise<ApiResponse<ScheduleEvent>> => {
-    const response = await api.post('/schedule/parse-email', payload)
-    return response.data
-  },
-
-  parseAndSave: async (payload: { subject: string; from: string; content: string }): Promise<ApiResponse<ScheduleEvent>> => {
-    const response = await api.post('/schedule/parse-and-save', payload)
-    return response.data
-  },
+  // 说明：自然语言解析日程（parseEmail / parseAndSave）已迁移到 Python Agent Engine，
+  // Java 不再提供对应端点，因此这里不再声明这两个方法，避免调用方拿到必然 404 的接口。
+  // 需要用自然语言创建日程时，请使用聊天页（/chat），Agent 会创建后回到本列表。
+  // 本页的「AI添加日程」入口会把描述带到聊天页。
 
   listFiles: async (): Promise<string[]> => {
     const response = await api.get('/schedule/files')

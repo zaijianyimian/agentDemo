@@ -32,7 +32,8 @@ const refreshAccessToken = async (): Promise<string | null> => {
         })
 
         if (!resp.ok) {
-          clearTokens()
+          // 仅后端明确判定令牌失效才清除；5xx 等瞬时故障保留 refresh token。
+          if (resp.status === 401 || resp.status === 403) clearTokens()
           return null
         }
 
@@ -45,7 +46,8 @@ const refreshAccessToken = async (): Promise<string | null> => {
         setTokens(payload.data.accessToken, payload.data.refreshToken)
         return payload.data.accessToken as string
       } catch {
-        clearTokens()
+        // 网络中断/超时属于瞬时故障：保留 refresh token，让用户可以重试，
+        // 不要因为一次抖动就销毁本地会话。
         return null
       } finally {
         refreshingPromise = null
@@ -74,7 +76,9 @@ export const fetchWithAuth = async (
 
   const refreshedAccessToken = await refreshAccessToken()
   if (!refreshedAccessToken) {
-    if (window.location.pathname !== '/login') {
+    // 仅在本地确实没有可用令牌时才跳登录；瞬时故障下仍持有旧令牌，
+    // 直接把原始响应交回调用方，由其提示「服务暂时不可用」。
+    if (!getAccessToken() && window.location.pathname !== '/login') {
       window.location.href = buildLoginRedirectUrl(window.location.pathname + window.location.search)
     }
     return response

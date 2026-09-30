@@ -19,7 +19,7 @@
       <div class="hero-context">
         <span>{{ formattedDate }}</span>
         <strong>{{ formattedTime }}</strong>
-        <small>{{ loading ? '正在同步工作区状态…' : 'Workspace 已同步' }}</small>
+        <small>{{ loading ? '正在同步工作区状态…' : loadError ? 'Workspace 同步失败' : 'Workspace 已同步' }}</small>
       </div>
     </section>
 
@@ -53,7 +53,13 @@
           <n-button tertiary size="small" @click="navigate('/inbox')">查看全部</n-button>
         </div>
 
-        <div v-if="attentionItems.length" class="attention-list">
+        <div v-if="loadError && !attentionItems.length" class="dashboard-empty">
+          <n-icon size="32"><AlertIcon /></n-icon>
+          <strong>工作区数据加载失败</strong>
+          <span>{{ loadError }}</span>
+          <n-button size="small" secondary @click="loadDashboard">重新加载</n-button>
+        </div>
+        <div v-else-if="attentionItems.length" class="attention-list">
           <button
             v-for="item in attentionItems"
             :key="itemKey(item)"
@@ -188,6 +194,7 @@ const message = useMessage()
 const authStore = useAuthStore()
 const navStore = useMacNavStore()
 const loading = ref(false)
+const loadError = ref('')
 const currentTime = ref(dayjs())
 let clockTimer: ReturnType<typeof setInterval> | null = null
 
@@ -300,20 +307,27 @@ const navigate = (path?: string) => {
   if (path) router.push(path)
 }
 
-/** 加载统一收件箱摘要；失败时使用最近缓存。 */
+/** 加载统一收件箱摘要；失败时使用最近缓存，没有缓存时展示错误态。 */
 const loadDashboard = async () => {
   loading.value = true
+  loadError.value = ''
   try {
     const response = await inboxService.summary(24)
     if (response.success && response.data) {
       inbox.value = response.data
       writeCachedPayload(DASHBOARD_CACHE_KEY, response.data)
+    } else {
+      loadError.value = response.message || '无法获取工作区数据，请稍后重试'
     }
-  } catch {
+  } catch (error) {
+    console.error('加载工作区数据失败:', error)
     const cached = readCachedPayload<InboxSummary>(DASHBOARD_CACHE_KEY)
     if (cached) {
       inbox.value = cached
+      loadError.value = '数据加载失败，当前展示最近一次缓存数据'
       message.info('首页当前使用最近缓存数据')
+    } else {
+      loadError.value = '数据加载失败，请检查网络或稍后重试'
     }
   } finally {
     loading.value = false

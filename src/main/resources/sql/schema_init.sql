@@ -222,6 +222,10 @@ CREATE TABLE IF NOT EXISTS `scheduled_task` (
 -- 10. 代码片段模块
 -- ============================================
 
+-- 注意：code_snippet 当前无任何 Java 消费者（无实体/Mapper/Controller），
+-- 属于代码片段功能下线后的遗留表。migrant.sql 仍有两处未加保护的引用
+-- （UPDATE code_snippet 与末尾的 UNION ALL 统计），直接删除本表会导致
+-- 多用户迁移脚本失败。清理需配套改写 migrant.sql 后单独执行。
 CREATE TABLE IF NOT EXISTS `code_snippet` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '片段ID',
     `title` VARCHAR(255) NOT NULL COMMENT '标题',
@@ -232,7 +236,7 @@ CREATE TABLE IF NOT EXISTS `code_snippet` (
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     KEY `idx_snippet_language` (`language`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代码片段表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代码片段表(遗留，无消费者)';
 
 -- ============================================
 -- 13. 系统设置模块

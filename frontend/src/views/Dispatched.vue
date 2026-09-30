@@ -94,13 +94,20 @@ async function load() {
   loading.value = true
   try {
     const resp = await dispatchedService.list(pagination.page, pagination.pageSize)
-    if (resp.success) {
+    if (resp.success && resp.data) {
       const data = resp.data as any
       rows.value = data.records || []
       pagination.itemCount = data.total || 0
     } else {
+      rows.value = []
+      pagination.itemCount = 0
       message.error(resp.message || '加载失败')
     }
+  } catch (error) {
+    console.error('加载派发任务失败:', error)
+    rows.value = []
+    pagination.itemCount = 0
+    message.error('加载派发任务失败，请检查网络后重试')
   } finally {
     loading.value = false
   }
@@ -111,23 +118,33 @@ async function refresh() {
 }
 
 async function cancel(id: number) {
-  const resp = await dispatchedService.cancel(id)
-  if (resp.success) {
-    message.success('已取消')
-    load()
-  } else {
-    message.error(resp.message || '取消失败')
+  try {
+    const resp = await dispatchedService.cancel(id)
+    if (resp.success) {
+      message.success('已取消')
+      await load()
+    } else {
+      message.error(resp.message || '取消失败')
+    }
+  } catch (error) {
+    console.error('取消派发任务失败:', error)
+    message.error('取消失败，请检查网络后重试')
   }
 }
 
 /** 将指定派发任务重新加入执行队列。 */
 async function rerun(id: number) {
-  const resp = await dispatchedService.rerun(id)
-  if (resp.success) {
-    message.success('已加入重跑队列')
-    load()
-  } else {
-    message.error(resp.message || '重跑失败')
+  try {
+    const resp = await dispatchedService.rerun(id)
+    if (resp.success) {
+      message.success('已加入重跑队列')
+      await load()
+    } else {
+      message.error(resp.message || '重跑失败')
+    }
+  } catch (error) {
+    console.error('重跑派发任务失败:', error)
+    message.error('重跑失败，请检查网络后重试')
   }
 }
 

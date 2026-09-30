@@ -430,25 +430,6 @@ export interface CodeSnippet {
   updateTime: string
 }
 
-// 代码生成请求类型
-export interface CodeGenerateRequest {
-  type: string
-  name: string
-  fields?: string[]
-  packageName?: string
-  description?: string
-  options?: Record<string, any>
-}
-
-// 代码生成响应类型
-export interface CodeGenerateResponse {
-  success: boolean
-  code?: string
-  fileName?: string
-  filePath?: string
-  message?: string
-}
-
 export interface BackupResult {
   fileName?: string
   filePath?: string
