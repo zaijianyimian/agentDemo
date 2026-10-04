@@ -1,9 +1,10 @@
 import type { ChatMessageEntity, ChatSession } from '@/types'
 import { fetchWithAuth } from '@/services/auth-fetch'
 
-// Python 的 /api/chat 接口直接返回对象或数组，不使用 Java 的 ApiResponse 包装。
+// 聊天接口走 /ai 前缀，由反向代理转发到 Python（生产 nginx 与 Vite 规则一致）。
+// Python 直接返回对象或数组，不使用 Java 的 ApiResponse 包装。
 const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
-  const response = await fetchWithAuth(`/api/chat${path}`, {
+  const response = await fetchWithAuth(`/ai/chat${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init.headers }
   })

@@ -54,8 +54,8 @@
           <strong>{{ currentSession?.title || '新对话' }}</strong>
         </div>
         <div class="chat-context-actions">
-          <span class="mode-status" :class="chatMode">
-            {{ chatModeLabel }}
+          <span class="mode-status">
+            流式对话
           </span>
         </div>
       </header>
@@ -125,19 +125,6 @@
           ></textarea>
 
           <div class="composer-toolbar">
-            <div class="mode-pills">
-              <button
-                v-for="mode in chatModes"
-                :key="mode.value"
-                type="button"
-                :class="['mode-pill', { active: chatMode === mode.value }]"
-                :disabled="loading"
-                @click="chatMode = mode.value"
-              >
-                {{ mode.label }}
-              </button>
-            </div>
-
             <div class="composer-actions">
               <button type="button" class="icon-action" :class="{ active: isVoiceActive }" title="语音输入" @click="toggleVoiceInput">
                 <n-icon size="18"><MicIcon /></n-icon>
@@ -165,7 +152,7 @@
       <div class="execution-summary">
         <div>
           <span>模式</span>
-          <strong>{{ chatModeLabel }}</strong>
+          <strong>流式对话</strong>
         </div>
         <div>
           <span>模型</span>
@@ -242,7 +229,6 @@ import { renderMarkdown, stripThinkContent } from '@/utils/markdown'
 import { formatSessionTime, formatTime } from '@/utils/date-format'
 import { useAuthStore } from '@/stores/auth'
 
-type ChatMode = 'stream' | 'normal'
 type ExecutionStatus = 'idle' | 'running' | 'done' | 'error'
 
 interface ExecutionStep {
@@ -250,11 +236,6 @@ interface ExecutionStep {
   description: string
   status: ExecutionStatus
 }
-
-const chatModes: Array<{ label: string; value: ChatMode }> = [
-  { label: '流式', value: 'stream' },
-  { label: '普通', value: 'normal' }
-]
 
 const starters = [
   '总结今天需要我处理的事情',
@@ -273,7 +254,6 @@ const message = useMessage()
 const authStore = useAuthStore()
 const inputText = ref('')
 const isInputFocused = ref(false)
-const chatMode = ref<ChatMode>('stream')
 const loading = ref(false)
 const messages = ref<ChatMessage[]>([])
 const sessions = ref<ChatSession[]>([])
@@ -294,11 +274,6 @@ const userInitial = computed(() => {
   const name = authStore.user?.displayName || authStore.user?.username || 'U'
   return name.slice(0, 1).toUpperCase()
 })
-const chatModeLabel = computed(() => {
-  if (chatMode.value === 'normal') return '普通对话'
-  return '流式对话'
-})
-
 const executionSteps = computed<ExecutionStep[]>(() => {
   if (executionState.value === 'idle') {
     return [
@@ -448,7 +423,7 @@ const saveSessionTitle = async () => {
   }
 }
 
-/** 发送用户消息，并按当前模式调用 Python 普通或流式接口。 */
+/** 发送用户消息，并调用 Python 流式接口。 */
 const sendMessage = async () => {
   const queryText = inputText.value.trim()
   if (!queryText || loading.value) return
@@ -488,11 +463,7 @@ const sendMessage = async () => {
   scrollToBottom()
 
   try {
-    if (chatMode.value === 'normal') {
-      await normalChat(queryText, assistantMessage)
-    } else {
-      await streamChat(queryText, assistantMessage)
-    }
+    await streamChat(queryText, assistantMessage)
     executionState.value = 'done'
   } catch (error: any) {
     if (error?.name === 'AbortError') {
@@ -549,7 +520,7 @@ const parseSseEvents = (rawEvent: string): string[] => {
 /** 从 Python 读取流式 Agent 回复；必须收到 [DONE] 才视为成功。 */
 const streamChat = async (query: string, messageObj: ChatMessage) => {
   abortController = new AbortController()
-  const apiPath = '/api/chat/turn/stream'
+  const apiPath = '/ai/chat/turn/stream'
 
   const response = await fetchWithAuth(apiPath, {
     method: 'POST',
@@ -602,20 +573,6 @@ const streamChat = async (query: string, messageObj: ChatMessage) => {
     for (const chunk of parseSseEvents(buffer)) await appendVisibleChunk(chunk)
   }
   if (!completed) throw new Error('响应流提前结束')
-}
-
-/** 调用普通非流式聊天接口。 */
-const normalChat = async (query: string, messageObj: ChatMessage) => {
-  abortController = new AbortController()
-  const response = await fetchWithAuth('/api/chat/turn', {
-    method: 'POST',
-    signal: abortController.signal,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id: currentSession.value!.id, message: query })
-  })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const payload = await response.json()
-  messageObj.content = payload.content
 }
 
 /** 中止当前流式响应。 */
@@ -787,8 +744,7 @@ onUnmounted(() => {
 .message-actions button,
 .icon-action,
 .send-btn,
-.starter-grid button,
-.mode-pill {
+.starter-grid button {
   border: 0;
   font: inherit;
   cursor: pointer;
@@ -1206,35 +1162,15 @@ onUnmounted(() => {
 .composer-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
   padding: 7px 8px 8px;
 }
 
-.mode-pills,
 .composer-actions {
   display: flex;
   align-items: center;
   gap: 5px;
-}
-
-.mode-pill {
-  min-height: 28px;
-  padding: 0 8px;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.64rem;
-}
-
-.mode-pill:hover,
-.mode-pill.active {
-  background: var(--bg-card);
-  color: var(--text-primary);
-}
-
-.mode-pill.active {
-  color: var(--primary-color);
 }
 
 .icon-action,

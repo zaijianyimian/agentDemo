@@ -111,7 +111,6 @@ const themeStore = useThemeStore()
 
 const primaryRoutes = [
   { path: '/', label: '工作台', icon: 'home' },
-  { path: '/mvp', label: '讲解 MVP', icon: 'sparkles' },
   { path: '/chat', label: '对话', icon: 'chatbubbles' },
   { path: '/inbox', label: '统一收件箱', icon: 'inbox' },
   { path: '/settings', label: '设置', icon: 'settings' }
@@ -119,7 +118,7 @@ const primaryRoutes = [
 
 const moduleRoutes = [
   { category: 'productivity', path: '/schedule', label: '效率与日程', icon: 'calendar' },
-  { category: 'knowledge', path: '/files', label: '文件', icon: 'book' },
+  { category: 'knowledge', path: '/knowledge', label: '知识与记忆', icon: 'book' },
   { category: 'agent', path: '/dispatched', label: '执行结果', icon: 'sparkles' },
   { category: 'system', path: '/email', label: '系统服务', icon: 'construct' }
 ]

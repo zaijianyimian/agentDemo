@@ -28,6 +28,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -70,7 +71,34 @@ public class JavaMailSupport {
         Session session = Session.getInstance(props);
         Store store = session.getStore(protocol);
         store.connect(host, email, secret);
+        identifyImapClient(store, host);
         return store;
+    }
+
+    /** 网易 IMAP 登录后要求 ID，否则 SELECT/EXAMINE 会被拒为 Unsafe Login。 */
+    public static void identifyImapClient(Store store, String host) throws MessagingException {
+        String lowerHost = host == null ? "" : host.toLowerCase(Locale.ROOT);
+        if (!(lowerHost.endsWith(".163.com") || lowerHost.endsWith(".126.com")
+                || lowerHost.endsWith(".188.com") || lowerHost.endsWith(".yeah.net"))) {
+            return;
+        }
+        Map<String, String> clientId = Map.of(
+                "name", "AgentDemo", "version", "1.0", "vendor", "AgentDemo");
+        try {
+            // 项目同时包含旧 JavaMail 与 Angus；按实际 Session 选中的 provider 调用。
+            if (store instanceof com.sun.mail.imap.IMAPStore imapStore) {
+                imapStore.id(clientId);
+            } else if (store instanceof org.eclipse.angus.mail.imap.IMAPStore imapStore) {
+                imapStore.id(clientId);
+            }
+        } catch (MessagingException error) {
+            try {
+                store.close();
+            } catch (MessagingException closeError) {
+                error.addSuppressed(closeError);
+            }
+            throw error;
+        }
     }
 
     public Folder openFolder(Store store, EmailConfig config, int mode) throws MessagingException {

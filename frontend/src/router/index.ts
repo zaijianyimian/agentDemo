@@ -26,18 +26,6 @@ const routes = [
     meta: { title: '登录', icon: 'lock', public: true, description: '账号密码与邮箱验证码登录。' }
   },
   {
-    path: '/mvp',
-    name: 'MultiUserMvp',
-    component: () => import('@/views/MultiUserMvp.vue'),
-    meta: {
-      title: '多用户安全 MVP',
-      icon: 'shield',
-      public: true,
-      standalone: true,
-      description: '用五个场景快速讲清 Java 多用户隔离改造。'
-    }
-  },
-  {
     path: '/schedule-share/:date',
     name: 'ScheduleShare',
     component: () => import('@/views/ScheduleShare.vue'),
@@ -88,7 +76,7 @@ const routes = [
   {
     path: '/knowledge',
     name: 'Knowledge',
-    component: () => import('@/views/LegacyFeature.vue'),
+    component: () => import('@/views/Knowledge.vue'),
     meta: { title: '知识库', icon: 'book', description: '创建知识库、上传文档并执行 RAG 检索。' }
   },
   {
@@ -178,7 +166,7 @@ const routes = [
   {
     path: '/knowledge-search',
     name: 'KnowledgeSearch',
-    component: () => import('@/views/LegacyFeature.vue'),
+    component: () => import('@/views/Knowledge.vue'),
     meta: { title: '知识搜索', icon: 'search', description: '在知识库中语义搜索文档片段。' }
   },
   {

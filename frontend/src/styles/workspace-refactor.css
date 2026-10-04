@@ -36,26 +36,14 @@ body {
 .page-shell,
 .file-manager,
 .schedule-page,
-.tools-page,
-.skills-page,
-.models-page,
 .knowledge-page,
-.notes-page,
-.snippets-page,
-.reports-page,
 .email-config,
 .email-page,
-.search-page,
 .personal-center,
 .inbox-page,
-.autonomy-center,
-.autonomy-page,
 .dashboard,
-.automation-hub,
 .chat-page,
 .notifications-page,
-.chat-import-page,
-.knowledge-search-page,
 .schedule-reader-page,
 .settings-page {
   width: min(100%, 1520px) !important;
@@ -141,7 +129,6 @@ body {
   letter-spacing: -0.01em;
 }
 
-.ui-grid,
 .ui-stat-grid,
 .section-grid {
   gap: 16px !important;
@@ -174,7 +161,6 @@ body {
   letter-spacing: -0.03em;
 }
 
-.ui-empty,
 .n-empty {
   min-height: 150px;
   border: 1px dashed var(--workspace-border) !important;
@@ -223,105 +209,6 @@ body {
 /* --------------------------------------------------------------------------
  * Scheduled tasks: keep behavior, remove old macOS/automation visual language
  * -------------------------------------------------------------------------- */
-
-.automation-hub {
-  position: relative;
-  display: grid !important;
-  gap: 18px !important;
-  min-height: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-}
-
-.automation-hub .hub-bg {
-  display: none !important;
-}
-
-.automation-hub .hub-header {
-  position: static !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 16px !important;
-  min-height: 82px !important;
-  padding: 18px 20px !important;
-  border: 1px solid var(--workspace-border) !important;
-  border-radius: var(--workspace-panel-radius) !important;
-  background: var(--bg-card) !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-}
-
-.automation-hub .breadcrumb-item,
-.automation-hub .breadcrumb-separator,
-.automation-hub .header-subtitle {
-  color: var(--text-muted) !important;
-}
-
-.automation-hub .breadcrumb-current {
-  color: var(--text-primary) !important;
-  font-weight: 700;
-}
-
-.automation-hub .stats-row {
-  display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  gap: 12px !important;
-  margin: 0 !important;
-}
-
-.automation-hub .stat-card,
-.automation-hub .task-panel,
-.automation-hub .template-section {
-  border: 1px solid var(--workspace-border) !important;
-  border-radius: var(--workspace-panel-radius) !important;
-  background: var(--bg-card) !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-}
-
-.automation-hub .stat-card {
-  min-height: 92px !important;
-  padding: 16px !important;
-}
-
-.automation-hub .stat-icon,
-.automation-hub .template-icon {
-  box-shadow: none !important;
-}
-
-.automation-hub .hub-grid {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr) !important;
-  gap: 16px !important;
-  margin: 0 !important;
-}
-
-.automation-hub .task-panel,
-.automation-hub .template-section {
-  padding: 18px !important;
-}
-
-.automation-hub .task-item,
-.automation-hub .template-card {
-  border: 1px solid transparent !important;
-  border-radius: 10px !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.automation-hub .task-item:hover,
-.automation-hub .task-item.active,
-.automation-hub .template-card:hover {
-  transform: none !important;
-  border-color: var(--workspace-border) !important;
-  background: var(--workspace-soft) !important;
-  box-shadow: none !important;
-}
-
-.automation-hub .template-overlay {
-  display: none !important;
-}
 
 /* --------------------------------------------------------------------------
  * Settings: retain section logic while making the huge page easier to scan
@@ -374,43 +261,8 @@ body {
  * Knowledge / capability / operational pages
  * -------------------------------------------------------------------------- */
 
-.kb-card,
-.search-card,
-.tool-card,
-.skill-card,
-.model-card,
-.note-card,
-.file-card,
 .calendar-event {
   box-shadow: none !important;
-}
-
-.kb-card,
-.search-card,
-.tool-card,
-.skill-card,
-.model-card,
-.note-card,
-.file-card {
-  border-color: var(--workspace-border) !important;
-}
-
-.kb-card:hover,
-.search-card:hover,
-.tool-card:hover,
-.skill-card:hover,
-.model-card:hover,
-.note-card:hover,
-.file-card:hover {
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-.kb-card.active,
-.tool-card.active,
-.skill-card.active,
-.model-card.active {
-  border-color: color-mix(in srgb, var(--primary-color) 42%, var(--workspace-border)) !important;
 }
 
 .calendar-event {
@@ -442,7 +294,6 @@ body {
  * -------------------------------------------------------------------------- */
 
 @media (max-width: 1100px) {
-  .automation-hub .hub-grid,
   .settings-page .settings-container {
     grid-template-columns: 1fr !important;
   }
@@ -465,18 +316,7 @@ body {
   }
 
   .ui-panel,
-  .automation-hub .task-panel,
-  .automation-hub .template-section,
   .settings-page .setting-card {
     padding: 14px !important;
-  }
-
-  .automation-hub .stats-row {
-    grid-template-columns: 1fr !important;
-  }
-
-  .automation-hub .hub-header {
-    align-items: flex-start !important;
-    flex-direction: column !important;
   }
 }

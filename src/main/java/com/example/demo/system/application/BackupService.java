@@ -1,6 +1,5 @@
 package com.example.demo.system.application;
 
-import com.example.demo.shared.dto.ApiResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

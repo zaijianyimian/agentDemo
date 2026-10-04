@@ -66,6 +66,31 @@
       </div>
     </section>
 
+    <section v-if="aiAnalysis" class="surface-panel">
+      <div class="section-head">
+        <div>
+          <div class="page-eyebrow">AI Analysis</div>
+          <h3>邮件 AI 分析</h3>
+        </div>
+        <div class="analysis-tags">
+          <n-tag v-if="aiAnalysis.category" size="small" round>
+            {{ aiAnalysis.category }}
+          </n-tag>
+          <n-tag v-if="aiAnalysis.priority" size="small" round :type="priorityTagType">
+            {{ aiAnalysis.priority }}
+          </n-tag>
+          <n-tag size="small" round :type="aiAnalysis.need_action ? 'warning' : 'default'">
+            {{ aiAnalysis.need_action ? '需要处理' : '无需处理' }}
+          </n-tag>
+        </div>
+      </div>
+      <p v-if="aiAnalysis.summary" class="analysis-summary">{{ aiAnalysis.summary }}</p>
+      <p v-else class="analysis-summary muted">Agent 尚未生成摘要（当前状态：{{ aiAnalysis.status }}）</p>
+      <p v-if="aiAnalysis.error_message" class="analysis-summary error">
+        分析失败：{{ aiAnalysis.error_message }}
+      </p>
+    </section>
+
     <section class="surface-panel">
       <div class="section-head">
         <div>
@@ -202,6 +227,7 @@ import {
   emailAttachmentService
 } from '@/services/api/email-attachment'
 import { emailService } from '@/services/api/email'
+import { type AiEmailAnalysis, emailAnalysisService } from '@/services/api/email-analysis'
 
 interface EmailDetail {
   messageId?: string
@@ -224,6 +250,10 @@ const message = useMessage()
 
 const messageId = computed(() => decodeURIComponent(String(route.params.messageId ?? '')))
 const email = ref<EmailDetail | null>(null)
+// 邮件级 AI 分析结果，由 Python EmailAgent 生成并持久化在 PostgreSQL。
+// Java 的 /api/email/messages/{messageId} 读的是监听进程内存缓存，
+// 重启或淘汰后即失效，不能作为分析结果的长期来源。
+const aiAnalysis = ref<AiEmailAnalysis | null>(null)
 const analyses = ref<EmailAttachmentAnalysis[]>([])
 const loading = ref(false)
 const retryingId = ref<number | null>(null)
@@ -233,6 +263,16 @@ const previewUrl = ref<string | null>(null)
 const previewTitle = ref('')
 
 const headerTitle = computed(() => email.value?.subject || '邮件详情')
+
+// EmailPriority 的取值为 LOW / NORMAL / HIGH / URGENT，与数据库 CHECK 约束一致。
+const priorityTagType = computed(() => {
+  switch (aiAnalysis.value?.priority) {
+    case 'URGENT': return 'error'
+    case 'HIGH': return 'warning'
+    case 'LOW': return 'success'
+    default: return 'default'
+  }
+})
 const headerSubtitle = computed(() =>
   email.value?.accountEmail ? `来自 ${email.value.accountEmail}` : messageId.value
 )
@@ -262,6 +302,17 @@ const loadAnalyses = async () => {
     message.error(e?.message || '加载附件解析结果失败')
   } finally {
     loading.value = false
+  }
+}
+
+/** 加载邮件级 AI 分析结果。尚未分析完成时保持为空，不打断详情页。 */
+const loadAiAnalysis = async () => {
+  if (!messageId.value) return
+  try {
+    aiAnalysis.value = await emailAnalysisService.getByMessageId(messageId.value)
+  } catch (e: any) {
+    aiAnalysis.value = null
+    message.error(e?.message || '加载 AI 分析结果失败')
   }
 }
 
@@ -342,13 +393,16 @@ const formatDate = (value?: string) => {
 onMounted(() => {
   loadEmail()
   loadAnalyses()
+  loadAiAnalysis()
 })
 
 watch(messageId, () => {
   email.value = null
   analyses.value = []
+  aiAnalysis.value = null
   loadEmail()
   loadAnalyses()
+  loadAiAnalysis()
 })
 </script>
 
@@ -357,6 +411,26 @@ watch(messageId, () => {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.analysis-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.analysis-summary {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--text-color-1, inherit);
+}
+
+.analysis-summary.muted {
+  opacity: 0.7;
+}
+
+.analysis-summary.error {
+  color: #d03050;
 }
 
 .meta-card,

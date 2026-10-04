@@ -22,6 +22,32 @@
       </button>
     </section>
 
+    <section class="surface-panel semantic-panel" aria-label="邮件语义搜索">
+      <div class="section-head">
+        <div><h3>按含义查找邮件</h3><p>描述你要找的内容，例如“客户要求延后交付的邮件”。</p></div>
+        <n-button size="small" :loading="rebuilding" :disabled="!indexStatus?.enabled" @click="rebuildEmailIndex">补建邮件索引</n-button>
+      </div>
+      <form class="semantic-form" @submit.prevent="searchEmails">
+        <n-input v-model:value="semanticQuery" aria-label="邮件搜索内容" placeholder="输入邮件内容或问题" :maxlength="2000" />
+        <n-button type="primary" attr-type="submit" :loading="searching" :disabled="!semanticQuery.trim() || !indexStatus?.enabled">搜索</n-button>
+        <n-button v-if="searchPerformed" @click="clearSemanticSearch">清除</n-button>
+      </form>
+      <div class="semantic-dates">
+        <label>开始时间 <input v-model="searchFrom" type="datetime-local" /></label>
+        <label>结束时间 <input v-model="searchBefore" type="datetime-local" /></label>
+      </div>
+      <p class="semantic-status" role="status">{{ indexMessage }}</p>
+      <p v-if="searchError" class="semantic-error" role="alert">{{ searchError }}</p>
+      <div v-if="searchResults.length" class="semantic-results">
+        <button v-for="hit in searchResults" :key="hit.email_id" type="button" class="semantic-hit" @click="openSource(hit.email_id)">
+          <strong>{{ hit.subject }}</strong>
+          <small>{{ hit.sender }} · {{ hit.received_at ? formatTime(hit.received_at) : '时间未知' }}</small>
+          <p>{{ hit.snippet }}</p><span>查看邮件来源</span>
+        </button>
+      </div>
+      <p v-else-if="searchPerformed && !searching && !searchError">{{ searchResultMessage }}</p>
+    </section>
+
     <section class="inbox-toolbar">
       <div class="filter-tabs" role="tablist" aria-label="收件箱筛选">
         <button
@@ -159,6 +185,16 @@
         </section>
       </aside>
     </div>
+    <n-modal v-model:show="showSource" preset="card" title="邮件来源" class="email-source-modal" style="width: min(720px, 94vw)">
+      <p v-if="sourceLoading">正在读取邮件…</p>
+      <div v-else-if="sourceEmail">
+        <h3>{{ sourceEmail.subject || '无主题' }}</h3>
+        <p>{{ sourceEmail.sender }} · {{ sourceEmail.received_at ? formatTime(sourceEmail.received_at) : '时间未知' }}</p>
+        <p v-if="sourceEmail.summary">{{ sourceEmail.summary }}</p>
+        <pre class="source-body">{{ sourceEmail.content || '这封邮件没有纯文本正文。' }}</pre>
+      </div>
+      <p v-else role="alert">{{ sourceError }}</p>
+    </n-modal>
   </UiPage>
 </template>
 
@@ -171,7 +207,7 @@
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NCheckbox, NIcon, NTag, useMessage } from 'naive-ui'
+import { NButton, NCheckbox, NIcon, NTag, NInput, NModal, useMessage } from 'naive-ui'
 import {
   AlertCircleOutline as AlertIcon,
   CalendarOutline as CalendarIcon,
@@ -182,6 +218,7 @@ import {
   TimeOutline as TaskIcon
 } from '@vicons/ionicons5'
 import type { InboxItem, InboxSummary } from '@/types'
+import { emailAnalysisService, type EmailSearchHit, type EmailIndexStatus, type AiEmailAnalysis } from '@/services/api/email-analysis'
 import { inboxService } from '@/services/api/inbox'
 import { scheduleService } from '@/services/api/schedule'
 import { taskService } from '@/services/api/task'
@@ -361,10 +398,114 @@ const batchExecuteTasks = async () => {
   await loadInbox()
 }
 
-onMounted(loadInbox)
+const semanticQuery = ref('')
+const searchFrom = ref('')
+const searchBefore = ref('')
+const searching = ref(false)
+const rebuilding = ref(false)
+const searchPerformed = ref(false)
+const searchResults = ref<EmailSearchHit[]>([])
+const searchError = ref('')
+const searchResultMessage = ref('')
+const indexStatus = ref<EmailIndexStatus | null>(null)
+const indexError = ref('')
+const showSource = ref(false)
+const sourceLoading = ref(false)
+const sourceEmail = ref<AiEmailAnalysis | null>(null)
+const sourceError = ref('')
+let sourceRequest = 0
+const indexMessage = computed(() => {
+  if (indexError.value) return indexError.value
+  const status = indexStatus.value
+  if (!status) return '正在读取索引状态…'
+  if (!status.enabled) return status.message
+  const counts = status.counts
+  return `已索引 ${counts.ready || 0} / ${status.total_emails || 0} 封 · 等待 ${(counts.pending || 0) + (counts.retry || 0)} 封 · 失败 ${counts.failed || 0} 封。${status.message}`
+})
+const loadIndexStatus = async () => {
+  try {
+    indexStatus.value = await emailAnalysisService.indexStatus()
+    indexError.value = ''
+  } catch (error) {
+    indexError.value = error instanceof Error ? error.message : '索引状态不可用'
+  }
+}
+const searchEmails = async () => {
+  if (!semanticQuery.value.trim() || searching.value) return
+  searching.value = true
+  searchPerformed.value = true
+  searchResults.value = []
+  searchError.value = ''
+  try {
+    const lower = searchFrom.value ? new Date(searchFrom.value).toISOString() : undefined
+    const upper = searchBefore.value ? new Date(searchBefore.value).toISOString() : undefined
+    if (lower && upper && upper <= lower) throw new Error('结束时间必须晚于开始时间')
+    const result = await emailAnalysisService.search(semanticQuery.value.trim(), lower, upper)
+    searchResults.value = result.results
+    searchResultMessage.value = result.message
+  } catch (error) {
+    searchError.value = error instanceof Error ? error.message : '搜索失败'
+  } finally {
+    searching.value = false
+    void loadIndexStatus()
+  }
+}
+const clearSemanticSearch = () => {
+  semanticQuery.value = ''
+  searchResults.value = []
+  searchError.value = ''
+  searchPerformed.value = false
+}
+const rebuildEmailIndex = async () => {
+  rebuilding.value = true
+  try {
+    const result = await emailAnalysisService.rebuildIndex()
+    message.success(result.message)
+    await loadIndexStatus()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '补建失败')
+  } finally {
+    rebuilding.value = false
+  }
+}
+const openSource = async (id: number) => {
+  const request = ++sourceRequest
+  showSource.value = true
+  sourceLoading.value = true
+  sourceEmail.value = null
+  sourceError.value = ''
+  try {
+    const email = await emailAnalysisService.getById(id)
+    if (request === sourceRequest) sourceEmail.value = email
+  } catch (error) {
+    if (request === sourceRequest) sourceError.value = error instanceof Error ? error.message : '邮件来源不可用'
+  } finally {
+    if (request === sourceRequest) sourceLoading.value = false
+  }
+}
+watch(() => route.query.email, value => {
+  if (typeof value === 'string' && /^[1-9]\d*$/.test(value)) void openSource(Number(value))
+}, { immediate: true })
+onMounted(() => { void loadInbox(); void loadIndexStatus() })
 </script>
 
 <style scoped>
+.semantic-panel { padding: 20px; }
+.semantic-form { display: flex; gap: 10px; }
+.semantic-form .n-input { flex: 1; }
+.semantic-dates { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.semantic-dates label { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 0.8rem; }
+.semantic-dates input { max-width: 100%; padding: 7px; border: 1px solid var(--border-light); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); }
+.semantic-status { margin-top: 12px; font-size: 0.8rem; color: var(--text-secondary); }
+.semantic-error { color: var(--error-color, #dc2626); }
+.semantic-results { display: grid; gap: 10px; margin-top: 14px; }
+.semantic-hit { display: grid; gap: 6px; padding: 14px; text-align: left; color: var(--text-primary); background: var(--bg-input); border: 1px solid var(--border-light); border-radius: 10px; cursor: pointer; overflow-wrap: anywhere; }
+.semantic-hit small { color: var(--text-secondary); }
+.semantic-hit p { white-space: pre-wrap; max-height: 7rem; overflow: hidden; margin: 0; }
+.semantic-hit span { color: var(--primary-color); }
+.source-body { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow-y: auto; font: inherit; }
+@media (max-width: 600px) { .semantic-form { flex-wrap: wrap; } .semantic-form .n-input { flex-basis: 100%; } .semantic-panel .section-head { flex-wrap: wrap; } }
+
 .agent-inbox-page {
   gap: 18px;
 }

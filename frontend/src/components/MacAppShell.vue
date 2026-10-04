@@ -172,12 +172,7 @@ const isMobile = computed(() => windowWidth.value < 768)
 const isTablet = computed(() => windowWidth.value >= 768 && windowWidth.value < 1200)
 const effectiveSidebarCollapsed = computed(() => sidebarCollapsed.value || isTablet.value)
 
-const actualTheme = computed(() => {
-  if (themeStore.mode === 'auto') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
-  return themeStore.mode
-})
+const actualTheme = computed(() => themeStore.actualTheme)
 
 const currentTitle = computed(() => (route.meta.title as string) || 'Agent Workspace')
 const currentCategoryLabel = computed(() =>

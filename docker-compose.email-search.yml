@@ -1,0 +1,27 @@
+# Email search overlay; the base docker-compose.yml is machine-local and ignored.
+# docker compose -f docker-compose.yml -f docker-compose.email-search.yml --profile email-search up -d qdrant graph
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.15.5
+    profiles: ["email-search"]
+    restart: unless-stopped
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - default
+  graph:
+    environment:
+      EMAIL_SEARCH_ENABLED: ${EMAIL_SEARCH_ENABLED:-false}
+      KNOWLEDGE_ENABLED: ${KNOWLEDGE_ENABLED:-false}
+      MEMORY_AUTO_SAVE_ENABLED: ${MEMORY_AUTO_SAVE_ENABLED:-false}
+      MEMORY_ASSESSMENT_TIMEOUT_SECONDS: ${MEMORY_ASSESSMENT_TIMEOUT_SECONDS:-12}
+      MEMORY_ENABLED: ${MEMORY_ENABLED:-false}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
+      EMBEDDING_REVISION: ${EMBEDDING_REVISION:-v1}
+volumes:
+  qdrant-data:

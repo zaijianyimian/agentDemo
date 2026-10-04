@@ -28,8 +28,6 @@ public class CacheConfig implements CachingConfigurer {
     public static final String USER_ACCOUNT_BY_USERNAME = "userAccountByUsername";
     public static final String USER_ACCOUNT_BY_EMAIL = "userAccountByEmail";
     public static final String USER_ACCOUNT_BY_LOGIN = "userAccountByLogin";
-    public static final String SETTINGS_ALL = "settingsAll";
-    public static final String SETTINGS_BY_CATEGORY = "settingsByCategory";
     public static final String SETTINGS_BY_KEY = "settingsByKey";
     public static final String NOTE_LIST = "noteList";
     public static final String NOTE_DETAIL = "noteDetail";
@@ -54,8 +52,6 @@ public class CacheConfig implements CachingConfigurer {
                 USER_ACCOUNT_BY_USERNAME,
                 USER_ACCOUNT_BY_EMAIL,
                 USER_ACCOUNT_BY_LOGIN,
-                SETTINGS_ALL,
-                SETTINGS_BY_CATEGORY,
                 SETTINGS_BY_KEY,
                 NOTE_LIST,
                 NOTE_DETAIL,

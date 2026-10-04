@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -19,6 +18,9 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -40,7 +42,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    @Qualifier("tokenVersionValidationFilter")
-                                                   OncePerRequestFilter tokenVersionValidationFilter) throws Exception {
+                                                   OncePerRequestFilter tokenVersionValidationFilter,
+                                                   @Qualifier("internalServiceTokenFilter")
+                                                   OncePerRequestFilter internalServiceTokenFilter) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -62,21 +66,17 @@ public class SecurityConfig {
                                 // TokenIntrospectionController 手动完成完整校验。
                                 // 该端点只返回 userId，不承担聊天业务或 Agent 网关职责。
                                 "/api/auth/introspect",
+                                // 服务间接口：调用方是 Python 而非浏览器，没有用户登录态。
+                                // 鉴权由 InternalServiceTokenFilter 依据共享令牌完成，
+                                // 因此不能落到 anyRequest().authenticated()，也不能匿名放行。
+                                "/api/internal/**",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.PUT, "/api/settings/**")
-                        .hasAuthority("SCOPE_platform.admin")
-                        .requestMatchers(HttpMethod.POST, "/api/settings/**")
-                        .hasAuthority("SCOPE_platform.admin")
-                        .requestMatchers(HttpMethod.DELETE, "/api/settings/**")
-                        .hasAuthority("SCOPE_platform.admin")
                         .requestMatchers(
                                 "/api/backup/**",
                                 "/api/autonomy/**",
-                                "/api/settings/data/**",
-                                "/api/settings/system/**",
                                 "/api/mcp/tools/sync/**",
                                 "/api/skill/sync/**",
                                 "/api/skill/reload",
@@ -87,7 +87,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(Customizer.withDefaults())
+                        .jwt(jwt -> jwt
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter()))
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(401);
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -103,7 +104,10 @@ public class SecurityConfig {
                             response.getWriter().write("{\"success\":false,\"message\":\"无权限访问该资源\"}");
                         })
                 )
-                .addFilterAfter(tokenVersionValidationFilter, BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(tokenVersionValidationFilter, BearerTokenAuthenticationFilter.class)
+                // 服务间鉴权先于 JWT 解析执行：Python 调用 /api/internal/** 时不携带
+                // 浏览器令牌，共享令牌是唯一的准入凭据。
+                .addFilterBefore(internalServiceTokenFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }
@@ -136,6 +140,38 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * 把令牌里的 {@code roles} 声明映射为 Spring Security 权限。
+     *
+     * <p>{@link com.example.demo.auth.application.JwtTokenService} 写入的是 {@code roles} claim
+     * （如 {@code USER} / {@code ADMIN}），而 Spring 默认只从 {@code scope} claim 取权限，
+     * 两者对不上会导致 {@code hasAuthority("SCOPE_platform.admin")} 永远不成立。
+     * 这里显式转换：管理员角色额外授予 {@code SCOPE_platform.admin}，
+     * 并保留 {@code SCOPE_} + {@code scope} 的默认行为以兼容既有令牌。</p>
+     */
+    private JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        // 保留 Spring 默认的 scope claim 转换，兼容使用标准 scope 的外部令牌。
+        JwtGrantedAuthoritiesConverter scopeConverter = new JwtGrantedAuthoritiesConverter();
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            java.util.List<org.springframework.security.core.GrantedAuthority> authorities =
+                    new java.util.ArrayList<>(scopeConverter.convert(jwt));
+            Object roles = jwt.getClaims().get("roles");
+            if (roles instanceof java.util.Collection<?> collection) {
+                boolean admin = collection.stream()
+                        .map(Object::toString)
+                        .map(String::trim)
+                        .anyMatch("ADMIN"::equalsIgnoreCase);
+                // 角色为 ADMIN 时授予平台管理员权限；其他角色不额外提权。
+                if (admin) {
+                    authorities.add(new SimpleGrantedAuthority("SCOPE_platform.admin"));
+                }
+            }
+            return authorities;
+        });
+        return converter;
     }
 
     private SecretKey hmacKey(String secret) {

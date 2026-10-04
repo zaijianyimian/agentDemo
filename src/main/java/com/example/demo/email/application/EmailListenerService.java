@@ -3,12 +3,12 @@ package com.example.demo.email.application;
 import com.example.demo.email.domain.EmailConfig;
 import com.example.demo.email.domain.EmailMessage;
 import com.example.demo.email.application.listener.EmailListenerManager;
+import com.example.demo.email.application.listener.JavaMailSupport;
 import com.example.demo.email.events.EmailReceivedEvent;
 import com.example.demo.email.persistence.AttachmentStorageService;
 import com.example.demo.email.persistence.EmailConfigMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.PreDestroy;
 import jakarta.mail.*;
 import jakarta.mail.event.MessageCountAdapter;
@@ -215,6 +215,7 @@ public class EmailListenerService {
         // 连接Store
         Store store = session.getStore(protocol);
         store.connect(host, email, authCredential.secret());
+        JavaMailSupport.identifyImapClient(store, host);
 
         // 保存连接
         Long configId = config.getId();
@@ -889,6 +890,7 @@ public class EmailListenerService {
             // 连接Store
             Store store = session.getStore(protocol);
             store.connect(host, email, authCredential.secret());
+            JavaMailSupport.identifyImapClient(store, host);
 
             // 测试打开文件夹
             Folder folder = store.getFolder(folderName);

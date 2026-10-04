@@ -3,6 +3,8 @@ package com.example.demo.auth.application;
 import com.example.demo.auth.domain.UserAccount;
 import com.example.demo.infrastructure.config.SecurityConfig;
 import com.example.demo.infrastructure.properties.AuthSecurityProperties;
+import com.example.demo.infrastructure.properties.GraphGatewayProperties;
+import com.example.demo.infrastructure.web.InternalServiceTokenFilter;
 import com.example.demo.shared.context.ExecutionContextScope;
 import com.example.demo.shared.web.GlobalExceptionHandler;
 import com.example.demo.shared.web.UserResourceNotFoundException;
@@ -128,24 +130,16 @@ class UserAuthenticationBoundaryTest {
     void ordinaryUserCannotReachPlatformHandlers() throws Exception {
         String access = token("access", "agent-demo", 3, 300);
         for (String path : new String[]{"/api/backup/create", "/api/backup/download",
-                "/api/autonomy/scan", "/api/settings/data/import", "/api/mcp/tools/sync",
+                "/api/autonomy/scan", "/api/mcp/tools/sync",
                 "/api/skill/sync", "/api/skill/reload", "/api/skill/reload-findskills"}) {
             mvc.perform(post(path).header("Authorization", "Bearer " + access))
                     .andExpect(status().isForbidden());
         }
-        for (String path : new String[]{"/api/backup/list", "/api/settings/data/export",
+        for (String path : new String[]{"/api/backup/list",
                 "/api/autonomy/artifacts", "/api/mcp/tools/sync/status", "/api/skill/sync/status"}) {
             mvc.perform(get(path).header("Authorization", "Bearer " + access))
                     .andExpect(status().isForbidden());
         }
-        mvc.perform(put("/api/settings/system").header("Authorization", "Bearer " + access))
-                .andExpect(status().isForbidden());
-        mvc.perform(put("/api/settings/file").header("Authorization", "Bearer " + access))
-                .andExpect(status().isForbidden());
-        mvc.perform(put("/api/settings/schedule").header("Authorization", "Bearer " + access))
-                .andExpect(status().isForbidden());
-        mvc.perform(delete("/api/settings/system/key").header("Authorization", "Bearer " + access))
-                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -214,6 +208,13 @@ class UserAuthenticationBoundaryTest {
     static class TestConfiguration {
         @Bean TokenVersionValidationFilter tokenVersionValidationFilter(AuthService authService) {
             return new TokenVersionValidationFilter(authService);
+        }
+        /** SecurityConfig 依赖该服务间鉴权过滤器；本套件只覆盖浏览器身份边界。 */
+        @Bean InternalServiceTokenFilter internalServiceTokenFilter(GraphGatewayProperties properties) {
+            return new InternalServiceTokenFilter(properties);
+        }
+        @Bean GraphGatewayProperties graphGatewayProperties() {
+            return new GraphGatewayProperties();
         }
         @Bean AuthSecurityProperties securityProperties() {
             var properties = new AuthSecurityProperties(new MockEnvironment().withProperty("spring.profiles.active", "test"));

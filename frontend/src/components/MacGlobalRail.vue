@@ -125,12 +125,7 @@ const activeCategory = computed(() => macNavStore.activeCategory)
 const topQuickAccess = computed(() => macNavStore.topQuickAccess)
 const userDisplayName = computed(() => authStore.user?.displayName || authStore.user?.username || 'User')
 const userInitial = computed(() => userDisplayName.value.slice(0, 1).toUpperCase())
-const actualTheme = computed(() => {
-  if (themeStore.mode === 'auto') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
-  return themeStore.mode
-})
+const actualTheme = computed(() => themeStore.actualTheme)
 
 // Icon mapping
 const iconMap: Record<string, any> = {

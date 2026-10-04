@@ -3,16 +3,12 @@
     <UiPageHeader
       eyebrow="Schedule Butler"
       title="日程管理"
-      subtitle="统一查看事件、解析邮件来源日程，并在列表和日历视图之间快速切换。"
+      subtitle="查看助手安排的日程，也可以手动创建、编辑、完成或删除。"
     >
       <template #actions>
-        <n-button type="primary" @click="showAddModal = true">
+        <n-button type="primary" @click="openCreate">
           <template #icon><n-icon><AddIcon /></n-icon></template>
           添加日程
-        </n-button>
-        <n-button @click="showAiAddModal = true">
-          <template #icon><n-icon><AddIcon /></n-icon></template>
-          AI添加
         </n-button>
         <n-button @click="loadSchedules">
           <template #icon><n-icon><RefreshIcon /></n-icon></template>
@@ -41,9 +37,11 @@
             <template #header-extra>
               <n-space>
                 <n-tag v-if="event.status === 'completed'" type="success" size="small">已完成</n-tag>
+                <n-tag v-else-if="event.status === 'cancelled'" size="small">已取消</n-tag>
                 <n-tag v-else type="warning" size="small">待处理</n-tag>
+                <n-button size="small" @click="openEdit(event)">编辑</n-button>
                 <n-dropdown :options="getActionOptions()" @select="(key: string) => handleAction(key, event)">
-                  <n-button quaternary size="small">
+                  <n-button quaternary size="small" :aria-label="`日程操作：${event.title}`">
                     <template #icon><n-icon><EllipsisIcon /></n-icon></template>
                   </n-button>
                 </n-dropdown>
@@ -89,7 +87,7 @@
     </UiPanel>
 
     <!-- 添加日程弹窗 -->
-    <n-modal v-model:show="showAddModal" preset="card" title="添加日程" style="width: 500px">
+    <n-modal v-model:show="showAddModal" preset="card" :title="editingId ? '编辑日程' : '添加日程'" style="width: min(500px, 92vw)">
       <n-form ref="formRef" :model="newEvent" label-placement="left" label-width="80">
         <n-form-item label="标题" path="title">
           <n-input v-model:value="newEvent.title" placeholder="输入日程标题" />
@@ -103,11 +101,13 @@
         <n-form-item label="地点" path="location">
           <n-input v-model:value="newEvent.location" placeholder="输入地点" />
         </n-form-item>
+        <n-form-item label="状态"><n-select v-model:value="newEvent.status" :options="statusOptions" /></n-form-item>
+        <n-form-item label="邮件提醒"><n-switch v-model:value="newEvent.reminderEnabled" /></n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
           <n-button @click="showAddModal = false">取消</n-button>
-          <n-button type="primary" @click="addEvent">确定</n-button>
+          <n-button type="primary" :loading="saving" @click="saveEvent">保存</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -120,7 +120,7 @@
         </n-descriptions-item>
         <n-descriptions-item label="状态">
           <n-tag :type="currentEvent?.status === 'completed' ? 'success' : 'warning'" size="small">
-            {{ currentEvent?.status === 'completed' ? '已完成' : '待处理' }}
+            {{ currentEvent?.status === 'completed' ? '已完成' : currentEvent?.status === 'cancelled' ? '已取消' : '待处理' }}
           </n-tag>
         </n-descriptions-item>
         <n-descriptions-item label="时间">
@@ -153,6 +153,8 @@
       <template #footer>
         <n-space justify="end">
           <n-button @click="showDetailModal = false">关闭</n-button>
+          <n-button @click="currentEvent && openEdit(currentEvent)">编辑</n-button>
+          <n-button type="error" @click="currentEvent && confirmDelete(currentEvent)">删除</n-button>
           <n-button type="primary" @click="completeCurrentEvent" :disabled="currentEvent?.status === 'completed'">
             标记完成
           </n-button>
@@ -160,33 +162,12 @@
       </template>
     </n-modal>
 
-    <!-- AI添加日程弹窗 -->
-    <n-modal v-model:show="showAiAddModal" preset="card" title="AI添加日程" style="width: 500px">
-      <div class="ai-add-hint">
-        用自然语言描述您的日程，AI会自动提取时间、地点等信息
-      </div>
-      <n-input
-        v-model:value="aiInput"
-        type="textarea"
-        :rows="4"
-        placeholder="例如：明天下午3点在会议室A开会讨论项目进度"
-        :disabled="aiLoading"
-      />
-      <template #footer>
-        <n-space justify="end">
-          <n-button @click="showAiAddModal = false">取消</n-button>
-          <n-button type="primary" :loading="aiLoading" @click="aiAddSchedule">
-            AI创建
-          </n-button>
-        </n-space>
-      </template>
-    </n-modal>
   </UiPage>
 </template>
 
 <script setup lang="ts">
 /**
- * 日程管理页面：列表/日历双视图，AI 自然语言解析创建，支持完成与删除。
+ * 日程管理页面：列表/日历双视图，支持手动创建、编辑、完成与删除。
  */
 import { ref, computed, onMounted } from 'vue'
 import {
@@ -203,12 +184,15 @@ import {
   NFormItem,
   NInput,
   NDatePicker,
+  NSelect,
+  NSwitch,
   NEmpty,
   NDescriptions,
   NDescriptionsItem,
   NCalendar,
   NRadioButton,
   NRadioGroup,
+  useDialog,
   useMessage
 } from 'naive-ui'
 import {
@@ -222,24 +206,29 @@ import {
 import { scheduleService } from '@/services/api/schedule'
 import type { ScheduleEvent } from '@/types'
 import dayjs from 'dayjs'
-import { formatDateTime as formatTime } from '@/utils/date-format'
+
 import { UiPage, UiPageHeader, UiPanel, UiStat } from '@/components/ui'
 
 const message = useMessage()
+const dialog = useDialog()
+const editingId = ref<number | null>(null)
+const saving = ref(false)
+const statusOptions = [{ label: '待处理', value: 'pending' }, { label: '已完成', value: 'completed' }, { label: '已取消', value: 'cancelled' }]
+const eventTimestamp = (time: string) => dayjs(time.replace('T ', 'T')).valueOf()
+const formatTime = (time: string) => dayjs(eventTimestamp(time)).format('YYYY-MM-DD HH:mm')
 const viewMode = ref('list')
 const schedules = ref<ScheduleEvent[]>([])
 const showAddModal = ref(false)
 const showDetailModal = ref(false)
-const showAiAddModal = ref(false)
 const currentEvent = ref<ScheduleEvent | null>(null)
 const calendarDate = ref(Date.now())
-const aiInput = ref('')
-const aiLoading = ref(false)
 const newEvent = ref({
   title: '',
   description: '',
   eventTime: null as number | null,
-  location: ''
+  location: '',
+  status: 'pending',
+  reminderEnabled: false
 })
 
 // 今日日程
@@ -256,78 +245,92 @@ const tomorrowSchedules = computed(() => {
 
 // 过滤后的日程
 const filteredSchedules = computed(() => {
-  return schedules.value.sort((a, b) =>
-    new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime()
+  return [...schedules.value].sort((a, b) =>
+    eventTimestamp(a.eventTime) - eventTimestamp(b.eventTime)
   )
 })
 
 // 操作选项
 const getActionOptions = () => [
   { label: '查看详情', key: 'detail' },
+  { label: '编辑', key: 'edit' },
   { label: '标记完成', key: 'complete' },
   { label: '删除', key: 'delete' }
 ]
 
-// 处理日程下拉操作（详情 / 完成 / 删除）
+const openCreate = () => {
+  editingId.value = null
+  newEvent.value = { title: '', description: '', eventTime: null, location: '', status: 'pending', reminderEnabled: false }
+  showAddModal.value = true
+}
+
+const openEdit = (event: ScheduleEvent) => {
+  editingId.value = event.id
+  newEvent.value = { title: event.title, description: event.description || '', eventTime: eventTimestamp(event.eventTime),
+    location: event.location || '', status: event.status || 'pending', reminderEnabled: event.reminderEnabled ?? false }
+  showDetailModal.value = false
+  showAddModal.value = true
+}
+
+const confirmDelete = (event: ScheduleEvent) => {
+  dialog.warning({ title: '删除日程', content: `确认删除“${event.title}”？`, positiveText: '删除', negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        const res = await scheduleService.delete(event.id)
+        if (!res.success) throw new Error(res.message || '删除失败')
+        showDetailModal.value = false
+        message.success('删除成功')
+        await loadSchedules()
+      } catch (error) { message.error(error instanceof Error ? error.message : '删除失败'); return false }
+    }
+  })
+}
+
 const handleAction = async (key: string, event: ScheduleEvent) => {
-  switch (key) {
-    case 'detail':
-      currentEvent.value = event
-      showDetailModal.value = true
-      break
-    case 'complete':
-      await scheduleService.complete(event.id)
+  if (key === 'detail') return showEventDetail(event)
+  if (key === 'edit') return openEdit(event)
+  if (key === 'delete') return confirmDelete(event)
+  if (key === 'complete') {
+    try {
+      const res = await scheduleService.complete(event.id)
+      if (!res.success) throw new Error(res.message || '操作失败')
       message.success('已标记完成')
-      loadSchedules()
-      break
-    case 'delete':
-      await scheduleService.delete(event.id)
-      message.success('删除成功')
-      loadSchedules()
-      break
+      showDetailModal.value = false
+      await loadSchedules()
+    } catch (error) { message.error(error instanceof Error ? error.message : '操作失败') }
   }
 }
 
-/** 在详情弹窗中标记当前日程完成。 */
 const completeCurrentEvent = async () => {
-  if (!currentEvent.value) return
-  await scheduleService.complete(currentEvent.value.id)
-  message.success('已标记完成')
-  showDetailModal.value = false
-  loadSchedules()
+  if (currentEvent.value) await handleAction('complete', currentEvent.value)
 }
 
-/** 从后端拉取日程列表。 */
 const loadSchedules = async () => {
   try {
     const res = await scheduleService.list()
+    if (!res.success) throw new Error(res.message || '加载失败')
     schedules.value = res.data || []
-  } catch (error) {
-    message.error('加载失败')
-  }
+  } catch (error) { message.error(error instanceof Error ? error.message : '加载失败') }
 }
 
-/** 提交新增日程表单，成功后刷新列表。 */
-const addEvent = async () => {
-  if (!newEvent.value.title) {
-    message.warning('请输入标题')
-    return
-  }
-
+const saveEvent = async () => {
+  if (saving.value) return
+  if (!newEvent.value.title.trim()) return message.warning('请输入标题')
+  if (newEvent.value.eventTime === null || !Number.isFinite(newEvent.value.eventTime)) return message.warning('请选择日程时间')
+  saving.value = true
   try {
-    await scheduleService.create({
-      title: newEvent.value.title,
-      description: newEvent.value.description,
-      eventTime: newEvent.value.eventTime ? dayjs(newEvent.value.eventTime).format('YYYY-MM-DD HH:mm:ss') : undefined,
-      eventDate: newEvent.value.eventTime ? dayjs(newEvent.value.eventTime).format('YYYY-MM-DD') : undefined,
-      location: newEvent.value.location
-    })
-    message.success('添加成功')
+    const existing = schedules.value.find(event => event.id === editingId.value)
+    const payload = { ...existing, title: newEvent.value.title.trim(), description: newEvent.value.description,
+      eventTime: dayjs(newEvent.value.eventTime).format('YYYY-MM-DDTHH:mm:ss'),
+      eventDate: dayjs(newEvent.value.eventTime).format('YYYY-MM-DD'), location: newEvent.value.location,
+      status: newEvent.value.status, reminderEnabled: newEvent.value.reminderEnabled }
+    const res = editingId.value ? await scheduleService.update(editingId.value, payload) : await scheduleService.create(payload)
+    if (!res.success) throw new Error(res.message || '保存失败')
+    message.success(editingId.value ? '修改成功' : '添加成功')
     showAddModal.value = false
-    loadSchedules()
-  } catch (error) {
-    message.error('添加失败')
-  }
+    await loadSchedules()
+  } catch (error) { message.error(error instanceof Error ? error.message : '保存失败') }
+  finally { saving.value = false }
 }
 
 /** 返回指定 (year, month, date) 当天的事件列表，供日历单元格渲染。 */
@@ -340,36 +343,6 @@ const getEventsByDate = (year: number, month: number, date: number) => {
 const showEventDetail = (event: ScheduleEvent) => {
   currentEvent.value = event
   showDetailModal.value = true
-}
-
-/** 调用 AI 接口从自然语言描述中解析并保存日程。 */
-const aiAddSchedule = async () => {
-  if (!aiInput.value.trim()) {
-    message.warning('请输入日程描述')
-    return
-  }
-
-  aiLoading.value = true
-  try {
-    const res = await scheduleService.parseAndSave({
-      subject: aiInput.value,
-      from: 'user',
-      content: aiInput.value
-    })
-
-    if (res.success && res.data) {
-      message.success(`已创建日程: ${res.data.title}`)
-      showAiAddModal.value = false
-      aiInput.value = ''
-      loadSchedules()
-    } else {
-      message.error(res.message || '无法从描述中提取日程信息')
-    }
-  } catch (error) {
-    message.error('无法从描述中提取日程信息')
-  } finally {
-    aiLoading.value = false
-  }
 }
 
 onMounted(() => {

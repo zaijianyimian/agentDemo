@@ -27,17 +27,24 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api/chat': {
+      // AI 能力：/ai/* 转发到 Python。
+      // 改写规则与生产 nginx-frontend.conf 完全一致（去掉 /ai、补上 /api），
+      // 因此开发和生产的前端请求路径完全相同。
+      //   /ai/chat/turn  ->  http://localhost:8001/api/chat/turn
+      //   /ai/email/list ->  http://localhost:8001/api/email/list
+      '/ai': {
         target: 'http://localhost:8001',
         changeOrigin: true,
+        rewrite: path => path.replace(/^\/ai/, '/api'),
+        // Vite/http-proxy 默认逐块透传响应。不要手工设置 Connection 或
+        // Transfer-Encoding；它们由 Node HTTP 层管理，强制改写会破坏 SSE 分块。
         timeout: 0,
         proxyTimeout: 0
       },
+      // 其余业务接口仍由 Java 处理。
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        // Vite/http-proxy 默认逐块透传响应。不要手工设置 Connection 或
-        // Transfer-Encoding；它们由 Node HTTP 层管理，强制改写会破坏 SSE 分块。
         timeout: 0,
         proxyTimeout: 0
       }

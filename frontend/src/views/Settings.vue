@@ -58,14 +58,19 @@
         </div>
       </section>
 
+      <BackupPanel v-if="authStore.isPlatformAdmin" />
+
       <section class="surface-panel boundary-panel">
         <div class="section-heading">
           <n-icon size="22"><ShieldIcon /></n-icon>
           <div>
             <h2>权限边界</h2>
-            <p>系统配置、外部服务凭据及全量备份恢复仅由平台管理员在受控维护流程中操作。</p>
+            <p>系统配置与外部服务凭据仅由平台管理员在受控维护流程中操作；全量备份与恢复需管理员权限。</p>
           </div>
         </div>
+        <p v-if="!authStore.isPlatformAdmin" class="boundary-note">
+          当前账号不是平台管理员，备份与系统配置入口不可见。
+        </p>
       </section>
     </main>
   </div>
@@ -80,8 +85,11 @@ import {
   TerminalOutline as TerminalIcon
 } from '@vicons/ionicons5'
 import { useThemeStore, type ThemeMode } from '@/stores/theme'
+import { useAuthStore } from '@/stores/auth'
+import BackupPanel from '@/components/BackupPanel.vue'
 
 const themeStore = useThemeStore()
+const authStore = useAuthStore()
 
 const themeOptions: Array<{ value: ThemeMode; label: string; hint: string }> = [
   { value: 'light', label: '浅色', hint: '明亮背景' },
@@ -126,6 +134,11 @@ h1,
 h2,
 p {
   margin: 0;
+}
+
+.boundary-note {
+  color: var(--text-muted, #6b7280);
+  font-size: 0.85rem;
 }
 
 h1 {

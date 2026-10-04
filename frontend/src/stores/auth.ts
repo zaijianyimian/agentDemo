@@ -20,6 +20,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!authTokenStorage.getAccessToken() && !!user.value)
 
+  /**
+   * 是否为平台管理员：后端 /api/backup/** 等敏感端点要求 SCOPE_platform.admin，
+   * 由 JWT 里的 roles 声明（ADMIN）授予。前端据此决定是否展示管理入口。
+   */
+  const isPlatformAdmin = computed(() => user.value?.role?.toUpperCase() === 'ADMIN')
+
   const setSession = (payload: AuthTokenResponse) => {
     if (!payload.accessToken || !payload.refreshToken || !payload.user) {
       throw new Error('登录态数据不完整')
@@ -131,6 +137,7 @@ export const useAuthStore = defineStore('auth', () => {
     initialized,
     sessionGeneration,
     isAuthenticated,
+    isPlatformAdmin,
     hydrate,
     setSession,
     clearSession,

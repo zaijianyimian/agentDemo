@@ -39,12 +39,7 @@ const authStore = useAuthStore()
 const isAuthPage = computed(() => route.path === '/login' || route.path === '/oauth/github/callback')
 const isStandalonePage = computed(() => isAuthPage.value || Boolean(route.meta.standalone))
 
-const actualTheme = computed(() => {
-  if (themeStore.mode === 'auto') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
-  return themeStore.mode
-})
+const actualTheme = computed(() => themeStore.actualTheme)
 
 // Agent Workspace 使用克制的橙色作为强调色，业务页面统一复用 Naive UI 主题变量。
 const themeOverrides = computed<GlobalThemeOverrides>(() => {

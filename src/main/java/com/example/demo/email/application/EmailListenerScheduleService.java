@@ -1,6 +1,5 @@
 package com.example.demo.email.application;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.demo.email.domain.EmailConfig;
 import com.example.demo.email.domain.OwnedEmailConfigRef;
 import com.example.demo.email.persistence.EmailConfigMapper;

@@ -147,6 +147,12 @@ public class ScheduleController {
     /** 创建日程。 */
     @PostMapping
     public ApiResponse<ScheduleEvent> add(@RequestBody ScheduleEvent event) {
+        if (event.getTitle() == null || event.getTitle().isBlank() || event.getEventTime() == null) {
+            return ApiResponse.error("日程标题和时间不能为空");
+        }
+        if (event.getStatus() != null && !List.of("pending", "completed", "cancelled").contains(event.getStatus())) {
+            return ApiResponse.error("无效的日程状态");
+        }
         prepareForCreate(event);
         scheduleEvents.create(event);
         syncScheduleFile(event.getEventDate());
@@ -160,6 +166,12 @@ public class ScheduleController {
         ScheduleEvent existing = scheduleEvents.findOwned(id);
         if (existing == null) {
             return ApiResponse.error("日程不存在");
+        }
+        if (event.getTitle() != null && event.getTitle().isBlank()) {
+            return ApiResponse.error("日程标题不能为空");
+        }
+        if (event.getStatus() != null && !List.of("pending", "completed", "cancelled").contains(event.getStatus())) {
+            return ApiResponse.error("无效的日程状态");
         }
         LocalDate previousDate = existing.getEventDate();
         event.setId(id);

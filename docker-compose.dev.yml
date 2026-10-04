@@ -1,0 +1,14 @@
+# 宿主机开发覆盖：仅为 Vite 开发服务器直连 Python 而开。
+#
+# 用法：
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d graph
+#
+# 只绑定 127.0.0.1：Vite 的 /ai 代理目标写死为 http://localhost:8001，
+# 因此不需要对外网暴露；绑定 0.0.0.0 会让 /docs 和 /internal/* 重新对宿主机
+# 外可见，等于撤销 docker-compose.yml 的默认隔离。
+#
+# 不要把本文件用于集成/验收部署——那一律走默认的 docker-compose.yml。
+services:
+  graph:
+    ports:
+      - "127.0.0.1:8001:8001"

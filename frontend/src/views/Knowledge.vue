@@ -1,420 +1,184 @@
-<template>
-  <UiPage>
-    <section class="page-hero hero-grid">
-      <div>
-        <div class="page-eyebrow">Knowledge Workspace</div>
-        <h2>把知识库、文档和检索结果放到同一张工作台。</h2>
-        <p>这里直接承接后端知识库接口，支持建库、上传文档、切换启用状态以及语义搜索。</p>
-      </div>
-      <div class="hero-side">
-        <div class="hero-stat"><span>知识库</span><strong>{{ knowledgeBases.length }}</strong></div>
-        <div class="hero-stat"><span>当前文档</span><strong>{{ documents.length }}</strong></div>
-        <div class="hero-stat"><span>当前选中</span><strong>{{ selectedKb?.name || '未选择' }}</strong></div>
-      </div>
-    </section>
-
-    <section class="section-grid">
-      <div class="surface-panel span-4">
-        <div class="section-head">
-          <div>
-            <div class="page-eyebrow">Library</div>
-            <h3>知识库列表</h3>
-          </div>
-          <n-button type="primary" @click="showCreateModal = true">
-            <template #icon><n-icon><AddIcon /></n-icon></template>
-            创建
-          </n-button>
-        </div>
-
-        <div v-if="knowledgeBases.length" class="kb-list">
-          <button
-            v-for="kb in knowledgeBases"
-            :key="kb.id"
-            type="button"
-            :class="['kb-card', { active: selectedKb?.id === kb.id }]"
-            @click="selectKb(kb)"
-          >
-            <div class="kb-card__head">
-              <strong>{{ kb.name }}</strong>
-              <n-tag :type="kb.enabled ? 'success' : 'default'" size="small" round>
-                {{ kb.enabled ? '启用' : '禁用' }}
-              </n-tag>
-            </div>
-            <p>{{ kb.description || '暂无描述' }}</p>
-            <div class="kb-card__meta">
-              <span>文档 {{ kb.documentCount || 0 }}</span>
-              <span>分块 {{ kb.chunkSize || 500 }}</span>
-            </div>
-          </button>
-        </div>
-        <n-empty v-else description="暂无知识库" />
-      </div>
-
-      <div class="surface-panel span-8">
-        <div class="section-head">
-          <div>
-            <div class="page-eyebrow">Documents</div>
-            <h3>{{ selectedKb ? `${selectedKb.name} 文档区` : '请先选择知识库' }}</h3>
-          </div>
-          <n-space v-if="selectedKb">
-            <n-button type="primary" @click="showUploadModal = true">
-              <template #icon><n-icon><UploadIcon /></n-icon></template>
-              上传文档
-            </n-button>
-            <n-button @click="toggleKbEnabled">{{ selectedKb.enabled ? '禁用' : '启用' }}</n-button>
-            <n-button type="error" @click="deleteKb">
-              <template #icon><n-icon><TrashIcon /></n-icon></template>
-              删除
-            </n-button>
-          </n-space>
-        </div>
-
-        <n-data-table
-          v-if="selectedKb"
-          :columns="docColumns"
-          :data="documents"
-          :loading="docLoading"
-          :row-key="(row: KnowledgeDocument) => row.id"
-          striped
-        />
-        <n-empty v-else description="左侧选择一个知识库后即可查看文档" />
-      </div>
-
-      <div class="surface-panel span-12" v-if="selectedKb">
-        <div class="section-head">
-          <div>
-            <div class="page-eyebrow">Semantic Search</div>
-            <h3>RAG 搜索</h3>
-          </div>
-        </div>
-        <div class="query-box">
-          <n-input v-model:value="queryText" type="textarea" :rows="3" placeholder="输入问题，系统会从知识库中检索相关片段..." />
-          <div class="query-actions">
-            <n-input-number v-model:value="queryTopK" :min="1" :max="20" />
-            <n-button type="primary" @click="executeQuery" :loading="queryLoading">搜索</n-button>
-          </div>
-        </div>
-        <div v-if="searchResults.length" class="search-grid">
-          <div v-for="(item, index) in searchResults" :key="index" class="search-card">
-            <div class="search-card__head">
-              <n-tag size="small" type="info" round>{{ item.docName }}</n-tag>
-              <span>{{ (item.score * 100).toFixed(1) }}%</span>
-            </div>
-            <p>{{ item.text }}</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <n-modal v-model:show="showCreateModal" preset="card" title="创建知识库" style="width: min(540px, 92vw)">
-      <n-form ref="createFormRef" :model="createForm" :rules="createRules" label-placement="top">
-        <n-form-item label="名称" path="name">
-          <n-input v-model:value="createForm.name" placeholder="请输入知识库名称" />
-        </n-form-item>
-        <n-form-item label="描述" path="description">
-          <n-input v-model:value="createForm.description" type="textarea" placeholder="请输入描述" />
-        </n-form-item>
-        <n-grid :cols="2" :x-gap="16">
-          <n-form-item-gi label="分块大小" path="chunkSize">
-            <n-input-number v-model:value="createForm.chunkSize" :min="100" :max="2000" style="width:100%" />
-          </n-form-item-gi>
-          <n-form-item-gi label="分块重叠" path="chunkOverlap">
-            <n-input-number v-model:value="createForm.chunkOverlap" :min="0" :max="200" style="width:100%" />
-          </n-form-item-gi>
-        </n-grid>
-      </n-form>
-      <template #footer>
-        <n-space justify="end">
-          <n-button @click="showCreateModal = false">取消</n-button>
-          <n-button type="primary" @click="createKb" :loading="createLoading">创建</n-button>
-        </n-space>
-      </template>
-    </n-modal>
-
-    <n-modal v-model:show="showUploadModal" preset="card" title="上传文档" style="width: min(560px, 92vw)">
-      <n-upload :custom-request="handleUpload" :show-file-list="true" accept=".txt,.md" :max="5">
-        <n-upload-dragger>
-          <div class="upload-area">
-            <n-icon size="44" class="upload-icon"><UploadIcon /></n-icon>
-            <p>点击或拖拽文件到此处上传</p>
-            <span>支持 txt、md，上传后将自动分块并向量化。</span>
-          </div>
-        </n-upload-dragger>
-      </n-upload>
-    </n-modal>
-  </UiPage>
-</template>
-
 <script setup lang="ts">
-/**
- * 知识库管理页面：创建知识库、上传文档、维护启用状态，并提供 RAG 语义检索。
- */
-import { ref, h, onMounted } from 'vue'
-import {
-  NButton,
-  NDataTable,
-  NEmpty,
-  NForm,
-  NFormItem,
-  NFormItemGi,
-  NGrid,
-  NSpace,
-  NIcon,
-  NTag,
-  NModal,
-  NInput,
-  NInputNumber,
-  NUpload,
-  NUploadDragger,
-  useMessage,
-  type DataTableColumns,
-  type UploadCustomRequestOptions
-} from 'naive-ui'
-import {
-  AddOutline as AddIcon,
-  CloudUploadOutline as UploadIcon,
-  TrashOutline as TrashIcon
-} from '@vicons/ionicons5'
-import dayjs from 'dayjs'
-import type { KnowledgeBase, KnowledgeDocument } from '@/types'
-import { knowledgeService } from '@/services/api/knowledge'
-import { UiPage } from '@/components/ui'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { knowledgeSourceService, type KnowledgeHit, type KnowledgeRecord, type SourceKind } from '@/services/api/knowledge'
+import { formatScore } from '@/utils/file-format'
 
-interface SearchResult {
-  score: number
-  text: string
-  docName: string
-  docId: string
+const route = useRoute()
+const router = useRouter()
+const kind = ref<SourceKind>('document')
+const records = ref<KnowledgeRecord[]>([])
+const hits = ref<KnowledgeHit[]>([])
+const query = ref('')
+const notice = ref('')
+const error = ref('')
+const loadError = ref('')
+const busy = ref(false)
+const source = ref<KnowledgeRecord | null>(null)
+const title = ref('')
+const content = ref('')
+const editId = ref<number>()
+const automaticMemory = ref(false)
+const autoMemoryAvailable = ref(false)
+const offset = ref(0)
+const page = ref(1)
+const currentText = computed(() => source.value?.pages?.[page.value - 1] ?? '')
+const labels: Record<string, string> = { pending: '待索引', ready: '可检索', retry: '正在重试', failed: '索引失败' }
+let timer: ReturnType<typeof setInterval> | undefined
+let refreshSequence = 0
+async function refresh() {
+  const sequence = ++refreshSequence
+  try {
+    const rows = await knowledgeSourceService.list(kind.value, offset.value)
+    if (sequence === refreshSequence) { records.value = rows; loadError.value = '' }
+    if (kind.value === 'memory' && !busy.value) {
+      const prefs = await knowledgeSourceService.preferences()
+      if (sequence === refreshSequence && !busy.value) {
+        automaticMemory.value = prefs.automatic; autoMemoryAvailable.value = prefs.available
+      }
+    }
+  } catch (e) { if (sequence === refreshSequence) loadError.value = (e as Error).message }
 }
-
-const message = useMessage()
-
-// 知识库列表
-const knowledgeBases = ref<KnowledgeBase[]>([])
-const kbLoading = ref(false)
-
-// 选中的知识库
-const selectedKb = ref<KnowledgeBase | null>(null)
-const documents = ref<KnowledgeDocument[]>([])
-const docLoading = ref(false)
-
-// 创建知识库
-const showCreateModal = ref(false)
-const createLoading = ref(false)
-const createFormRef = ref()
-const createForm = ref({
-  name: '',
-  description: '',
-  chunkSize: 500,
-  chunkOverlap: 50
+async function action(work: () => Promise<void>) {
+  if (busy.value) return
+  busy.value = true
+  error.value = ''
+  notice.value = ''
+  try { await work() } catch (e) { error.value = (e as Error).message } finally { busy.value = false }
+}
+async function upload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  await action(async () => {
+    if (file.size > 5 * 1024 * 1024) throw new Error('文件不能超过 5 MiB')
+    notice.value = (await knowledgeSourceService.upload(file)).message
+    offset.value = 0
+    await refresh()
+  })
+  input.value = ''
+}
+async function saveMemory() {
+  await action(async () => {
+    notice.value = (await knowledgeSourceService.saveMemory(title.value, content.value, editId.value)).message
+    title.value = ''; content.value = ''; editId.value = undefined
+    hits.value = []; offset.value = 0
+    await refresh()
+  })
+}
+async function search() {
+  await action(async () => {
+    hits.value = []
+    const result = await knowledgeSourceService.search(kind.value, query.value)
+    hits.value = result.results
+    notice.value = result.message
+  })
+}
+async function openSource(id: number, targetPage = 1) {
+  source.value = null
+  await action(async () => {
+    const row = await knowledgeSourceService.get(id)
+    source.value = row
+    page.value = Math.min(Math.max(1, targetPage), row.pages?.length || 1)
+  })
+}
+async function edit(row: KnowledgeRecord) {
+  await action(async () => {
+    const full = await knowledgeSourceService.get(row.id)
+    editId.value = full.id; title.value = full.title; content.value = full.pages?.join('\n') || ''
+  })
+}
+async function remove(row: KnowledgeRecord) {
+  if (!window.confirm(`确定${row.kind === 'memory' ? '忘记' : '删除'}“${row.title}”？`)) return
+  await action(async () => {
+    notice.value = (await knowledgeSourceService.delete(row.id)).message
+    hits.value = hits.value.filter(hit => hit.id !== row.id)
+    if (source.value?.id === row.id) source.value = null
+    if (editId.value === row.id) { editId.value = undefined; title.value = ''; content.value = '' }
+    await refresh()
+  })
+}
+async function toggleAutomaticMemory(event: Event) {
+  const desired = (event.target as HTMLInputElement).checked
+  await action(async () => {
+    const result = await knowledgeSourceService.setPreferences(desired)
+    automaticMemory.value = result.automatic
+    notice.value = result.automatic ? '自动记忆已开启' : '自动记忆已关闭；已有记忆保留，可单独忘记'
+  })
+  ;(event.target as HTMLInputElement).checked = automaticMemory.value
+}
+async function retry() {
+  await action(async () => { notice.value = (await knowledgeSourceService.rebuild(kind.value)).message; await refresh() })
+}
+async function sourceFromRoute() {
+  const id = Number(route.query.record)
+  if (Number.isSafeInteger(id) && id > 0) await openSource(id, Number(route.query.page) || 1)
+}
+function closeSource() {
+  source.value = null
+  if (route.query.record) void router.replace({ path: route.path, query: {} })
+}
+watch(kind, () => { offset.value = 0; records.value = []; hits.value = []; error.value = ''; loadError.value = ''; notice.value = ''; void refresh() })
+watch(() => [route.query.record, route.query.page], () => { void sourceFromRoute() })
+onMounted(async () => {
+  await refresh(); await sourceFromRoute()
+  try {
+    const prefs = await knowledgeSourceService.preferences()
+    automaticMemory.value = prefs.automatic; autoMemoryAvailable.value = prefs.available
+  } catch (e) { loadError.value = (e as Error).message }
+  timer = setInterval(() => { void refresh() }, 10000)
 })
-const createRules = {
-  name: { required: true, message: '请输入名称', trigger: 'blur' }
-}
-
-// 上传文档
-const showUploadModal = ref(false)
-
-// RAG 问答
-const queryText = ref('')
-const queryTopK = ref(5)
-const queryLoading = ref(false)
-const searchResults = ref<SearchResult[]>([])
-
-// 文档表格列
-const docColumns: DataTableColumns<KnowledgeDocument> = [
-  { title: '文件名', key: 'fileName', ellipsis: { tooltip: true } },
-  { title: '类型', key: 'fileType', width: 80, render: row => h(NTag, { size: 'small' }, { default: () => (row.fileType || '-').toUpperCase() }) },
-  { title: '大小', key: 'fileSize', width: 100, render: row => formatSize(row.fileSize) },
-  { title: '分块数', key: 'chunkCount', width: 80 },
-  { title: '状态', key: 'status', width: 100, render: row => h(NTag, { type: getStatusType(row.status), size: 'small' }, { default: () => row.status }) },
-  { title: '创建时间', key: 'createTime', width: 160, render: row => formatTime(row.createTime) },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 80,
-    render: row => h(NButton, {
-      size: 'small',
-      quaternary: true,
-      type: 'error',
-      onClick: () => deleteDoc(row)
-    }, { icon: () => h(NIcon, null, { default: () => h(TrashIcon) }) })
-  }
-]
-
-// 加载知识库列表
-const loadKnowledgeBases = async () => {
-  kbLoading.value = true
-  try {
-    const res = await knowledgeService.list()
-    knowledgeBases.value = res.data || []
-  } catch (error) {
-    message.error('加载知识库失败')
-  } finally {
-    kbLoading.value = false
-  }
-}
-
-/** 选中知识库后立即拉取其下的文档列表。 */
-const selectKb = async (kb: KnowledgeBase) => {
-  selectedKb.value = kb
-  await loadDocuments(kb.id)
-}
-
-// 加载文档列表
-const loadDocuments = async (baseId: number) => {
-  docLoading.value = true
-  try {
-    const res = await knowledgeService.listDocuments(baseId)
-    documents.value = res.data || []
-  } catch (error) {
-    message.error('加载文档失败')
-  } finally {
-    docLoading.value = false
-  }
-}
-
-// 创建知识库
-const createKb = async () => {
-  try {
-    await createFormRef.value?.validate()
-    createLoading.value = true
-    const res = await knowledgeService.create(createForm.value)
-    if (res.success) {
-      message.success('创建成功')
-      showCreateModal.value = false
-      createForm.value = { name: '', description: '', chunkSize: 500, chunkOverlap: 50 }
-      loadKnowledgeBases()
-    } else {
-      message.error(res.message || '创建失败')
-    }
-  } catch (error) {
-    message.error('创建失败')
-  } finally {
-    createLoading.value = false
-  }
-}
-
-/** 自定义上传：把文档追加到当前选中知识库并触发分块向量化。 */
-const handleUpload = async ({ file }: UploadCustomRequestOptions) => {
-  if (!selectedKb.value) return
-  try {
-    const res = await knowledgeService.upload(selectedKb.value.id, file.file as File)
-    if (res.success) {
-      message.success('上传成功')
-      showUploadModal.value = false
-      loadDocuments(selectedKb.value.id)
-      loadKnowledgeBases()
-    } else {
-      message.error(res.message || '上传失败')
-    }
-  } catch (error) {
-    message.error('上传失败')
-  }
-}
-
-// 删除文档
-const deleteDoc = async (doc: KnowledgeDocument) => {
-  try {
-    const res = await knowledgeService.deleteDocument(doc.id)
-    if (res.success) {
-      message.success('删除成功')
-      loadDocuments(selectedKb.value!.id)
-      loadKnowledgeBases()
-    }
-  } catch (error) {
-    message.error('删除失败')
-  }
-}
-
-// 切换启用状态
-const toggleKbEnabled = async () => {
-  if (!selectedKb.value) return
-  try {
-    const res = await knowledgeService.toggle(selectedKb.value.id)
-    if (res.success) {
-      selectedKb.value = res.data || null
-      loadKnowledgeBases()
-    }
-  } catch (error) {
-    message.error('操作失败')
-  }
-}
-
-// 删除知识库
-const deleteKb = async () => {
-  if (!selectedKb.value) return
-  try {
-    const res = await knowledgeService.delete(selectedKb.value.id)
-    if (res.success) {
-      message.success('删除成功')
-      selectedKb.value = null
-      documents.value = []
-      loadKnowledgeBases()
-    }
-  } catch (error) {
-    message.error('删除失败')
-  }
-}
-
-/** 向当前知识库发送检索请求并展示 topK 个匹配片段。 */
-const executeQuery = async () => {
-  if (!selectedKb.value || !queryText.value) return
-  queryLoading.value = true
-  try {
-    const res = await knowledgeService.search(selectedKb.value.id, queryText.value, queryTopK.value)
-    searchResults.value = res.data || []
-    if (!searchResults.value.length) {
-      message.info('未找到相关内容')
-    }
-  } catch (error) {
-    message.error('搜索失败')
-  } finally {
-    queryLoading.value = false
-  }
-}
-
-function getStatusType(status: string) {
-  if (status === 'completed') return 'success'
-  if (status === 'processing') return 'warning'
-  if (status === 'failed') return 'error'
-  return 'default'
-}
-
-function formatSize(size: number) {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
-}
-
-function formatTime(time?: string) {
-  return time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-'
-}
-
-onMounted(() => {
-  loadKnowledgeBases()
-})
+onUnmounted(() => { if (timer) clearInterval(timer); refreshSequence++ })
 </script>
 
+<template>
+  <main class="knowledge-page">
+    <header><h1>知识库与长期记忆</h1><p>上传文档供对话引用，每轮聊天自动筛选值得长期记住的偏好与事实。</p></header>
+    <nav class="tabs" aria-label="内容类型">
+      <button :class="{ active: kind === 'document' }" :disabled="busy" @click="kind = 'document'">文档知识库</button>
+      <button :class="{ active: kind === 'memory' }" :disabled="busy" @click="kind = 'memory'">长期记忆</button>
+    </nav>
+    <p v-if="error || loadError" role="alert" class="error">{{ error || loadError }}</p>
+    <p v-if="notice" role="status" class="notice">{{ notice }}</p>
+    <section v-if="kind === 'document'" class="panel">
+      <h2>上传文档</h2><p>支持文本型 PDF、TXT、Markdown，最大 5 MiB。扫描 PDF 请先进行 OCR。</p>
+      <input aria-label="选择文档" type="file" accept=".pdf,.txt,.md,.markdown" :disabled="busy" @change="upload" />
+    </section>
+    <section v-if="kind === 'memory'" class="panel">
+      <h2>自动记忆</h2>
+      <label><input type="checkbox" :checked="automaticMemory" :disabled="busy || !autoMemoryAvailable" @change="toggleAutomaticMemory" /> 每轮聊天自动保存长期偏好和稳定事实</label>
+      <p>保存后会在聊天中提示，向量索引在后台更新。关闭后停止自动保存，已有记忆仍可编辑或忘记。</p>
+    </section>
+    <form v-if="kind === 'memory'" class="panel" @submit.prevent="saveMemory">
+      <h2>{{ editId ? '编辑记忆' : '保存记忆' }}</h2><p>也可以在这里手动保存；自动评估会跳过普通问题和临时要求。</p>
+      <label>标题<input v-model="title" required maxlength="200" placeholder="例如：回复风格" /></label>
+      <label>内容<textarea v-model="content" required maxlength="2000" rows="4" placeholder="例如：我偏好简短的中文回复。" /></label>
+      <div class="actions"><button type="submit" :disabled="busy">{{ editId ? '保存修改' : '保存记忆' }}</button><button v-if="editId" type="button" @click="editId = undefined; title = ''; content = ''">取消编辑</button></div>
+    </form>
+    <section class="panel">
+      <h2>语义搜索</h2><form class="search" @submit.prevent="search"><input v-model="query" required maxlength="2000" aria-label="搜索内容" placeholder="描述你想查找的内容" /><button :disabled="busy || !query.trim()">搜索</button></form>
+      <article v-for="hit in hits" :key="`${hit.id}-${hit.page}-${hit.snippet}`" class="hit"><div class="hit-head"><button class="source-link" @click="openSource(hit.id, hit.page)">{{ hit.title }} · 第 {{ hit.page }} 页</button><small class="hit-score">{{ formatScore(hit.score) }}</small></div><p>{{ hit.snippet }}</p></article>
+    </section>
+    <section class="panel">
+      <div class="section-header"><h2>{{ kind === 'memory' ? '已保存记忆' : '我的文档' }}</h2><button :disabled="busy" @click="retry">重建 / 重试索引</button></div>
+      <p v-if="!records.length">暂无{{ kind === 'memory' ? '记忆' : '文档' }}。</p>
+      <article v-for="row in records" :key="row.id" class="record"><div><button class="source-link" @click="openSource(row.id)">{{ row.title }}</button><small>{{ labels[row.status] || row.status }}</small></div><div class="actions"><button v-if="kind === 'memory'" :disabled="busy" @click="edit(row)">编辑</button><button :disabled="busy" @click="remove(row)">{{ kind === 'memory' ? '忘记' : '删除' }}</button></div></article>
+      <div class="actions"><button v-if="offset > 0" @click="offset -= 100; refresh()">上一页</button><button v-if="records.length === 100" @click="offset += 100; refresh()">下一页</button></div>
+    </section>
+    <div v-if="source" class="overlay" @click.self="closeSource"><section class="source-modal" role="dialog" aria-modal="true" aria-label="原文来源"><div class="section-header"><h2>{{ source.title }}</h2><button @click="closeSource">关闭</button></div><label v-if="(source.pages?.length || 0) > 1">页码<select v-model.number="page"><option v-for="(_, index) in source.pages" :key="index" :value="index + 1">第 {{ index + 1 }} 页</option></select></label><pre>{{ currentText }}</pre></section></div>
+  </main>
+</template>
+
 <style scoped>
-.hero-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(260px,.85fr); gap:20px; }
-.hero-side { display:grid; gap:12px; }
-.hero-stat, .kb-card, .search-card { border:1px solid var(--border-color); background:rgba(255,255,255,.05); }
-.hero-stat { padding:16px 18px; border-radius:20px; }
-.hero-stat span { color:var(--text-secondary); font-size:.86rem; }
-.hero-stat strong { display:block; margin-top:6px; font-size:1.3rem; }
-.kb-list, .search-grid { display:grid; gap:12px; }
-.kb-card { padding:16px; border-radius:22px; text-align:left; cursor:pointer; transition:all .25s ease; }
-.kb-card.active, .kb-card:hover { border-color:var(--primary-color); box-shadow:var(--shadow-glow); transform:translateY(-2px); }
-.kb-card__head, .search-card__head, .query-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.kb-card p, .kb-card__meta, .search-card p, .upload-area span { color:var(--text-secondary); }
-.kb-card__meta { display:flex; gap:12px; margin-top:10px; font-size:.86rem; }
-.query-box { display:grid; gap:14px; margin-bottom:16px; }
-.query-actions { justify-content:flex-end; }
-.search-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-.search-card { padding:16px; border-radius:20px; }
-.upload-area { padding:36px; text-align:center; }
-.upload-area p { margin:10px 0 6px; }
-.upload-icon { color:var(--primary-color); }
-@media (max-width: 900px) { .hero-grid, .search-grid { grid-template-columns:1fr; } }
+.knowledge-page { padding: 24px; max-width: 1000px; margin: 0 auto; color: var(--text-primary, #172033); }
+h1 { font-size: 26px; } h2 { font-size: 18px; margin: 0 0 12px; } header p, .panel > p { color: var(--text-secondary, #64748b); }
+.tabs, .actions, .search, .section-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tabs { margin: 24px 0; } .section-header { justify-content: space-between; }
+.panel { background: var(--bg-primary, #fff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 14px; padding: 20px; margin: 16px 0; }
+button { border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; padding: 8px 14px; background: var(--bg-secondary, #f8fafc); color: inherit; cursor: pointer; } button:disabled { opacity: .5; cursor: wait; } .active { background: #2563eb; color: white; }
+label { display: block; margin: 12px 0; } input:not([type=file]), textarea, select { display: block; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-primary, #fff); color: inherit; border-radius: 8px; padding: 10px; width: 100%; box-sizing: border-box; margin-top: 6px; font: inherit; } .search input { flex: 1; min-width: 160px; margin: 0; }
+.record { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 0; border-bottom: 1px solid var(--border-color, #e2e8f0); } small { display: block; margin-top: 6px; color: var(--text-secondary, #64748b); } .source-link { border: 0; padding: 0; background: transparent; color: #2563eb; text-align: left; overflow-wrap: anywhere; }
+.hit { padding: 16px 0; } .hit p { white-space: pre-wrap; overflow-wrap: anywhere; }.hit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; } .hit-score { color: var(--text-muted, #6b7280); font-variant-numeric: tabular-nums; white-space: nowrap; }.error { color: #b91c1c; }.notice { color: #15803d; }
+.overlay { position: fixed; inset: 0; background: #0008; z-index: 1000; display: grid; place-items: center; padding: 20px; }.source-modal { background: var(--bg-primary, #fff); padding: 24px; border-radius: 14px; width: min(800px, 100%); box-sizing: border-box; max-height: 85vh; overflow: auto; } pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+@media(max-width: 600px) { .knowledge-page { padding: 14px; } .panel { padding: 16px; } h1 { font-size: 22px; } }
 </style>
